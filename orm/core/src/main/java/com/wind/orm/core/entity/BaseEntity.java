@@ -1,5 +1,11 @@
 package com.wind.orm.core.entity;
 
+import com.wind.integration.core.model.IdObject;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+
 import javax.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 
@@ -9,8 +15,11 @@ import java.time.LocalDateTime;
  * @author wuxp
  * @date 2024-12-15 13:14
  **/
-public abstract class BaseEntity<ID> {
-
+@Getter
+@Setter
+@EqualsAndHashCode(of = "id")
+@ToString
+public abstract class BaseEntity<ID> implements IdObject<ID> {
 
     /**
      * id

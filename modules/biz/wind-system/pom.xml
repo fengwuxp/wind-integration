@@ -5,17 +5,18 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.integration</groupId>
-        <artifactId>wind-orm</artifactId>
+        <artifactId>wind-integration-biz</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <artifactId>wind-orm-core</artifactId>
+    <artifactId>wind-system-biz</artifactId>
+
+
     <dependencies>
         <dependency>
             <groupId>com.wind.integration</groupId>
-            <artifactId>wind-integration-core</artifactId>
+            <artifactId>wind-system-domain</artifactId>
         </dependency>
     </dependencies>
-
 
 </project>

@@ -22,6 +22,9 @@
         <module>transaction</module>
         <module>extends/mybatis-flex-extends</module>
         <module>orm</module>
+        <module>modules/biz</module>
+        <module>modules/domain</module>
+        <module>tests</module>
     </modules>
 
     <properties>
@@ -92,6 +95,11 @@
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>mybatis-flex-extends</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-system-domain</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

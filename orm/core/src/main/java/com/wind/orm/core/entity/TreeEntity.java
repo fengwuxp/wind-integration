@@ -1,5 +1,10 @@
 package com.wind.orm.core.entity;
 
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Null;
@@ -10,6 +15,10 @@ import javax.validation.constraints.Null;
  * @author wuxp
  * @date 2024-12-15 13:20
  **/
+@Getter
+@Setter
+@EqualsAndHashCode(callSuper = true)
+@ToString
 public abstract class TreeEntity<ID> extends NamedEntity<ID> {
 
     /**

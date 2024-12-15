@@ -1,14 +1,14 @@
-package com.wind.orm.core;
+package com.wind.integration.core.model;
 
 import javax.validation.constraints.NotBlank;
 
 /**
- * 支持环境隔离的实体对象
+ * 支持环境隔离的对象
  *
  * @author wuxp
  * @date 2024-12-15 13:07
  **/
-public interface EnvIsolationEntity {
+public interface EnvIsolationObject {
 
     /**
      * @return 环境

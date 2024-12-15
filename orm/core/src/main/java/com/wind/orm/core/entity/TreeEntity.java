@@ -13,13 +13,13 @@ import javax.validation.constraints.Null;
 public abstract class TreeEntity<ID> extends NamedEntity<ID> {
 
     /**
-     * 父资源
+     * 父资源，为 null 表示根节点
      */
     @Null
     private ID parentId;
 
     /**
-     * 层级，0 表示根节点
+     * 层级
      */
     @NotNull
     @Min(0)
@@ -35,6 +35,6 @@ public abstract class TreeEntity<ID> extends NamedEntity<ID> {
      * @return 是否为根节点
      */
     public boolean isRoot() {
-        return level == 0;
+        return parentId == null;
     }
 }

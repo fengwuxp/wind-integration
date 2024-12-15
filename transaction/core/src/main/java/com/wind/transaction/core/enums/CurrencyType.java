@@ -1,14 +1,19 @@
-package com.wind.transaction.core;
+package com.wind.transaction.core.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import com.wind.common.exception.AssertUtils;
+import com.wind.transaction.core.Money;
 import lombok.Getter;
+import org.springframework.lang.Nullable;
 
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.util.Arrays;
 import java.util.Objects;
 
 /**
  * 币种类型
- * 参见：https://en.wikipedia.org/wiki/ISO_4217
+ * 参见：<a href="https://en.wikipedia.org/wiki/ISO_4217">...</a>
  *
  * @author wuxp
  * @date 2023-09-27 18:48
@@ -91,7 +96,8 @@ public enum CurrencyType implements DescriptiveEnum {
     EGP("818", "EGP", "埃及", "E£"),
 
     ARS("32", "ARS", "阿根廷比索", "$"),
-    ;
+
+    KES("4217", "KES", "肯尼亚先令", "Ksh");
 
     /**
      * 货币国际代码
@@ -102,7 +108,7 @@ public enum CurrencyType implements DescriptiveEnum {
     /**
      * 通用货币三字码
      */
-    private final String enDesc;
+    private final String enCode;
 
     /**
      * 货币描述
@@ -121,25 +127,69 @@ public enum CurrencyType implements DescriptiveEnum {
      */
     private final Integer precision;
 
-    CurrencyType(String value, String enDesc, String desc, String sign) {
-        this(value, enDesc, desc, sign, 2);
+    CurrencyType(String value, String enCode, String desc, String sign) {
+        this(value, enCode, desc, sign, 2);
     }
 
-    CurrencyType(String value, String enDesc, String desc, String sign, Integer precision) {
+    CurrencyType(String value, String enCode, String desc, String sign, Integer precision) {
         this.value = value;
-        this.enDesc = enDesc;
+        this.enCode = enCode;
         this.desc = desc;
         this.sign = sign;
         this.precision = precision;
     }
 
     /**
-     * 创建一个货币对象
+     * 创建一个{@link Money}对象
      *
      * @param amount 货币数额
      * @return 货币对象
      */
     public Money of(int amount) {
         return Money.immutable(amount, this);
+    }
+
+    /**
+     * 通过 {@link #value} 或 {@link  #enCode} 交换 {@link CurrencyType}
+     *
+     * @param enCodeOrCode 英文编码或数字编码
+     * @return CurrencyType
+     */
+    @NotNull
+    public static CurrencyType requireByEnCode(@NotBlank String enCodeOrCode) {
+        CurrencyType result = ofByEnCode(enCodeOrCode);
+        if (result == null) {
+            result = ofByCode(enCodeOrCode);
+        }
+        AssertUtils.notNull(result, () -> String.format("unknown CurrencyType, enCode or Code = %s", enCodeOrCode));
+        return result;
+    }
+
+    /**
+     * 通过 {@link  #enCode} 交换 {@link CurrencyType}
+     *
+     * @param enCode 英文编码
+     * @return CurrencyType
+     */
+    @Nullable
+    public static CurrencyType ofByEnCode(String enCode) {
+        return Arrays.stream(values())
+                .filter(currencyType -> Objects.equals(currencyType.getEnCode(), enCode))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 通过 {@link #value} 交换 {@link CurrencyType}
+     *
+     * @param code 数字编码
+     * @return CurrencyType
+     */
+    @Nullable
+    public static CurrencyType ofByCode(String code) {
+        return Arrays.stream(values())
+                .filter(currencyType -> Objects.equals(currencyType.getValue(), code))
+                .findFirst()
+                .orElse(null);
     }
 }

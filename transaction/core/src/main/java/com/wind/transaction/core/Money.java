@@ -1,6 +1,7 @@
 package com.wind.transaction.core;
 
 import com.wind.common.exception.AssertUtils;
+import com.wind.transaction.core.enums.CurrencyType;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 

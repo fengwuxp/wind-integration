@@ -70,13 +70,13 @@ public final class QueryMethodHelper {
      *               <p>
      *               <code>
      *               column:
-     *                  t_user.identity
+     *               t_user.identity
      *               texts:
-     *                 Set<String> identitys = new HashSet<>();
-     *                 identitys.add("OPENAPI");
-     *                 identitys.add("MEMBER");
+     *               Set<String> identitys = new HashSet<>();
+     *               identitys.add("OPENAPI");
+     *               identitys.add("MEMBER");
      *               生成的SQL:
-     *                  (FIND_IN_SET('OPENAPI', identity) > 0 OR FIND_IN_SET('MEMBER', identity) > 0)
+     *               (FIND_IN_SET('OPENAPI', identity) > 0 OR FIND_IN_SET('MEMBER', identity) > 0)
      *               </code>
      *               <p/>
      * @return String sql

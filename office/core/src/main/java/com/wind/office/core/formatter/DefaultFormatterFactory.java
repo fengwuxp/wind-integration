@@ -55,7 +55,8 @@ public final class DefaultFormatterFactory {
     }
 
     public static Formatter<TemporalAccessor> ofDateTime(String pattern) {
-        DateTimeFormatter formatter = DEFAULT_FORMATTERS.containsKey(pattern) ? DEFAULT_FORMATTERS.get(pattern) : DateTimeFormatter.ofPattern(pattern);
+        DateTimeFormatter formatter = DEFAULT_FORMATTERS.containsKey(pattern) ? DEFAULT_FORMATTERS.get(pattern) :
+                DateTimeFormatter.ofPattern(pattern);
         return new Formatter<TemporalAccessor>() {
 
             @Override

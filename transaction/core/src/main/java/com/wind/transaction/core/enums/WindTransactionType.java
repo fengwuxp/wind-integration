@@ -1,5 +1,6 @@
-package com.wind.transaction.core;
+package com.wind.transaction.core.enums;
 
+import com.wind.transaction.core.AccountTransactionType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 

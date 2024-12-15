@@ -1,6 +1,7 @@
 package com.wind.transaction.core;
 
 import com.wind.common.WindConstants;
+import com.wind.transaction.core.enums.CurrencyType;
 
 /**
  * 这是一个可用于支出、收入的支付交易账户定义

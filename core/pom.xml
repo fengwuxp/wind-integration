@@ -12,4 +12,10 @@
     <artifactId>wind-integration-core</artifactId>
 
 
+    <dependencies>
+        <dependency>
+            <groupId>com.wind.middleware</groupId>
+            <artifactId>wind-core</artifactId>
+        </dependency>
+    </dependencies>
 </project>

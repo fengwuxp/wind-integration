@@ -9,6 +9,4 @@ package com.wind.integration.core.model;
 public interface IdObject<ID> {
 
     ID getId();
-
-    void setId(ID id);
 }

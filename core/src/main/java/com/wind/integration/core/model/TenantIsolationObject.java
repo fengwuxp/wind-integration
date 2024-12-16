@@ -13,8 +13,4 @@ public interface TenantIsolationObject<ID> extends IdObject<ID> {
      */
     ID getTenantId();
 
-    /**
-     * @param tenantId 租户 ID
-     */
-    void setTenant(ID tenantId);
 }

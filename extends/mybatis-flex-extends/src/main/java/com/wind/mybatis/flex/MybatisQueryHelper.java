@@ -16,13 +16,18 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
+ * mybatis flex query helper
+ *
  * @author wuxp
  */
-public final class MybatisFlexQueryHelper {
+public final class MybatisQueryHelper {
 
+    /**
+     * 默认的表别名
+     */
     public static final String DEFAULT_TABLE_ALIAS = "t";
 
-    private MybatisFlexQueryHelper() {
+    private MybatisQueryHelper() {
         throw new AssertionError();
     }
 

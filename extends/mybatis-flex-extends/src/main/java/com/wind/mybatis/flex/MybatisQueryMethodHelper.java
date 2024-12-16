@@ -14,9 +14,9 @@ import java.util.Set;
  * @author wuxp
  * @date 2023-11-20 12:54
  **/
-public final class QueryMethodHelper {
+public final class MybatisQueryMethodHelper {
 
-    private QueryMethodHelper() {
+    private MybatisQueryMethodHelper() {
         throw new AssertionError();
     }
 

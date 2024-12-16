@@ -25,6 +25,7 @@
         <module>modules/biz</module>
         <module>modules/domain</module>
         <module>tests</module>
+        <module>modules/infrastructure</module>
     </modules>
 
     <properties>
@@ -100,6 +101,11 @@
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-system-domain</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-mybatis-dal</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

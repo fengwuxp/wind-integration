@@ -1,5 +1,6 @@
 package com.wind.integration.system.services.dal.entities;
 
+
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.system.model.enums.WindConfigContentType;
@@ -11,44 +12,46 @@ import lombok.ToString;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.io.Serializable;
+import java.util.Locale;
 
 /**
+ * 数据字典
+ *
  * @author wuxp
- * @date 2023-09-27 16:17
+ * @date 2024-12-16
  **/
 @Data
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
-@Table(SystemConfig.TABLE_NAME)
-public class SystemConfig extends NamedEntity<Long> implements Serializable {
+@Table(Dictionary.TABLE_NAME)
+public class Dictionary extends NamedEntity<Long> implements Serializable {
 
-    public static final String TABLE_NAME = "t_system_config";
+    public static final String TABLE_NAME = "t_dictionary";
 
     /**
-     * 配置内容
+     * 语言类型
      */
     @NotNull
-    @Column("config_content")
-    private String content;
+    private Locale locale;
 
     /**
-     * 配置内容类型
+     * 字典所属分组
+     */
+    @NotNull
+    @Column(value = "dictionary_group")
+    private String group;
+
+    /**
+     * 字典内容类型
      */
     @NotNull
     private WindConfigContentType contentType;
 
     /**
-     * 配置分组
+     * 字典内容
      */
     @NotBlank
-    @Column("config_group")
-    private String group;
-
-    /**
-     * 是否加密
-     */
-    @Column("is_encryption")
-    private Boolean encryption;
+    private String content;
 
     /**
      * 是否启用，默认 true
@@ -57,7 +60,13 @@ public class SystemConfig extends NamedEntity<Long> implements Serializable {
     private Boolean enabled;
 
     /**
-     * 配置描述
+     * 租户id
+     */
+    @NotNull
+    private Long tenantId;
+
+    /**
+     * 字典描述
      */
     private String description;
 

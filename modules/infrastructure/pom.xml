@@ -10,17 +10,10 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>wind-integration-domain</artifactId>
+    <artifactId>wind-integration-infrastructure</artifactId>
     <packaging>pom</packaging>
-
     <modules>
-        <module>wind-system</module>
+        <module>mybatis-dal</module>
     </modules>
 
-    <dependencies>
-        <dependency>
-            <groupId>com.wind.middleware</groupId>
-            <artifactId>wind-core</artifactId>
-        </dependency>
-    </dependencies>
 </project>

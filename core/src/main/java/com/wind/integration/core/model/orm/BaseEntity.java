@@ -1,4 +1,4 @@
-package com.wind.orm.core.entity;
+package com.wind.integration.core.model.orm;
 
 import com.wind.integration.core.model.IdObject;
 import lombok.EqualsAndHashCode;

@@ -1,4 +1,4 @@
-package com.wind.orm.core.entity;
+package com.wind.integration.core.model.orm;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;

@@ -4,7 +4,7 @@ package com.wind.integration.system.services.dal.entities;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.system.model.enums.WindConfigContentType;
-import com.wind.orm.core.entity.NamedEntity;
+import com.wind.integration.core.model.orm.NamedEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;

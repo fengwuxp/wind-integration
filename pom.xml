@@ -21,7 +21,6 @@
         <module>office</module>
         <module>transaction</module>
         <module>extends/mybatis-flex-extends</module>
-        <module>orm</module>
         <module>modules/biz</module>
         <module>modules/domain</module>
         <module>tests</module>
@@ -87,11 +86,6 @@
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-office-excel</artifactId>
-                <version>${revision}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.wind.integration</groupId>
-                <artifactId>wind-orm-core</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

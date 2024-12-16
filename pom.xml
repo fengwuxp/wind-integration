@@ -26,6 +26,7 @@
         <module>modules/domain</module>
         <module>tests</module>
         <module>modules/infrastructure</module>
+        <module>dependencies</module>
     </modules>
 
     <properties>

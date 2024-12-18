@@ -26,6 +26,7 @@
         <module>tests</module>
         <module>modules/infrastructure</module>
         <module>dependencies</module>
+        <module>wind-oss</module>
     </modules>
 
     <properties>

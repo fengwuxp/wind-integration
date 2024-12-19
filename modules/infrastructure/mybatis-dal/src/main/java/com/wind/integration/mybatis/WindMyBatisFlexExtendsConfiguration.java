@@ -8,6 +8,7 @@ import com.wind.common.annotations.VisibleForTesting;
 import com.wind.common.exception.AssertUtils;
 import com.wind.mybatis.convert.LocaleTypeHandler;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Array;
@@ -29,22 +30,18 @@ public class WindMyBatisFlexExtendsConfiguration implements MyBatisFlexCustomize
 
     static {
         QueryColumnBehavior.setIgnoreFunction(val -> {
-            if (val instanceof String) {
-                // 如果是空字符串，则忽略
-                return !StringUtils.hasText((String) val);
+            if (ObjectUtils.isEmpty(val)) {
+                return true;
             }
-            boolean result = Objects.isNull(val);
-            if (!result) {
-                if (val instanceof Collection) {
-                    // 集合类型，认为是 in 操作
-                    AssertUtils.isTrue(((Collection<?>) val).size() < IN_OP_MAX_SIZE, IN_OP_SIZE_ERROR_MESSAGE);
-                }
-                if (val.getClass().isArray()) {
-                    // 数组类型，认为是 in 操作
-                    AssertUtils.isTrue(Array.getLength(val) < IN_OP_MAX_SIZE, IN_OP_SIZE_ERROR_MESSAGE);
-                }
+            if (val instanceof Collection) {
+                // 集合类型，认为是 in 操作
+                AssertUtils.isTrue(((Collection<?>) val).size() < IN_OP_MAX_SIZE, IN_OP_SIZE_ERROR_MESSAGE);
             }
-            return result;
+            if (val.getClass().isArray()) {
+                // 数组类型，认为是 in 操作
+                AssertUtils.isTrue(Array.getLength(val) < IN_OP_MAX_SIZE, IN_OP_SIZE_ERROR_MESSAGE);
+            }
+            return false;
         });
     }
 

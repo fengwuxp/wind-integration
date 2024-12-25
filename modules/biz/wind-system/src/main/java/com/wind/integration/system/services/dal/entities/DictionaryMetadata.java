@@ -3,8 +3,8 @@ package com.wind.integration.system.services.dal.entities;
 
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Table;
-import com.wind.integration.system.model.enums.WindConfigContentType;
 import com.wind.integration.core.model.orm.NamedEntity;
+import com.wind.integration.system.model.enums.WindConfigContentType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -15,7 +15,7 @@ import java.io.Serializable;
 import java.util.Locale;
 
 /**
- * 数据字典
+ * 数据字典元数据
  *
  * @author wuxp
  * @date 2024-12-16
@@ -23,10 +23,10 @@ import java.util.Locale;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
-@Table(Dictionary.TABLE_NAME)
-public class Dictionary extends NamedEntity<Long> implements Serializable {
+@Table(DictionaryMetadata.TABLE_NAME)
+public class DictionaryMetadata extends NamedEntity<Long> implements Serializable {
 
-    public static final String TABLE_NAME = "t_dictionary";
+    public static final String TABLE_NAME = "t_dictionary_metadata";
 
     /**
      * 语言类型

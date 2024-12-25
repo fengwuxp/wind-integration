@@ -13,6 +13,8 @@ import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 
 /**
+ * 系统配置表
+ *
  * @author wuxp
  * @date 2023-09-27 16:17
  **/

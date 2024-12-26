@@ -25,7 +25,7 @@ public enum CurrencyType implements DescriptiveEnum {
 
     USD("840", "USD", "美元", "$"),
 
-    USDT("000", "USDT", "泰达币", "T"),
+    USDT("000", "USDT", "泰达币", "$"),
 
     GBR("10000", "GBR", "芽布令", "??"),
 

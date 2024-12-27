@@ -76,6 +76,21 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
+                <artifactId>wind-oss-api</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-oss-alibabacloud</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-oss-spring-boot-starter</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
                 <artifactId>wind-office-core</artifactId>
                 <version>${revision}</version>
             </dependency>

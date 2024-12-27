@@ -1,6 +1,5 @@
 package com.wind.integration.oss;
 
-import com.wind.integration.oss.model.OssUploadResult;
 import com.wind.integration.oss.model.WindOssFile;
 
 import javax.validation.constraints.NotBlank;
@@ -26,6 +25,7 @@ public interface WindOssClient {
 
     /**
      * 删除 bucket
+     *
      * @param bucketName bucket name
      * @throws OSSException
      */
@@ -46,11 +46,11 @@ public interface WindOssClient {
      * @param objectKey   对象上传到 oss 的 key（文件名）
      * @param inputStream 文件内容的输入流
      * @param metadata    文件的元数据（可选）
-     * @return 上传结果信息
+     * @return 文件元数据
      * @throws OSSException 如果上传失败
      */
-    OssUploadResult uploadFile(@NotBlank String bucketName, @NotBlank String objectKey, @NotNull InputStream inputStream,
-                               Map<String, String> metadata) throws OSSException;
+    WindOssFile uploadFile(@NotBlank String bucketName, @NotBlank String objectKey, @NotNull InputStream inputStream,
+                           Map<String, String> metadata) throws OSSException;
 
     /**
      * 下载文件从 OSS
@@ -86,71 +86,47 @@ public interface WindOssClient {
      * 拷贝文件
      *
      * @param bucketName     存储桶名称
-     * @param fileName       存储桶文件名称
+     * @param objectKey      存储桶文件 key
      * @param destBucketName 目标存储桶名称
      */
-    void copyFile(String bucketName, String fileName, String destBucketName) throws OSSException;
+    void copyFile(String bucketName, String objectKey, String destBucketName) throws OSSException;
 
     /**
      * 拷贝文件
      *
      * @param bucketName     存储桶名称
-     * @param fileName       存储桶文件名称
+     * @param sourceKey      存储桶文件 key
      * @param destBucketName 目标存储桶名称
-     * @param destFileName   目标存储桶文件名称
+     * @param destKey        目标存储桶文件 key
      */
-    void copyFile(String bucketName, String fileName, String destBucketName, String destFileName) throws OSSException;
-
-    /**
-     * 获取文件信息
-     *
-     * @param fileName 存储桶文件名称
-     * @return InputStream
-     */
-    WindOssFile statFile(String fileName);
+    void copyFile(String bucketName, String sourceKey, String destBucketName, String destKey) throws OSSException;
 
     /**
      * 获取文件信息
      *
      * @param bucketName 存储桶名称
-     * @param fileName   存储桶文件名称
+     * @param objectKey  存储桶文件 key
      * @return InputStream
      */
-    WindOssFile statFile(String bucketName, String fileName);
-
-    /**
-     * 获取文件相对路径
-     *
-     * @param fileName 存储桶对象名称
-     * @return String
-     */
-    String getFilePath(String fileName);
+    WindOssFile statFile(String bucketName, String objectKey);
 
     /**
      * 获取文件相对路径
      *
      * @param bucketName 存储桶名称
-     * @param fileName   存储桶对象名称
+     * @param objectKey  存储桶对象名称
      * @return String
      */
-    String getFilePath(String bucketName, String fileName);
-
-    /**
-     * 获取文件地址
-     *
-     * @param fileName 存储桶对象名称
-     * @return String
-     */
-    String getFileLink(String fileName);
+    String getFilePath(String bucketName, String objectKey);
 
     /**
      * 获取文件地址
      *
      * @param bucketName 存储桶名称
-     * @param fileName   存储桶对象名称
+     * @param objectKey  存储桶对象名称
      * @return String
      */
-    String getFileLink(String bucketName, String fileName);
+    String getFileLink(String bucketName, String objectKey);
 
     /**
      * 获取文件的元数据
@@ -160,5 +136,5 @@ public interface WindOssClient {
      * @return 文件的元数据
      * @throws OSSException 如果获取元数据失败
      */
-    Map<String, String> getFileMetadata(String bucketName, String objectKey) throws OSSException;
+    <T> T getFileMetadata(String bucketName, String objectKey) throws OSSException;
 }

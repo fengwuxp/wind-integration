@@ -1,5 +1,7 @@
 package com.wind.integration.oss.model;
 
+import lombok.Data;
+
 import javax.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -10,6 +12,7 @@ import java.util.Map;
  * @author wuxp
  * @date 2024-12-17 18:59
  **/
+@Data
 public class WindOssFile {
 
     /**

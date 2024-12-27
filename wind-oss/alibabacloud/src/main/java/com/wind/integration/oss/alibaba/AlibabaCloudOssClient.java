@@ -1,14 +1,20 @@
 package com.wind.integration.oss.alibaba;
 
 import com.aliyun.oss.OSSClient;
+import com.aliyun.oss.common.comm.ResponseMessage;
 import com.aliyun.oss.model.Bucket;
+import com.aliyun.oss.model.CopyObjectResult;
+import com.aliyun.oss.model.ListObjectsV2Request;
+import com.aliyun.oss.model.ListObjectsV2Result;
+import com.aliyun.oss.model.OSSObject;
+import com.aliyun.oss.model.OSSObjectSummary;
 import com.aliyun.oss.model.ObjectMetadata;
 import com.aliyun.oss.model.PutObjectResult;
 import com.aliyun.oss.model.VoidResult;
+import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.oss.OSSException;
 import com.wind.integration.oss.WindOssClient;
-import com.wind.integration.oss.model.OssUploadResult;
 import com.wind.integration.oss.model.WindOssFile;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 阿里云 oss client
@@ -32,20 +39,22 @@ public class AlibabaCloudOssClient implements WindOssClient {
 
     private final OSSClient ossClient;
 
+    private final String endpoint;
+
     @Override
     public void createBucket(String bucketName) throws OSSException {
         if (!isBucketExists(bucketName)) {
-            Bucket result = ossClient.createBucket(bucketName);
-            AssertUtils.state(result.getResponse().isSuccessful(),
-                    () -> new OSSException(result.getResponse().getErrorResponseAsString(), result.getRequestId()));
+            Bucket response = ossClient.createBucket(bucketName);
+            AssertUtils.state(response.getResponse().isSuccessful(),
+                    () -> new OSSException(response.getResponse().getErrorResponseAsString(), response.getRequestId()));
         }
     }
 
     @Override
     public void deleteBucket(String bucketName) throws OSSException {
-        VoidResult result = ossClient.deleteBucket(bucketName);
-        AssertUtils.state(result.getResponse().isSuccessful(),
-                () -> new OSSException(result.getResponse().getErrorResponseAsString(), result.getRequestId()));
+        VoidResult response = ossClient.deleteBucket(bucketName);
+        AssertUtils.state(response.getResponse().isSuccessful(),
+                () -> new OSSException(response.getResponse().getErrorResponseAsString(), response.getRequestId()));
     }
 
     @Override
@@ -55,7 +64,7 @@ public class AlibabaCloudOssClient implements WindOssClient {
     }
 
     @Override
-    public OssUploadResult uploadFile(String bucketName, String objectKey, InputStream inputStream, Map<String, String> metadata) throws OSSException {
+    public WindOssFile uploadFile(String bucketName, String objectKey, InputStream inputStream, Map<String, String> metadata) throws OSSException {
         // 覆盖上传
         ObjectMetadata objectMetadata = new ObjectMetadata();
         objectMetadata.setUserMetadata(metadata == null ? Collections.emptyMap() : metadata);
@@ -64,68 +73,88 @@ public class AlibabaCloudOssClient implements WindOssClient {
             // 尝试做一次重试
             response = ossClient.putObject(bucketName, objectKey, inputStream, objectMetadata);
         }
-        AssertUtils.isTrue(response.getResponse().isSuccessful(), () -> String.format("upload file to oss error, bucketName = %s key = %s",
-                bucketName, objectKey));
-        return new OssUploadResult(objectKey, response.getETag(), LocalDateTime.now());
+        ResponseMessage message = response.getResponse();
+        String requestId = response.getRequestId();
+        AssertUtils.state(response.getResponse().isSuccessful(), () -> new OSSException(message.getErrorResponseAsString(), requestId));
+        return statFile(bucketName, objectKey);
     }
 
     @Override
     public InputStream downloadFile(String bucketName, String objectKey) throws OSSException {
-        return null;
+        OSSObject response = ossClient.getObject(bucketName, objectKey);
+        AssertUtils.state(response.getResponse().isSuccessful(), () -> new OSSException(response.getResponse().getErrorResponseAsString(),
+                response.getRequestId()));
+        return response.getObjectContent();
     }
 
     @Override
     public void deleteFile(String bucketName, String objectKey) throws OSSException {
-
+        VoidResult response = ossClient.deleteObject(bucketName, objectKey);
+        AssertUtils.state(response.getResponse().isSuccessful(), () -> new OSSException(response.getResponse().getErrorResponseAsString(),
+                response.getRequestId()));
     }
 
     @Override
     public List<String> listFiles(String bucketName, String prefix, int maxKeys) throws OSSException {
-        return Collections.emptyList();
+        ListObjectsV2Request request = new ListObjectsV2Request();
+        request.setBucketName(bucketName);
+        request.setPrefix(prefix);
+        request.setMaxKeys(maxKeys);
+        ListObjectsV2Result response = ossClient.listObjectsV2(request);
+        AssertUtils.state(response.getResponse().isSuccessful(), () -> new OSSException(response.getResponse().getErrorResponseAsString(),
+                response.getRequestId()));
+        return response.getObjectSummaries()
+                .stream()
+                .map(OSSObjectSummary::getKey)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public void copyFile(String bucketName, String fileName, String destBucketName) throws OSSException {
-        ossClient.copyObject(bucketName, fileName, bucketName, fileName);
+    public void copyFile(String bucketName, String objectKey, String destBucketName) throws OSSException {
+        copyFile(bucketName, objectKey, destBucketName, objectKey);
     }
 
     @Override
-    public void copyFile(String bucketName, String fileName, String destBucketName, String destFileName) throws OSSException {
-        ossClient.copyObject(bucketName, fileName, destBucketName, destFileName);
+    public void copyFile(String bucketName, String sourceKey, String destBucketName, String destKey) throws OSSException {
+        CopyObjectResult response = ossClient.copyObject(bucketName, sourceKey, destBucketName, destKey);
+        AssertUtils.state(response.getResponse().isSuccessful(), () -> new OSSException(response.getResponse().getErrorResponseAsString(),
+                response.getRequestId()));
     }
 
     @Override
-    public WindOssFile statFile(String fileName) {
-        return null;
+    public WindOssFile statFile(String bucketName, String objectKey) {
+        ObjectMetadata metadata = ossClient.getObjectMetadata(bucketName, objectKey);
+        WindOssFile result = new WindOssFile();
+        result.setName(objectKey);
+        result.setKey(objectKey);
+        result.setETag(metadata.getETag());
+        result.setUrl(getFileLink(bucketName, objectKey));
+        result.setHash(metadata.getContentMD5());
+        result.setSize(metadata.getContentLength());
+        result.setLastModified(LocalDateTime.from(metadata.getLastModified().toInstant()));
+        result.setContentType(metadata.getContentType());
+        result.setMetadata(metadata.getUserMetadata());
+        return result;
     }
 
     @Override
-    public WindOssFile statFile(String bucketName, String fileName) {
-        return null;
+    public String getFilePath(String bucketName, String objectKey) {
+        return getBucketEndpoint(bucketName).concat(WindConstants.SLASH).concat(objectKey);
     }
 
     @Override
-    public String getFilePath(String fileName) {
-        return "";
+    public String getFileLink(String bucketName, String objectKey) {
+        return getBucketEndpoint(bucketName).concat(WindConstants.SLASH).concat(objectKey);
     }
 
     @Override
-    public String getFilePath(String bucketName, String fileName) {
-        return "";
+    @SuppressWarnings("unchecked")
+    public <T> T getFileMetadata(String bucketName, String objectKey) throws OSSException {
+        return (T) ossClient.getObjectMetadata(bucketName, objectKey);
     }
 
-    @Override
-    public String getFileLink(String fileName) {
-        return "";
-    }
-
-    @Override
-    public String getFileLink(String bucketName, String fileName) {
-        return "";
-    }
-
-    @Override
-    public Map<String, String> getFileMetadata(String bucketName, String objectKey) throws OSSException {
-        return Collections.emptyMap();
+    private String getBucketEndpoint(String bucketName) {
+        String baseEndpoint = endpoint.contains("https://") ? "https://" : "http://";
+        return baseEndpoint + bucketName + WindConstants.DOT + endpoint.replaceFirst(baseEndpoint, "");
     }
 }

@@ -18,7 +18,7 @@ public class AlibabaCloudOssProperties {
      * 是否启用
      */
     @NotNull
-    private Boolean enabled = false;
+    private Boolean enabled = true;
 
     /**
      * Access key就像用户ID，可以唯一标识你的账户
@@ -33,25 +33,14 @@ public class AlibabaCloudOssProperties {
     private String secretKey;
 
     /**
-     * 对象存储名称
-     */
-    @NotBlank
-    private String name;
-
-    /**
-     * 对象存储服务的URL
+     * oss endpoint (地域节点)
      */
     private String endpoint;
 
     /**
-     * 默认的存储桶名称
+     * 上传内容限制 200MB
      */
-    private String bucketName;
-
-    /**
-     * 上传内容限制
-     */
-    private Long maxContentLength = 1024 * 1024 * 1024L;
+    private Long maxContentLength = 200 * 1024 * 1024L;
 
 
 }

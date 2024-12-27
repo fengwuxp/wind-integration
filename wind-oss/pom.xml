@@ -14,6 +14,7 @@
     <modules>
         <module>api</module>
         <module>alibabacloud</module>
+        <module>wind-oss-spring-boot-starter</module>
     </modules>
 
     <properties>
@@ -25,11 +26,6 @@
 
     <dependencyManagement>
         <dependencies>
-            <dependency>
-                <groupId>com.wind.integration</groupId>
-                <artifactId>wind-oss-api</artifactId>
-                <version>${revision}</version>
-            </dependency>
             <dependency>
                 <groupId>com.aliyun.oss</groupId>
                 <artifactId>aliyun-sdk-oss</artifactId>

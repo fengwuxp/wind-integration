@@ -62,7 +62,7 @@ public class WindOssAutoConfiguration {
 
 
     @Bean
-    @ConditionalOnExpression(value = "#wind.oss.default-bucket-name != null")
+    @ConditionalOnExpression(value = "#{T(org.springframework.util.StringUtils).hasText('${wind.oss.default-bucket-name}')}")
     @ConditionalOnBean(WindOssClient.class)
     public WindBucketTemplate defaultWindBucketTemplate(WindOssClient windOssClient, @Value("${wind.oss.default-bucket-name}") String defaultBucketName) {
         return new DefaultWindBucketTemplate(windOssClient, defaultBucketName);

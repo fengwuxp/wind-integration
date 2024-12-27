@@ -2,6 +2,9 @@ package com.wind.integration.oss.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
@@ -11,7 +14,9 @@ import java.time.LocalDateTime;
  * @author wuxp
  * @date 2024-12-17 18:51
  **/
-@Data
+@Getter
+@EqualsAndHashCode
+@ToString
 @AllArgsConstructor
 public class OssUploadResult {
 

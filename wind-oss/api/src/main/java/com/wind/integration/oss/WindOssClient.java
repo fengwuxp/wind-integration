@@ -25,6 +25,13 @@ public interface WindOssClient {
     void createBucket(@NotBlank String bucketName) throws OSSException;
 
     /**
+     * 删除 bucket
+     * @param bucketName bucket name
+     * @throws OSSException
+     */
+    void deleteBucket(@NotBlank String bucketName) throws OSSException;
+
+    /**
      * 存储桶是否存在
      *
      * @param bucketName 存储桶名称
@@ -36,7 +43,7 @@ public interface WindOssClient {
      * 上传文件到 OSS
      *
      * @param bucketName  存储桶名称
-     * @param objectKey   对象的键（文件名）
+     * @param objectKey   对象上传到 oss 的 key（文件名）
      * @param inputStream 文件内容的输入流
      * @param metadata    文件的元数据（可选）
      * @return 上传结果信息

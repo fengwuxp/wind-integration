@@ -27,7 +27,6 @@ public interface WindOssClient {
      * 删除 bucket
      *
      * @param bucketName bucket name
-     * @throws OSSException
      */
     void deleteBucket(@NotBlank String bucketName) throws OSSException;
 

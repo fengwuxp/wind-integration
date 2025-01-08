@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 
 /**
  * @author wuxp
@@ -51,13 +52,13 @@ public abstract class AbstractDelegateDocumentTask implements OfficeDocumentTask
     }
 
     @Override
-    public void addRow(Object row) {
-        delegate.addRow(row);
+    public void addRows(Collection<Object> rows) {
+        delegate.addRows(rows);
     }
 
     @Override
-    public void addFailedRow(Object row) {
-        delegate.addFailedRow(row);
+    public void addFailedRows(Collection<Object> rows) {
+        delegate.addFailedRows(rows);
     }
 
     @Override

@@ -9,11 +9,9 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.mybatis.convert.LocaleTypeHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.ObjectUtils;
-import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Array;
 import java.util.Collection;
-import java.util.Objects;
 
 /**
  * @author wuxp
@@ -23,10 +21,10 @@ import java.util.Objects;
 public class WindMyBatisFlexExtendsConfiguration implements MyBatisFlexCustomizer {
 
     @VisibleForTesting
-    public static final int IN_OP_MAX_SIZE = 1000;
+    public static final int IN_OP_MAX_SIZE = 4096;
 
     @VisibleForTesting
-    public static final String IN_OP_SIZE_ERROR_MESSAGE = "database query in op size range in >=1 && <=1000";
+    public static final String IN_OP_SIZE_ERROR_MESSAGE = "database query in op size range in >=1 && <=4096";
 
     static {
         QueryColumnBehavior.setIgnoreFunction(val -> {
@@ -48,11 +46,11 @@ public class WindMyBatisFlexExtendsConfiguration implements MyBatisFlexCustomize
     @Override
     public void customize(FlexGlobalConfig globalConfig) {
         globalConfig.getConfiguration().getTypeHandlerRegistry().register(LocaleTypeHandler.class);
-
         // 设置全局 ID 生成策略为数据库自增
         FlexGlobalConfig.KeyConfig keyConfig = new FlexGlobalConfig.KeyConfig();
         keyConfig.setKeyType(KeyType.Auto);
         FlexGlobalConfig.getDefaultConfig().setKeyConfig(keyConfig);
+        globalConfig.setTenantColumn("tenant_id");
         globalConfig.setKeyConfig(keyConfig);
     }
 

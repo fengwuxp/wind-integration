@@ -25,12 +25,13 @@ public class SpringExpressionExportExcelTask extends AbstractDelegateDocumentTas
     }
 
     @Override
+    @SuppressWarnings({"rawtypes","unchecked"})
     protected void doTask() {
         int queryPage = 1;
         ExportExcelTaskInfo taskInfo = (ExportExcelTaskInfo) getDelegate();
         while (true) {
-            List<?> rows = fetcher.fetch(queryPage, taskInfo.getFetchSize());
-            rows.forEach(this::addRow);
+            List rows = fetcher.fetch(queryPage, taskInfo.getFetchSize());
+            this.addRows(rows);
             if (Objects.equals(OfficeTaskState.INTERRUPT, getState())) {
                 log.info("excel task is interrupted，id = {}", getId());
                 updateState(OfficeTaskState.INTERRUPT);

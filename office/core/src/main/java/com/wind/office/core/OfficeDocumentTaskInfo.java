@@ -3,6 +3,7 @@ package com.wind.office.core;
 import org.springframework.lang.Nullable;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 
 /**
  * 办公文档任务处理信息
@@ -66,14 +67,14 @@ public interface OfficeDocumentTaskInfo {
     /**
      * 添加处理成功的行
      *
-     * @param row 数据
+     * @param rows 数据
      */
-    void addRow(Object row);
+    void addRows(Collection<Object> rows);
 
     /**
      * 添加处理失败的行
      *
-     * @param row 数据
+     * @param rows 数据
      */
-    void addFailedRow(Object row);
+    void addFailedRows(Collection<Object> rows);
 }

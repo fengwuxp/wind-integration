@@ -42,6 +42,8 @@ class SpringExpressionExportExcelTaskTest {
     void testTask() {
         task.run();
         Assertions.assertEquals(OfficeTaskState.COMPLETED, task.getState());
+        Assertions.assertEquals(3000, task.getRowSize());
+        Assertions.assertEquals(0, task.getFailedRowSize());
     }
 
     private ExportExcelDataFetcher<Object> mockExcelDataFetcher() {

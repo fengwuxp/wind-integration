@@ -9,6 +9,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 
 import java.beans.Transient;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -76,15 +77,15 @@ public class ExportExcelTaskInfo implements OfficeDocumentTaskInfo {
     }
 
     @Override
-    public void addRow(Object row) {
-        writer.write(row);
-        rowSize.incrementAndGet();
+    public void addRows(Collection<Object> rows) {
+        writer.write(rows);
+        rowSize.addAndGet(rows.size());
     }
 
     @Override
-    public void addFailedRow(Object row) {
-        writer.write(row);
-        failedRowSize.incrementAndGet();
+    public void addFailedRows(Collection<Object> rows) {
+        writer.write(rows);
+        failedRowSize.addAndGet(rows.size());
     }
 
     @Override

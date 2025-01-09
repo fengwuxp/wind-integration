@@ -4,8 +4,8 @@ import com.aliyun.oss.ClientConfiguration;
 import com.aliyun.oss.OSSClient;
 import com.aliyun.oss.common.auth.CredentialsProvider;
 import com.aliyun.oss.common.auth.DefaultCredentialProvider;
-import com.wind.integration.oss.DefaultWindBucketTemplate;
-import com.wind.integration.oss.WindBucketTemplate;
+import com.wind.integration.oss.DefaultBucketOperationsTemplate;
+import com.wind.integration.oss.BucketOperationsTemplate;
 import com.wind.integration.oss.WindOssClient;
 import com.wind.integration.oss.alibaba.AlibabaCloudOssClient;
 import com.wind.integration.oss.alibaba.AlibabaCloudOssProperties;
@@ -64,7 +64,7 @@ public class WindOssAutoConfiguration {
     @Bean
     @ConditionalOnExpression(value = "#{T(org.springframework.util.StringUtils).hasText('${wind.oss.default-bucket-name}')}")
     @ConditionalOnBean(WindOssClient.class)
-    public WindBucketTemplate defaultWindBucketTemplate(WindOssClient windOssClient, @Value("${wind.oss.default-bucket-name}") String defaultBucketName) {
-        return new DefaultWindBucketTemplate(windOssClient, defaultBucketName);
+    public BucketOperationsTemplate defaultWindBucketTemplate(WindOssClient windOssClient, @Value("${wind.oss.default-bucket-name}") String defaultBucketName) {
+        return new DefaultBucketOperationsTemplate(windOssClient, defaultBucketName);
     }
 }

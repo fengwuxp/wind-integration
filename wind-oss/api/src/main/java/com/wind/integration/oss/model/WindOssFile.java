@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
- * oss 文件
+ * oss 文件对象
  *
  * @author wuxp
  * @date 2024-12-17 18:59

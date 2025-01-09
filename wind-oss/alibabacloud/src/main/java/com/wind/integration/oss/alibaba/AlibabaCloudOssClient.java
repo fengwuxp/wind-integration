@@ -13,7 +13,7 @@ import com.aliyun.oss.model.PutObjectResult;
 import com.aliyun.oss.model.VoidResult;
 import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
-import com.wind.integration.oss.OSSException;
+import com.wind.integration.oss.WindOSSException;
 import com.wind.integration.oss.WindOssClient;
 import com.wind.integration.oss.model.WindOssFile;
 import lombok.AllArgsConstructor;
@@ -42,29 +42,29 @@ public class AlibabaCloudOssClient implements WindOssClient {
     private final String endpoint;
 
     @Override
-    public void createBucket(String bucketName) throws OSSException {
+    public void createBucket(String bucketName) throws WindOSSException {
         if (!isBucketExists(bucketName)) {
             Bucket response = ossClient.createBucket(bucketName);
             AssertUtils.state(response.getResponse().isSuccessful(),
-                    () -> new OSSException(response.getResponse().getErrorResponseAsString(), response.getRequestId()));
+                    () -> new WindOSSException(response.getResponse().getErrorResponseAsString(), response.getRequestId()));
         }
     }
 
     @Override
-    public void deleteBucket(String bucketName) throws OSSException {
+    public void deleteBucket(String bucketName) throws WindOSSException {
         VoidResult response = ossClient.deleteBucket(bucketName);
         AssertUtils.state(response.getResponse().isSuccessful(),
-                () -> new OSSException(response.getResponse().getErrorResponseAsString(), response.getRequestId()));
+                () -> new WindOSSException(response.getResponse().getErrorResponseAsString(), response.getRequestId()));
     }
 
     @Override
-    public boolean isBucketExists(String bucketName) throws OSSException {
+    public boolean isBucketExists(String bucketName) throws WindOSSException {
         AssertUtils.hasText(bucketName, "argument bucketName must not empty");
         return ossClient.doesBucketExist(bucketName);
     }
 
     @Override
-    public WindOssFile uploadFile(String bucketName, String objectKey, InputStream inputStream, Map<String, String> metadata) throws OSSException {
+    public WindOssFile uploadFile(String bucketName, String objectKey, InputStream inputStream, Map<String, String> metadata) throws WindOSSException {
         // 覆盖上传
         ObjectMetadata objectMetadata = new ObjectMetadata();
         objectMetadata.setUserMetadata(metadata == null ? Collections.emptyMap() : metadata);
@@ -75,33 +75,33 @@ public class AlibabaCloudOssClient implements WindOssClient {
         }
         ResponseMessage message = response.getResponse();
         String requestId = response.getRequestId();
-        AssertUtils.state(response.getResponse().isSuccessful(), () -> new OSSException(message.getErrorResponseAsString(), requestId));
+        AssertUtils.state(response.getResponse().isSuccessful(), () -> new WindOSSException(message.getErrorResponseAsString(), requestId));
         return statFile(bucketName, objectKey);
     }
 
     @Override
-    public InputStream downloadFile(String bucketName, String objectKey) throws OSSException {
+    public InputStream downloadFile(String bucketName, String objectKey) throws WindOSSException {
         OSSObject response = ossClient.getObject(bucketName, objectKey);
-        AssertUtils.state(response.getResponse().isSuccessful(), () -> new OSSException(response.getResponse().getErrorResponseAsString(),
+        AssertUtils.state(response.getResponse().isSuccessful(), () -> new WindOSSException(response.getResponse().getErrorResponseAsString(),
                 response.getRequestId()));
         return response.getObjectContent();
     }
 
     @Override
-    public void deleteFile(String bucketName, String objectKey) throws OSSException {
+    public void deleteFile(String bucketName, String objectKey) throws WindOSSException {
         VoidResult response = ossClient.deleteObject(bucketName, objectKey);
-        AssertUtils.state(response.getResponse().isSuccessful(), () -> new OSSException(response.getResponse().getErrorResponseAsString(),
+        AssertUtils.state(response.getResponse().isSuccessful(), () -> new WindOSSException(response.getResponse().getErrorResponseAsString(),
                 response.getRequestId()));
     }
 
     @Override
-    public List<String> listFiles(String bucketName, String prefix, int maxKeys) throws OSSException {
+    public List<String> listFiles(String bucketName, String prefix, int maxKeys) throws WindOSSException {
         ListObjectsV2Request request = new ListObjectsV2Request();
         request.setBucketName(bucketName);
         request.setPrefix(prefix);
         request.setMaxKeys(maxKeys);
         ListObjectsV2Result response = ossClient.listObjectsV2(request);
-        AssertUtils.state(response.getResponse().isSuccessful(), () -> new OSSException(response.getResponse().getErrorResponseAsString(),
+        AssertUtils.state(response.getResponse().isSuccessful(), () -> new WindOSSException(response.getResponse().getErrorResponseAsString(),
                 response.getRequestId()));
         return response.getObjectSummaries()
                 .stream()
@@ -110,14 +110,14 @@ public class AlibabaCloudOssClient implements WindOssClient {
     }
 
     @Override
-    public void copyFile(String bucketName, String objectKey, String destBucketName) throws OSSException {
+    public void copyFile(String bucketName, String objectKey, String destBucketName) throws WindOSSException {
         copyFile(bucketName, objectKey, destBucketName, objectKey);
     }
 
     @Override
-    public void copyFile(String bucketName, String sourceKey, String destBucketName, String destKey) throws OSSException {
+    public void copyFile(String bucketName, String sourceKey, String destBucketName, String destKey) throws WindOSSException {
         CopyObjectResult response = ossClient.copyObject(bucketName, sourceKey, destBucketName, destKey);
-        AssertUtils.state(response.getResponse().isSuccessful(), () -> new OSSException(response.getResponse().getErrorResponseAsString(),
+        AssertUtils.state(response.getResponse().isSuccessful(), () -> new WindOSSException(response.getResponse().getErrorResponseAsString(),
                 response.getRequestId()));
     }
 
@@ -149,7 +149,7 @@ public class AlibabaCloudOssClient implements WindOssClient {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <T> T getFileMetadata(String bucketName, String objectKey) throws OSSException {
+    public <T> T getFileMetadata(String bucketName, String objectKey) throws WindOSSException {
         return (T) ossClient.getObjectMetadata(bucketName, objectKey);
     }
 

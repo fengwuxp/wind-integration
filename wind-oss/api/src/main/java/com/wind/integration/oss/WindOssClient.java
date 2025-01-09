@@ -21,14 +21,14 @@ public interface WindOssClient {
      *
      * @param bucketName bucket name
      */
-    void createBucket(@NotBlank String bucketName) throws OSSException;
+    void createBucket(@NotBlank String bucketName) throws WindOSSException;
 
     /**
      * 删除 bucket
      *
      * @param bucketName bucket name
      */
-    void deleteBucket(@NotBlank String bucketName) throws OSSException;
+    void deleteBucket(@NotBlank String bucketName) throws WindOSSException;
 
     /**
      * 存储桶是否存在
@@ -36,7 +36,7 @@ public interface WindOssClient {
      * @param bucketName 存储桶名称
      * @return boolean
      */
-    boolean isBucketExists(@NotBlank String bucketName) throws OSSException;
+    boolean isBucketExists(@NotBlank String bucketName) throws WindOSSException;
 
     /**
      * 上传文件到 OSS
@@ -46,10 +46,10 @@ public interface WindOssClient {
      * @param inputStream 文件内容的输入流
      * @param metadata    文件的元数据（可选）
      * @return 文件元数据
-     * @throws OSSException 如果上传失败
+     * @throws WindOSSException 如果上传失败
      */
     WindOssFile uploadFile(@NotBlank String bucketName, @NotBlank String objectKey, @NotNull InputStream inputStream,
-                           Map<String, String> metadata) throws OSSException;
+                           Map<String, String> metadata) throws WindOSSException;
 
     /**
      * 下载文件从 OSS
@@ -57,18 +57,18 @@ public interface WindOssClient {
      * @param bucketName 存储桶名称
      * @param objectKey  对象的键（文件名）
      * @return 文件的输入流
-     * @throws OSSException 如果下载失败
+     * @throws WindOSSException 如果下载失败
      */
-    InputStream downloadFile(@NotBlank String bucketName, String objectKey) throws OSSException;
+    InputStream downloadFile(@NotBlank String bucketName, String objectKey) throws WindOSSException;
 
     /**
      * 删除 OSS 上的文件
      *
      * @param bucketName 存储桶名称
      * @param objectKey  对象的键（文件名）
-     * @throws OSSException 如果删除失败
+     * @throws WindOSSException 如果删除失败
      */
-    void deleteFile(String bucketName, String objectKey) throws OSSException;
+    void deleteFile(String bucketName, String objectKey) throws WindOSSException;
 
     /**
      * 列出 OSS 存储桶中的文件
@@ -77,9 +77,9 @@ public interface WindOssClient {
      * @param prefix     文件的前缀（可选）
      * @param maxKeys    最大返回的文件数量
      * @return 文件列表
-     * @throws OSSException 如果列举失败
+     * @throws WindOSSException 如果列举失败
      */
-    List<String> listFiles(String bucketName, String prefix, int maxKeys) throws OSSException;
+    List<String> listFiles(String bucketName, String prefix, int maxKeys) throws WindOSSException;
 
     /**
      * 拷贝文件
@@ -88,7 +88,7 @@ public interface WindOssClient {
      * @param objectKey      存储桶文件 key
      * @param destBucketName 目标存储桶名称
      */
-    void copyFile(String bucketName, String objectKey, String destBucketName) throws OSSException;
+    void copyFile(String bucketName, String objectKey, String destBucketName) throws WindOSSException;
 
     /**
      * 拷贝文件
@@ -98,7 +98,7 @@ public interface WindOssClient {
      * @param destBucketName 目标存储桶名称
      * @param destKey        目标存储桶文件 key
      */
-    void copyFile(String bucketName, String sourceKey, String destBucketName, String destKey) throws OSSException;
+    void copyFile(String bucketName, String sourceKey, String destBucketName, String destKey) throws WindOSSException;
 
     /**
      * 获取文件信息
@@ -133,7 +133,7 @@ public interface WindOssClient {
      * @param bucketName 存储桶名称
      * @param objectKey  对象的键（文件名）
      * @return 文件的元数据
-     * @throws OSSException 如果获取元数据失败
+     * @throws WindOSSException 如果获取元数据失败
      */
-    <T> T getFileMetadata(String bucketName, String objectKey) throws OSSException;
+    <T> T getFileMetadata(String bucketName, String objectKey) throws WindOSSException;
 }

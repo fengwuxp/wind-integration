@@ -12,39 +12,39 @@ import java.util.Map;
  * @date 2024-12-27 15:38
  **/
 @AllArgsConstructor
-public class DefaultWindBucketTemplate implements WindBucketTemplate {
+public class DefaultBucketOperationsTemplate implements BucketOperationsTemplate {
 
     private final WindOssClient client;
 
     private final String bucketName;
 
     @Override
-    public WindOssFile uploadFile(String objectKey, InputStream inputStream, Map<String, String> metadata) throws OSSException {
+    public WindOssFile uploadFile(String objectKey, InputStream inputStream, Map<String, String> metadata) throws WindOSSException {
         return client.uploadFile(bucketName, objectKey, inputStream, metadata);
     }
 
     @Override
-    public InputStream downloadFile(String objectKey) throws OSSException {
+    public InputStream downloadFile(String objectKey) throws WindOSSException {
         return client.downloadFile(bucketName, objectKey);
     }
 
     @Override
-    public void deleteFile(String objectKey) throws OSSException {
+    public void deleteFile(String objectKey) throws WindOSSException {
         client.deleteFile(bucketName, objectKey);
     }
 
     @Override
-    public List<String> listFiles(String keyPrefix, int maxKeys) throws OSSException {
+    public List<String> listFiles(String keyPrefix, int maxKeys) throws WindOSSException {
         return client.listFiles(bucketName, keyPrefix, maxKeys);
     }
 
     @Override
-    public void copyFile(String objectKey, String destBucketName) throws OSSException {
+    public void copyFile(String objectKey, String destBucketName) throws WindOSSException {
         client.copyFile(bucketName, objectKey, destBucketName);
     }
 
     @Override
-    public void copyFile(String sourceKey, String destBucketName, String destKey) throws OSSException {
+    public void copyFile(String sourceKey, String destBucketName, String destKey) throws WindOSSException {
         client.copyFile(bucketName, sourceKey, destBucketName, destKey);
     }
 
@@ -64,7 +64,7 @@ public class DefaultWindBucketTemplate implements WindBucketTemplate {
     }
 
     @Override
-    public <T> T getFileMetadata(String objectKey) throws OSSException {
+    public <T> T getFileMetadata(String objectKey) throws WindOSSException {
         return client.getFileMetadata(bucketName, objectKey);
     }
 }

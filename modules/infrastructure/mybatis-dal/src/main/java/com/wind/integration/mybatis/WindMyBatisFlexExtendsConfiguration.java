@@ -27,20 +27,7 @@ public class WindMyBatisFlexExtendsConfiguration implements MyBatisFlexCustomize
     public static final String IN_OP_SIZE_ERROR_MESSAGE = "database query in op size range in >=1 && <=4096";
 
     static {
-        QueryColumnBehavior.setIgnoreFunction(val -> {
-            if (ObjectUtils.isEmpty(val)) {
-                return true;
-            }
-            if (val instanceof Collection) {
-                // 集合类型，认为是 in 操作
-                AssertUtils.isTrue(((Collection<?>) val).size() < IN_OP_MAX_SIZE, IN_OP_SIZE_ERROR_MESSAGE);
-            }
-            if (val.getClass().isArray()) {
-                // 数组类型，认为是 in 操作
-                AssertUtils.isTrue(Array.getLength(val) < IN_OP_MAX_SIZE, IN_OP_SIZE_ERROR_MESSAGE);
-            }
-            return false;
-        });
+        QueryColumnBehavior.setIgnoreFunction(WindMyBatisFlexExtendsConfiguration::queryIgnoreCheckFunction);
     }
 
     @Override
@@ -54,4 +41,30 @@ public class WindMyBatisFlexExtendsConfiguration implements MyBatisFlexCustomize
         globalConfig.setKeyConfig(keyConfig);
     }
 
+    private static boolean queryIgnoreCheckFunction(Object val) {
+        if (ObjectUtils.isEmpty(val)) {
+            return true;
+        }
+        if (val instanceof Collection) {
+            // 集合类型，认为是 in 操作
+            Collection<?> elements = (Collection<?>) val;
+            AssertUtils.isTrue(elements.size() < IN_OP_MAX_SIZE, IN_OP_SIZE_ERROR_MESSAGE);
+        }
+        if (val.getClass().isArray()) {
+            // 数组类型，认为是 in 操作
+            int length = Array.getLength(val);
+            if (length == 1) {
+                // 参见：QueryColumn#in(Object... value)
+                return queryIgnoreCheckFunction(Array.get(val, 0));
+            }
+            AssertUtils.isTrue(length < IN_OP_MAX_SIZE, IN_OP_SIZE_ERROR_MESSAGE);
+            // 临时兼容单个元素的数组的空对象，参见：QueryColumn#in(Object... value)
+            for (int i = 0; i < length; i++) {
+                if (Array.get(val, i) == null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 }

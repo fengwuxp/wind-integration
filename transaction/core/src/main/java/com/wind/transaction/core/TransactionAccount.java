@@ -78,7 +78,7 @@ public interface TransactionAccount {
     }
 
     /**
-     * @return 卡是否可用
+     * @return 是否可用
      */
     default boolean isAvailable() {
         return getAvailableAmount() > 0;

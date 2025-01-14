@@ -6,12 +6,15 @@ import com.wind.common.WindDateFormatPatterns;
 import com.wind.common.WindDateFormater;
 import com.wind.common.enums.DescriptiveEnum;
 import com.wind.common.exception.AssertUtils;
+import com.wind.common.exception.BaseException;
+import com.wind.common.util.StringJoinSplitUtils;
 import org.springframework.format.Formatter;
 import org.springframework.util.StringUtils;
 
 import java.text.ParseException;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -67,6 +70,36 @@ public final class DefaultFormatterFactory {
             @Override
             public String print(TemporalAccessor time, Locale locale) {
                 return formatter.format(time);
+            }
+        };
+    }
+
+    public static Formatter<Object[]> ofArray() {
+        return new Formatter<Object[]>() {
+
+            @Override
+            public Object[] parse(String text, Locale locale) throws ParseException {
+                throw BaseException.common("unsupported, Please handle it yourself.");
+            }
+
+            @Override
+            public String print(Object[] values, Locale locale) {
+                return StringJoinSplitUtils.join(values);
+            }
+        };
+    }
+
+    public static Formatter<Collection<?>> ofCollection() {
+        return new Formatter<Collection<?>>() {
+
+            @Override
+            public Collection<?> parse(String text, Locale locale) throws ParseException {
+                return StringJoinSplitUtils.split(text);
+            }
+
+            @Override
+            public String print(Collection<?> object, Locale locale) {
+                return StringJoinSplitUtils.join(object);
             }
         };
     }

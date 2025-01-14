@@ -9,6 +9,8 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.common.exception.BaseException;
 import com.wind.common.util.StringJoinSplitUtils;
 import org.springframework.format.Formatter;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
 
 import java.text.ParseException;
@@ -68,7 +70,8 @@ public final class DefaultFormatterFactory {
             }
 
             @Override
-            public String print(TemporalAccessor time, Locale locale) {
+            @NonNull
+            public String print(@NonNull TemporalAccessor time, @Nullable Locale locale) {
                 return formatter.format(time);
             }
         };
@@ -83,7 +86,8 @@ public final class DefaultFormatterFactory {
             }
 
             @Override
-            public String print(Object[] values, Locale locale) {
+            @NonNull
+            public String print(@NonNull Object[] values, @Nullable Locale locale) {
                 return StringJoinSplitUtils.join(values);
             }
         };
@@ -98,7 +102,7 @@ public final class DefaultFormatterFactory {
             }
 
             @Override
-            public String print(Collection<?> object, Locale locale) {
+            public String print(@NonNull Collection<?> object,@Nullable Locale locale) {
                 return StringJoinSplitUtils.join(object);
             }
         };

@@ -1,8 +1,8 @@
 package com.wind.office.core.formatter;
 
-import com.wind.common.WindConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.Formatter;
+import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
 import javax.annotation.Nonnull;
@@ -39,10 +39,7 @@ public class MapFormatter<T> implements Formatter<T> {
 
     @Nonnull
     @Override
-    public String print(@Nullable T value, @Nullable Locale locale) {
-        if (value == null) {
-            return WindConstants.EMPTY;
-        }
+    public String print(@NonNull T value, @Nullable Locale locale) {
         return (String) this.dataSource.get(String.valueOf(value));
     }
 }

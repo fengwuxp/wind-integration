@@ -12,7 +12,7 @@ import lombok.Getter;
  **/
 @AllArgsConstructor
 @Getter
-public enum WindTransactionType implements AccountTransactionType {
+public enum DefaultTransactionType implements AccountTransactionType {
 
     /**
      * 存款（充值）
@@ -25,7 +25,7 @@ public enum WindTransactionType implements AccountTransactionType {
     WITHDRAW("取款（提现）"),
 
     /**
-     * 退款
+     * 支付
      */
     PAYMENT("支付"),
 

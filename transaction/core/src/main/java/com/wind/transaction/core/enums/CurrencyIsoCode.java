@@ -13,19 +13,15 @@ import java.util.Objects;
 
 /**
  * 币种类型
- * 参见：<a href="https://en.wikipedia.org/wiki/ISO_4217">...</a>
+ * 参见：<a href="https://en.wikipedia.org/wiki/ISO_4217">ISO_4217</a>
  *
  * @author wuxp
  * @date 2023-09-27 18:48
  **/
 @Getter
-public enum CurrencyType implements DescriptiveEnum {
-
-    UNKNOWN("-1", "unknown", "未知", "??"),
+public enum CurrencyIsoCode implements DescriptiveEnum {
 
     USD("840", "USD", "美元", "$"),
-
-    USDT("000", "USDT", "泰达币", "$"),
 
     GBR("10000", "GBR", "芽布令", "??"),
 
@@ -356,12 +352,17 @@ public enum CurrencyType implements DescriptiveEnum {
     ZMW("967", "ZMW", "尚比亞克瓦查", "ZK"),
 
     ZWL("932", "ZWL", "津巴布韋元", "$"),
+
+    // 虚拟货币和特殊需求
+    BTC("BTC", "BTC", "比特币", "₿", 8), // 比特币
+    ETH("ETH", "ETH", "以太坊", "Ξ", 8), // 以太币
+    USDT("USDT", "USDT", "泰达币", "$", 2), // 泰达币
+    UNKNOWN("-1", "unknown", "未知", "??", 2); // 未知币种
     ;
 
 
     /**
      * 货币国际代码
-     * 数字币代码段大于等于10000
      */
     private final String value;
 
@@ -387,11 +388,11 @@ public enum CurrencyType implements DescriptiveEnum {
      */
     private final Integer precision;
 
-    CurrencyType(String value, String enCode, String desc, String sign) {
+    CurrencyIsoCode(String value, String enCode, String desc, String sign) {
         this(value, enCode, desc, sign, 2);
     }
 
-    CurrencyType(String value, String enCode, String desc, String sign, Integer precision) {
+    CurrencyIsoCode(String value, String enCode, String desc, String sign, Integer precision) {
         this.value = value;
         this.enCode = enCode;
         this.desc = desc;
@@ -410,45 +411,61 @@ public enum CurrencyType implements DescriptiveEnum {
     }
 
     /**
-     * 通过 {@link #value} 或 {@link  #enCode} 交换 {@link CurrencyType}
+     * 通过 {@link #value} 或 {@link  #enCode} 交换 {@link CurrencyIsoCode}
      *
-     * @param enCodeOrCode 英文编码或数字编码
-     * @return CurrencyType
+     * @param currency 英文编码或数字编码
+     * @return CurrencyIsoCode
      */
     @NotNull
-    public static CurrencyType requireByEnCode(@NotBlank String enCodeOrCode) {
-        CurrencyType result = ofByEnCode(enCodeOrCode);
+    public static CurrencyIsoCode requireOf(@NotBlank String currency) {
+        CurrencyIsoCode result = of(currency);
         if (result == null) {
-            result = ofByCode(enCodeOrCode);
+            // 尝试使用币种名称交换
+            return CurrencyIsoCode.valueOf(currency);
         }
-        AssertUtils.notNull(result, () -> String.format("unknown CurrencyType, enCode or Code = %s", enCodeOrCode));
+        AssertUtils.notNull(result, () -> String.format("unknown currency, enCode or Code = %s", currency));
         return result;
     }
 
     /**
-     * 通过 {@link  #enCode} 交换 {@link CurrencyType}
+     * 通过 {@link #value} 或 {@link  #enCode} 交换 {@link CurrencyIsoCode}
      *
-     * @param enCode 英文编码
-     * @return CurrencyType
+     * @param currency 英文编码或数字编码
+     * @return CurrencyIsoCode
      */
     @Nullable
-    public static CurrencyType ofByEnCode(String enCode) {
+    public static CurrencyIsoCode of(@NotBlank String currency) {
+        CurrencyIsoCode result = ofByCode(currency);
+        if (result == null) {
+            result = ofByEnCode(currency);
+        }
+        return result;
+    }
+
+    /**
+     * 通过 {@link  #enCode} 交换 {@link CurrencyIsoCode}
+     *
+     * @param enCode 英文编码
+     * @return CurrencyIsoCode
+     */
+    @Nullable
+    private static CurrencyIsoCode ofByEnCode(String enCode) {
         return Arrays.stream(values())
-                .filter(currencyType -> Objects.equals(currencyType.getEnCode(), enCode))
+                .filter(currencyIsoCode -> Objects.equals(currencyIsoCode.getEnCode(), enCode))
                 .findFirst()
                 .orElse(null);
     }
 
     /**
-     * 通过 {@link #value} 交换 {@link CurrencyType}
+     * 通过 {@link #value} 交换 {@link CurrencyIsoCode}
      *
-     * @param code 数字编码
-     * @return CurrencyType
+     * @param value 数字编码
+     * @return CurrencyIsoCode
      */
     @Nullable
-    public static CurrencyType ofByCode(String code) {
+    private static CurrencyIsoCode ofByCode(String value) {
         return Arrays.stream(values())
-                .filter(currencyType -> Objects.equals(currencyType.getValue(), code))
+                .filter(currencyIsoCode -> Objects.equals(currencyIsoCode.getValue(), value))
                 .findFirst()
                 .orElse(null);
     }

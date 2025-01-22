@@ -5,6 +5,8 @@ import com.wind.common.enums.DescriptiveEnum;
 import javax.validation.constraints.NotBlank;
 
 /**
+ * 账号交易类型
+ *
  * @author wuxp
  * @date 2024-10-10 22:08
  **/

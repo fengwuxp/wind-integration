@@ -1,7 +1,7 @@
 package com.wind.transaction.core;
 
 import com.wind.common.WindConstants;
-import com.wind.transaction.core.enums.CurrencyType;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 
 /**
  * 这是一个可用于支出、收入的支付交易账户定义
@@ -69,12 +69,12 @@ public interface TransactionAccount {
     }
 
     /**
-     * 账户金额的币种类型
+     * 账户金额的币种
      *
-     * @return 币种类型
+     * @return 币种
      */
-    default CurrencyType getCurrencyType() {
-        return CurrencyType.CNY;
+    default CurrencyIsoCode getCurrency() {
+        return CurrencyIsoCode.CNY;
     }
 
     /**

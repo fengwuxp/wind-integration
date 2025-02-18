@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.wind.middleware</groupId>
         <artifactId>wind-middleware</artifactId>
-        <version>1.0.22-SNAPSHOT</version>
+        <version>1.0.24-SNAPSHOT</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -27,16 +27,18 @@
         <module>modules/infrastructure</module>
         <module>dependencies</module>
         <module>wind-oss</module>
+        <module>wind-kms</module>
     </modules>
 
     <properties>
-        <revision>1.0.22-SNAPSHOT</revision>
+        <revision>1.0.24-SNAPSHOT</revision>
         <java.version>1.8</java.version>
         <maven.compiler.target>1.8</maven.compiler.target>
         <maven.compiler.source>1.8</maven.compiler.source>
 
         <easyexcel.version>3.3.2</easyexcel.version>
         <aliyun.oss.version>3.17.4</aliyun.oss.version>
+        <aliyun.kms.version>1.2.3</aliyun.kms.version>
     </properties>
 
     <dependencies>
@@ -92,6 +94,16 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
+                <artifactId>wind-kms-api</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-kms-alibabacloud</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
                 <artifactId>wind-office-core</artifactId>
                 <version>${revision}</version>
             </dependency>
@@ -134,6 +146,12 @@
                 <groupId>com.aliyun.oss</groupId>
                 <artifactId>aliyun-sdk-oss</artifactId>
                 <version>${aliyun.oss.version}</version>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/com.aliyun/kms20160120 -->
+            <dependency>
+                <groupId>com.aliyun</groupId>
+                <artifactId>kms20160120</artifactId>
+                <version>${aliyun.kms.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

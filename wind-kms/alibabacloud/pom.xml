@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.wind.integration</groupId>
+        <artifactId>wind-kms</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>wind-kms-alibabacloud</artifactId>
+
+    <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <!-- https://mvnrepository.com/artifact/com.aliyun/kms20160120 -->
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>kms20160120</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-kms-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.security</groupId>
+            <artifactId>wind-security-crypto</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>

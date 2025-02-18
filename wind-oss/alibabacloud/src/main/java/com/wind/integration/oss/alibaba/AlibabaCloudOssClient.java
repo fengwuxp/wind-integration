@@ -69,10 +69,6 @@ public class AlibabaCloudOssClient implements WindOssClient {
         ObjectMetadata objectMetadata = new ObjectMetadata();
         objectMetadata.setUserMetadata(metadata == null ? Collections.emptyMap() : metadata);
         PutObjectResult response = ossClient.putObject(bucketName, objectKey, inputStream, objectMetadata);
-        if (!response.getResponse().isSuccessful()) {
-            // 尝试做一次重试
-            response = ossClient.putObject(bucketName, objectKey, inputStream, objectMetadata);
-        }
         ResponseMessage message = response.getResponse();
         String requestId = response.getRequestId();
         AssertUtils.state(response.getResponse().isSuccessful(), () -> new WindOSSException(message.getErrorResponseAsString(), requestId));

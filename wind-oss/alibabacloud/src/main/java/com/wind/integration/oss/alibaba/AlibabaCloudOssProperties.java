@@ -1,5 +1,6 @@
 package com.wind.integration.oss.alibaba;
 
+import com.aliyun.oss.ClientConfiguration;
 import lombok.Data;
 
 import javax.validation.constraints.NotBlank;
@@ -37,10 +38,9 @@ public class AlibabaCloudOssProperties {
      */
     private String endpoint;
 
-    /**
-     * 上传内容限制 200MB
-     */
-    private Long maxContentLength = 200 * 1024 * 1024L;
-
-
+    public ClientConfiguration getDefaultClientConfiguration() {
+        ClientConfiguration result = new ClientConfiguration();
+        result.setMaxConnections(256);
+        return result;
+    }
 }

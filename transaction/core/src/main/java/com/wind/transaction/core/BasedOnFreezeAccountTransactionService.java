@@ -38,7 +38,8 @@ public interface BasedOnFreezeAccountTransactionService extends AccountTransacti
      *
      * @param id      账户标识
      * @param request 转出请求
+     * @return 账号交易流水号
      */
-    void freezeAndTransferOut(TransactionAccountId id, TransferRequest request);
+    String freezeAndTransferOut(TransactionAccountId id, TransferRequest request);
 
 }

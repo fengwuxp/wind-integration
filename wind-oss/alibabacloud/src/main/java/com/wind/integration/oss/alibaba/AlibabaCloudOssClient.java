@@ -20,7 +20,6 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.InputStream;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Collections;
@@ -131,7 +130,7 @@ public class AlibabaCloudOssClient implements WindOssClient {
         result.setMetadata(metadata.getUserMetadata());
         if (metadata.getLastModified() != null) {
             ZonedDateTime time = metadata.getLastModified().toInstant().atZone(ZoneId.systemDefault());
-            result.setLastModified( time.toLocalDateTime());
+            result.setLastModified(time.toLocalDateTime());
         }
         return result;
     }
@@ -139,13 +138,13 @@ public class AlibabaCloudOssClient implements WindOssClient {
     @Override
     public String getFileUrl(String bucketName, String objectKey) {
         String host = ossClient.getEndpoint().getHost();
-        return AlibabaCloudOssProperties.getBucketDomain(bucketName, host).concat(WindConstants.SLASH).concat(objectKey);
+        return AlibabaCloudOssProperties.getBucketEndpoint(bucketName, host).concat(WindConstants.SLASH).concat(objectKey);
     }
 
     @Override
     public String getFileInternalUrl(String bucketName, String objectKey) {
         String host = ossClient.getEndpoint().getHost();
-        return AlibabaCloudOssProperties.getBucketInternalDomain(bucketName, host).concat(WindConstants.SLASH).concat(objectKey);
+        return AlibabaCloudOssProperties.getBucketInternalEndpoint(bucketName, host).concat(WindConstants.SLASH).concat(objectKey);
     }
 
     @Override

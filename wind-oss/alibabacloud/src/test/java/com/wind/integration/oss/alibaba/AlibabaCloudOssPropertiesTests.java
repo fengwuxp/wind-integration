@@ -13,14 +13,14 @@ import java.net.URI;
 class AlibabaCloudOssPropertiesTests {
 
     @Test
-    void testGetBucketDomain() {
-        Assertions.assertEquals("example.oss-cn-hangzhou.aliyuncs.com",
-                AlibabaCloudOssProperties.getBucketDomain("example", "oss-cn-hangzhou.aliyuncs.com"));
-        Assertions.assertEquals("example.oss-cn-hangzhou.aliyuncs.com",
-                AlibabaCloudOssProperties.getBucketDomain("example", "oss-cn-hangzhou-internal.aliyuncs.com"));
-        Assertions.assertEquals("example.oss-cn-hangzhou-internal.aliyuncs.com", AlibabaCloudOssProperties.getBucketInternalDomain("example", "oss" +
+    void testGetBucketEndpoint() {
+        Assertions.assertEquals("https://example.oss-cn-hangzhou.aliyuncs.com",
+                AlibabaCloudOssProperties.getBucketEndpoint("example", "oss-cn-hangzhou.aliyuncs.com"));
+        Assertions.assertEquals("https://example.oss-cn-hangzhou.aliyuncs.com",
+                AlibabaCloudOssProperties.getBucketEndpoint("example", "oss-cn-hangzhou-internal.aliyuncs.com"));
+        Assertions.assertEquals("https://example.oss-cn-hangzhou-internal.aliyuncs.com", AlibabaCloudOssProperties.getBucketInternalEndpoint("example", "oss" +
                 "-cn-hangzhou.aliyuncs.com"));
-        Assertions.assertEquals("example.oss-cn-hangzhou-internal.aliyuncs.com", AlibabaCloudOssProperties.getBucketInternalDomain("example", "oss" +
+        Assertions.assertEquals("https://example.oss-cn-hangzhou-internal.aliyuncs.com", AlibabaCloudOssProperties.getBucketInternalEndpoint("example", "oss" +
                 "-cn-hangzhou-internal.aliyuncs.com"));
     }
 

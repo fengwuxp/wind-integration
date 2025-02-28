@@ -1,6 +1,7 @@
 package com.wind.integration.oss.alibaba;
 
 import com.aliyun.oss.ClientConfiguration;
+import com.aliyun.oss.internal.OSSUtils;
 import com.wind.common.WindConstants;
 import lombok.Data;
 
@@ -51,33 +52,39 @@ public class AlibabaCloudOssProperties {
     }
 
     /**
-     * 获取 bucket 公网域名
+     * 获取 bucket 公网 endpoint
      *
      * @param bucketName   bucket 名称
      * @param endpointHost endpoint host  (不带协议)
-     * @return bucket 公网域名
+     * @return bucket 公网 endpoint
      */
-    public static String getBucketDomain(String bucketName, String endpointHost) {
+    public static String getBucketEndpoint(String bucketName, String endpointHost) {
+        String result;
         if (endpointHost.contains(INTERNAL_FLAG)) {
             // 替换掉 -internal
-            return bucketName + WindConstants.DOT + endpointHost.replaceAll(INTERNAL_FLAG.substring(0, INTERNAL_FLAG.length() - 1), "");
+            result = bucketName + WindConstants.DOT + endpointHost.replaceAll(INTERNAL_FLAG.substring(0, INTERNAL_FLAG.length() - 1), "");
+        } else {
+            result = bucketName + WindConstants.DOT + endpointHost;
         }
-        return bucketName + WindConstants.DOT + endpointHost;
+        return OSSUtils.toEndpointURI(result, "https").toString();
     }
 
     /**
-     * 获取 bucket 内网域名
+     * 获取 bucket 内网 endpoint
      *
      * @param bucketName   bucket 名称
      * @param endpointHost endpoint host (不带协议)
-     * @return bucket 内网域名
+     * @return bucket 内网 endpoint
      */
-    public static String getBucketInternalDomain(String bucketName, String endpointHost) {
+    public static String getBucketInternalEndpoint(String bucketName, String endpointHost) {
+        String result;
         if (endpointHost.contains(INTERNAL_FLAG)) {
-            return bucketName + WindConstants.DOT + endpointHost;
+            result = bucketName + WindConstants.DOT + endpointHost;
+        } else {
+            // 拼接上 -internal
+            endpointHost = endpointHost.substring(0, endpointHost.length() - ALIYUN_DOMAIN.length() - 1) + INTERNAL_FLAG + ALIYUN_DOMAIN;
+            result = bucketName + WindConstants.DOT + endpointHost;
         }
-        // 拼接上 -internal
-        endpointHost = endpointHost.substring(0, endpointHost.length() - ALIYUN_DOMAIN.length() - 1) + INTERNAL_FLAG + ALIYUN_DOMAIN;
-        return bucketName + WindConstants.DOT + endpointHost;
+        return OSSUtils.toEndpointURI(result, "https").toString();
     }
 }

@@ -22,14 +22,10 @@ public class WindOssFile {
     private String key;
 
     /**
-     * 文件地址
+     * 文件地址（公网地址）
      */
+    @NotBlank
     private String url;
-
-    /**
-     * 域名地址
-     */
-    private String domain;
 
     /**
      * 文件名
@@ -45,7 +41,7 @@ public class WindOssFile {
     /**
      * 文件 hash 值
      */
-    public String hash;
+    private String hash;
 
     /**
      * 文件大小，字节数

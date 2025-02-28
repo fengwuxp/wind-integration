@@ -12,6 +12,7 @@ import com.aliyun.oss.model.ObjectMetadata;
 import com.aliyun.oss.model.PutObjectResult;
 import com.aliyun.oss.model.VoidResult;
 import com.wind.common.WindConstants;
+import com.wind.common.annotations.VisibleForTesting;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.oss.WindOSSException;
 import com.wind.integration.oss.WindOssClient;
@@ -37,9 +38,14 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class AlibabaCloudOssClient implements WindOssClient {
 
+    private static final String ALIYUN_DOMAIN = "aliyuncs.com";
+
     private final OSSClient ossClient;
 
-    private final String endpoint;
+    /**
+     * 地区，例如：cn-hangzhou
+     */
+    private final String region;
 
     @Override
     public void createBucket(String bucketName) throws WindOSSException {
@@ -124,7 +130,7 @@ public class AlibabaCloudOssClient implements WindOssClient {
         result.setName(objectKey);
         result.setKey(objectKey);
         result.setETag(metadata.getETag());
-        result.setUrl(getFileLink(bucketName, objectKey));
+        result.setUrl(getFileUrl(bucketName, objectKey));
         result.setHash(metadata.getContentMD5());
         result.setSize(metadata.getContentLength());
         result.setLastModified(LocalDateTime.from(metadata.getLastModified().toInstant()));
@@ -134,13 +140,13 @@ public class AlibabaCloudOssClient implements WindOssClient {
     }
 
     @Override
-    public String getFilePath(String bucketName, String objectKey) {
-        return getBucketEndpoint(bucketName).concat(WindConstants.SLASH).concat(objectKey);
+    public String getFileUrl(String bucketName, String objectKey) {
+        return getBucketDomain(bucketName, false).concat(WindConstants.SLASH).concat(objectKey);
     }
 
     @Override
-    public String getFileLink(String bucketName, String objectKey) {
-        return getBucketEndpoint(bucketName).concat(WindConstants.SLASH).concat(objectKey);
+    public String getFileInternalUrl(String bucketName, String objectKey) {
+        return getBucketDomain(bucketName, true).concat(WindConstants.SLASH).concat(objectKey);
     }
 
     @Override
@@ -149,8 +155,10 @@ public class AlibabaCloudOssClient implements WindOssClient {
         return (T) ossClient.getObjectMetadata(bucketName, objectKey);
     }
 
-    private String getBucketEndpoint(String bucketName) {
-        String baseEndpoint = endpoint.contains("https://") ? "https://" : "http://";
-        return baseEndpoint + bucketName + WindConstants.DOT + endpoint.replaceFirst(baseEndpoint, "");
+    @VisibleForTesting
+    String getBucketDomain(String bucketName, boolean useInternal) {
+        String incFlag = useInternal ? "-internal" : WindConstants.EMPTY;
+        String endpoint = "oss" + WindConstants.DASHED + region + incFlag + WindConstants.DOT + ALIYUN_DOMAIN;
+        return bucketName + WindConstants.DOT + endpoint;
     }
 }

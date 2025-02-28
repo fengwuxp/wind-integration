@@ -34,9 +34,10 @@ public class AlibabaCloudOssProperties {
     private String secretKey;
 
     /**
-     * oss endpoint (地域节点)
+     * oss 地区，例如：cn-hangzhou
+     * 无地区属性的使用：rg-china-mainland
      */
-    private String endpoint;
+    private String region;
 
     public ClientConfiguration getDefaultClientConfiguration() {
         ClientConfiguration result = new ClientConfiguration();

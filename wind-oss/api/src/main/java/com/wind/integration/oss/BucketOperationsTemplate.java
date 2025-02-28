@@ -80,20 +80,20 @@ public interface BucketOperationsTemplate {
     WindOssFile statFile(String objectKey);
 
     /**
-     * 获取文件相对路径
+     * 获取文件 url (公网)
      *
      * @param objectKey 存储桶对象名称
      * @return String
      */
-    String getFilePath(String objectKey);
+    String getFileUrl(String objectKey);
 
     /**
-     * 获取文件地址
+     * 获取文件 url (内网)
      *
      * @param objectKey 存储桶对象名称
      * @return String
      */
-    String getFileLink(String objectKey);
+    String getFileInternalUrl(String objectKey);
 
     /**
      * 获取文件的元数据

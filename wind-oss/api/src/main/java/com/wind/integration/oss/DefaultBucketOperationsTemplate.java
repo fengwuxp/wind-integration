@@ -54,13 +54,13 @@ public class DefaultBucketOperationsTemplate implements BucketOperationsTemplate
     }
 
     @Override
-    public String getFilePath(String objectKey) {
-        return client.getFilePath(bucketName, objectKey);
+    public String getFileUrl(String objectKey) {
+        return client.getFileUrl(bucketName, objectKey);
     }
 
     @Override
-    public String getFileLink(String objectKey) {
-        return client.getFileLink(bucketName, objectKey);
+    public String getFileInternalUrl(String objectKey) {
+        return client.getFileInternalUrl(bucketName, objectKey);
     }
 
     @Override

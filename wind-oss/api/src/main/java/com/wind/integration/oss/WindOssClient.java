@@ -110,22 +110,22 @@ public interface WindOssClient {
     WindOssFile statFile(String bucketName, String objectKey);
 
     /**
-     * 获取文件相对路径
+     * 获取文件地址 (公网)
      *
      * @param bucketName 存储桶名称
      * @param objectKey  存储桶对象名称
      * @return String
      */
-    String getFilePath(String bucketName, String objectKey);
+    String getFileUrl(String bucketName, String objectKey);
 
     /**
-     * 获取文件地址
+     * 获取文件地址 (内网)
      *
      * @param bucketName 存储桶名称
      * @param objectKey  存储桶对象名称
      * @return String
      */
-    String getFileLink(String bucketName, String objectKey);
+    String getFileInternalUrl(String bucketName, String objectKey);
 
     /**
      * 获取文件的元数据

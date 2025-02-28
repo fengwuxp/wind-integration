@@ -38,8 +38,8 @@ public class WindOssAutoConfiguration {
     @ConditionalOnMissingBean(WindOssClient.class)
     public WindOssClient alibabaCloudOssClient(AlibabaCloudOssProperties properties) {
         CredentialsProvider credentialProvider = new DefaultCredentialProvider(properties.getAccessKey(), properties.getSecretKey());
-        OSSClient ossClient = new OSSClient(properties.getEndpoint(), credentialProvider, properties.getDefaultClientConfiguration());
-        return new AlibabaCloudOssClient(ossClient, properties.getEndpoint());
+        OSSClient ossClient = new OSSClient(properties.getRegion(), credentialProvider, properties.getDefaultClientConfiguration());
+        return new AlibabaCloudOssClient(ossClient, properties.getRegion());
     }
 
     @Bean

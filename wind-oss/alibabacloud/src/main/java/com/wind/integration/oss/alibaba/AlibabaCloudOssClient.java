@@ -21,6 +21,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.InputStream;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -71,15 +73,14 @@ public class AlibabaCloudOssClient implements WindOssClient {
         objectMetadata.setUserMetadata(metadata == null ? Collections.emptyMap() : metadata);
         PutObjectResult response = ossClient.putObject(bucketName, objectKey, inputStream, objectMetadata);
         ResponseMessage message = response.getResponse();
-        String requestId = response.getRequestId();
-        AssertUtils.state(response.getResponse().isSuccessful(), () -> new WindOSSException(message.getErrorResponseAsString(), requestId));
+        AssertUtils.state(response.getETag() != null, () -> new WindOSSException(message.getErrorResponseAsString(), response.getRequestId()));
         return statFile(bucketName, objectKey);
     }
 
     @Override
     public InputStream downloadFile(String bucketName, String objectKey) throws WindOSSException {
         OSSObject response = ossClient.getObject(bucketName, objectKey);
-        AssertUtils.state(response.getResponse().isSuccessful(), () -> new WindOSSException(response.getResponse().getErrorResponseAsString(),
+        AssertUtils.state(response.getObjectContent() != null, () -> new WindOSSException(response.getResponse().getErrorResponseAsString(),
                 response.getRequestId()));
         return response.getObjectContent();
     }
@@ -98,8 +99,6 @@ public class AlibabaCloudOssClient implements WindOssClient {
         request.setPrefix(prefix);
         request.setMaxKeys(maxKeys);
         ListObjectsV2Result response = ossClient.listObjectsV2(request);
-        AssertUtils.state(response.getResponse().isSuccessful(), () -> new WindOSSException(response.getResponse().getErrorResponseAsString(),
-                response.getRequestId()));
         return response.getObjectSummaries()
                 .stream()
                 .map(OSSObjectSummary::getKey)
@@ -114,7 +113,7 @@ public class AlibabaCloudOssClient implements WindOssClient {
     @Override
     public void copyFile(String bucketName, String sourceKey, String destBucketName, String destKey) throws WindOSSException {
         CopyObjectResult response = ossClient.copyObject(bucketName, sourceKey, destBucketName, destKey);
-        AssertUtils.state(response.getResponse().isSuccessful(), () -> new WindOSSException(response.getResponse().getErrorResponseAsString(),
+        AssertUtils.state(response.getETag() != null, () -> new WindOSSException(response.getResponse().getErrorResponseAsString(),
                 response.getRequestId()));
     }
 
@@ -131,7 +130,8 @@ public class AlibabaCloudOssClient implements WindOssClient {
         result.setContentType(metadata.getContentType());
         result.setMetadata(metadata.getUserMetadata());
         if (metadata.getLastModified() != null) {
-            result.setLastModified(LocalDateTime.from(metadata.getLastModified().toInstant()));
+            ZonedDateTime time = metadata.getLastModified().toInstant().atZone(ZoneId.systemDefault());
+            result.setLastModified( time.toLocalDateTime());
         }
         return result;
     }

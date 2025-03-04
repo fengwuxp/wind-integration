@@ -1,5 +1,6 @@
 package com.wind.transaction.core;
 
+import com.wind.common.exception.AssertUtils;
 import com.wind.core.WritableContextVariables;
 
 import javax.validation.constraints.NotBlank;
@@ -22,6 +23,7 @@ public final class TransactionContextVariables implements WritableContextVariabl
     private final Map<String, Object> variables;
 
     private TransactionContextVariables(@NotNull Map<String, Object> variables) {
+        AssertUtils.notNull(variables,"argument variables must not null");
         this.variables = variables;
     }
 
@@ -42,6 +44,12 @@ public final class TransactionContextVariables implements WritableContextVariabl
     @Override
     public WritableContextVariables putVariable(@NotBlank String name, Object val) {
         variables.put(name, val);
+        return this;
+    }
+
+    @Override
+    public WritableContextVariables removeVariable(@NotBlank String name) {
+        variables.remove(name);
         return this;
     }
 

@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.UnaryOperator;
@@ -42,7 +43,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     /**
      * 用于解密 kms ak/sk 的秘钥
      */
-    private static final String KMS_KEY_ASE_KEY_FILE = "kms_key_ase_key.key";
+    private static final String KMS_KEY_ASE_KEY_FILE = "classpath:kms_key_ase_key.key";
 
     private static final String ALIBABA_CLOUD_ACCESS_KEY_ID = "ALIBABA_CLOUD_K_AK";
 
@@ -71,7 +72,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
      * @return AlibabaCloudKmsReadyOnlyClient
      */
     public static AlibabaCloudKmsCryptoClient of() {
-        String key = loadFileAsText(KMS_KEY_ASE_KEY_FILE);
+        String key = loadFileAsText();
         if (StringUtils.hasText(key)) {
             try {
                 BufferedReader reader = new BufferedReader(new StringReader(key));
@@ -92,8 +93,8 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
      */
     public static AlibabaCloudKmsCryptoClient of(UnaryOperator<String> decryptFunc) {
         // 必填，请确保代码运行环境设置了环境变量 ALIBABA_CLOUD_ACCESS_KEY_ID。
-        return form(decryptFunc.apply(System.getenv(ALIBABA_CLOUD_ACCESS_KEY_ID)),
-                decryptFunc.apply(System.getenv(ALIBABA_CLOUD_ACCESS_KEY_SECRET)), System.getenv(ALIBABA_CLOUD_ENDPOINT));
+        return form(decryptFunc.apply(requireEnv(ALIBABA_CLOUD_ACCESS_KEY_ID)),
+                decryptFunc.apply(requireEnv(ALIBABA_CLOUD_ACCESS_KEY_SECRET)), requireEnv(ALIBABA_CLOUD_ENDPOINT));
     }
 
     /**
@@ -179,12 +180,18 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
         AssertUtils.state(statusCode >= 200 && statusCode < 300, () -> new WindKmsException("kms request failure", reqeustId));
     }
 
-    private static String loadFileAsText(String fileName) {
+    private static String loadFileAsText() {
         try {
-            return StreamUtils.copyToString(Files.newInputStream(ResourceUtils.getFile("classpath:" + fileName).toPath()),
-                    StandardCharsets.UTF_8);
+            Path path = ResourceUtils.getFile(AlibabaCloudKmsCryptoClient.KMS_KEY_ASE_KEY_FILE).toPath();
+            return StreamUtils.copyToString(Files.newInputStream(path), StandardCharsets.UTF_8);
         } catch (IOException exception) {
             return WindConstants.EMPTY;
         }
+    }
+
+    private static String requireEnv(String name) {
+        String result = System.getProperty(name, System.getenv(name));
+        AssertUtils.notNull(result, String.format("env name =%s not configure", name));
+        return result;
     }
 }

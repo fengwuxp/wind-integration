@@ -8,12 +8,25 @@ import com.aliyun.kms20160120.models.EncryptResponse;
 import com.aliyun.kms20160120.models.GetSecretValueRequest;
 import com.aliyun.kms20160120.models.GetSecretValueResponse;
 import com.aliyun.kms20160120.models.GetSecretValueResponseBody;
+import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
+import com.wind.common.exception.BaseException;
+import com.wind.common.exception.DefaultExceptionCode;
 import com.wind.integration.kms.WindCredentialsClient;
 import com.wind.integration.kms.WindCryptoClient;
 import com.wind.integration.kms.WindKmsException;
 import com.wind.integration.kms.model.dto.KmsSecretDetailsDTO;
+import com.wind.security.crypto.symmetric.AesTextEncryptor;
+import org.springframework.security.crypto.encrypt.TextEncryptor;
+import org.springframework.util.ResourceUtils;
+import org.springframework.util.StreamUtils;
+import org.springframework.util.StringUtils;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.UnaryOperator;
@@ -25,6 +38,11 @@ import java.util.function.UnaryOperator;
  * @date 2025-02-17 18:22
  **/
 public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindCryptoClient {
+
+    /**
+     * 用于解密 kms ak/sk 的秘钥
+     */
+    private static final String KMS_KEY_ASE_KEY_FILE = "kms_key_ase_key.key";
 
     private static final String ALIBABA_CLOUD_ACCESS_KEY_ID = "ALIBABA_CLOUD_K_AK";
 
@@ -43,8 +61,27 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
      *
      * @return AlibabaCloudKmsReadyOnlyClient
      */
-    public static AlibabaCloudKmsCryptoClient of() {
+    public static AlibabaCloudKmsCryptoClient defaults() {
         return of(text -> text);
+    }
+
+    /**
+     * 从环境变量中获取配置创建 client
+     *
+     * @return AlibabaCloudKmsReadyOnlyClient
+     */
+    public static AlibabaCloudKmsCryptoClient of() {
+        String key = loadFileAsText(KMS_KEY_ASE_KEY_FILE);
+        if (StringUtils.hasText(key)) {
+            try {
+                BufferedReader reader = new BufferedReader(new StringReader(key));
+                TextEncryptor encryptor = new AesTextEncryptor(reader.readLine(), reader.readLine());
+                return AlibabaCloudKmsCryptoClient.of(encryptor::decrypt);
+            } catch (IOException exception) {
+                throw new BaseException(DefaultExceptionCode.COMMON_ERROR, "build kms client error", exception);
+            }
+        }
+        return defaults();
     }
 
     /**
@@ -87,7 +124,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
         EncryptRequest request = new EncryptRequest();
         request.setKeyId(keyId);
         request.setPlaintext(plaintext);
-        HashMap<String, Object> context = new HashMap<>(options);
+        Map<String, Object> context = new HashMap<>(options);
         request.setEncryptionContext(context);
         try {
             EncryptResponse response = client.encrypt(request);
@@ -140,5 +177,14 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
 
     private void assertSuccessful(int statusCode, String reqeustId) {
         AssertUtils.state(statusCode >= 200 && statusCode < 300, () -> new WindKmsException("kms request failure", reqeustId));
+    }
+
+    private static String loadFileAsText(String fileName) {
+        try {
+            return StreamUtils.copyToString(Files.newInputStream(ResourceUtils.getFile("classpath:" + fileName).toPath()),
+                    StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            return WindConstants.EMPTY;
+        }
     }
 }

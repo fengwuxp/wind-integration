@@ -42,7 +42,6 @@ public class AlibabaCloudOssClient implements WindOssClient {
 
     private final OSSClient ossClient;
 
-
     @Override
     public void createBucket(String bucketName) throws WindOSSException {
         if (!isBucketExists(bucketName)) {
@@ -152,6 +151,5 @@ public class AlibabaCloudOssClient implements WindOssClient {
     public <T> T getFileMetadata(String bucketName, String objectKey) throws WindOSSException {
         return (T) ossClient.getObjectMetadata(bucketName, objectKey);
     }
-
 
 }

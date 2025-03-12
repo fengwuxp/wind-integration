@@ -24,6 +24,7 @@ public class AlibabaCloudKmsCredentialsProvider implements WindCredentialsProvid
         synchronized (client) {
             // 改为延迟初始化，避免不强依赖 kms 时初始化错误
             if (client.get() == null) {
+                log.info("Init WindCredentialsClient");
                 client.set(AlibabaCloudKmsCryptoClient.of());
             }
         }

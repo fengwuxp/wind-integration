@@ -17,8 +17,10 @@ import com.wind.integration.kms.WindCryptoClient;
 import com.wind.integration.kms.WindKmsException;
 import com.wind.integration.kms.model.dto.KmsSecretDetailsDTO;
 import com.wind.security.crypto.symmetric.AesTextEncryptor;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
-import org.springframework.util.ResourceUtils;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StreamUtils;
 import org.springframework.util.StringUtils;
 
@@ -26,8 +28,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.UnaryOperator;
@@ -117,7 +117,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
         AssertUtils.hasText(ak, "argument ak must not empty");
         AssertUtils.hasText(sk, "argument sk must not empty");
         AssertUtils.hasText(endpoint, "argument endpoint must not empty");
-        LOGGER.info(String.format("alibaba cloud kms init, ak = %s", ak));
+        LOGGER.finer(String.format("alibaba cloud kms init, the first 5 characters of AK= %s", ak.substring(0, 5)));
         com.aliyun.teaopenapi.models.Config config = new com.aliyun.teaopenapi.models.Config()
                 .setAccessKeyId(ak)
                 .setAccessKeySecret(sk)
@@ -190,9 +190,13 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     }
 
     private static String loadFileAsText() {
+        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         try {
-            Path path = ResourceUtils.getFile(AlibabaCloudKmsCryptoClient.KMS_KEY_ASE_KEY_FILE).toPath();
-            return StreamUtils.copyToString(Files.newInputStream(path), StandardCharsets.UTF_8);
+            Resource[] resources = resolver.getResources(AlibabaCloudKmsCryptoClient.KMS_KEY_ASE_KEY_FILE);
+            if (ObjectUtils.isEmpty(resources)) {
+                return WindConstants.EMPTY;
+            }
+            return StreamUtils.copyToString(resources[0].getInputStream(), StandardCharsets.UTF_8);
         } catch (IOException exception) {
             return WindConstants.EMPTY;
         }

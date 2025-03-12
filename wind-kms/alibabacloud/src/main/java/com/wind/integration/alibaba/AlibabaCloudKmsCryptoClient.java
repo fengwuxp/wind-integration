@@ -31,6 +31,8 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.UnaryOperator;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Logger;
 
 /**
  * 阿里云 kms client
@@ -39,6 +41,12 @@ import java.util.function.UnaryOperator;
  * @date 2025-02-17 18:22
  **/
 public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindCryptoClient {
+
+    private static final Logger LOGGER = Logger.getLogger(AlibabaCloudKmsCryptoClient.class.getName());
+
+    static {
+        LOGGER.addHandler(new ConsoleHandler());
+    }
 
     /**
      * 用于解密 kms ak/sk 的秘钥
@@ -73,6 +81,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
      */
     public static AlibabaCloudKmsCryptoClient of() {
         String key = loadFileAsText();
+        LOGGER.info("init Alibaba Cloud Kms Client");
         if (StringUtils.hasText(key)) {
             try {
                 BufferedReader reader = new BufferedReader(new StringReader(key));

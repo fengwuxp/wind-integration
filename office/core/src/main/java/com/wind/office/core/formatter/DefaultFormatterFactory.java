@@ -102,7 +102,7 @@ public final class DefaultFormatterFactory {
             }
 
             @Override
-            public String print(@NonNull Collection<?> object,@Nullable Locale locale) {
+            public String print(@NonNull Collection<?> object, @Nullable Locale locale) {
                 return StringJoinSplitUtils.join(object);
             }
         };

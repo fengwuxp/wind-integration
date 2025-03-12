@@ -29,7 +29,8 @@ public class CompositeMessageSender implements MessageSender<MessageDefinition<?
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public void sendMessages(Collection<MessageDefinition<?>> messages) {
-        Map<Class<? extends MessageDefinition>, List<MessageDefinition>> classListMap = messages.stream().collect(Collectors.groupingBy(MessageDefinition::getClass));
+        Map<Class<? extends MessageDefinition>, List<MessageDefinition>> classListMap =
+                messages.stream().collect(Collectors.groupingBy(MessageDefinition::getClass));
         classListMap.forEach((k, v) -> {
             for (MessageSender delegate : delegates) {
                 if (delegate.supports(k)) {

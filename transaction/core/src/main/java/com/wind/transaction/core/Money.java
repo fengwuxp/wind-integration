@@ -80,7 +80,7 @@ public final class Money implements Serializable {
     /**
      * 创建一个具有{@param amount} 数额的货币对象
      *
-     * @param amount       数额(分)
+     * @param amount          数额(分)
      * @param currencyIsoCode 货币类型
      * @return 货币实例
      */
@@ -92,7 +92,7 @@ public final class Money implements Serializable {
     /**
      * 元转分：创建一个具有{@param amount} 数额的货币对象
      *
-     * @param amount       数额(元)
+     * @param amount          数额(元)
      * @param currencyIsoCode 货币类型
      * @return 货币实例
      */

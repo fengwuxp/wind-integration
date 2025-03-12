@@ -25,7 +25,7 @@ public class SpringExpressionExportExcelTask extends AbstractDelegateDocumentTas
     }
 
     @Override
-    @SuppressWarnings({"rawtypes","unchecked"})
+    @SuppressWarnings({"rawtypes", "unchecked"})
     protected void doTask() {
         int queryPage = 1;
         ExportExcelTaskInfo taskInfo = (ExportExcelTaskInfo) getDelegate();

@@ -12,6 +12,7 @@ import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.exception.BaseException;
 import com.wind.common.exception.DefaultExceptionCode;
+import com.wind.common.jul.JulLogFactory;
 import com.wind.integration.kms.WindCredentialsClient;
 import com.wind.integration.kms.WindCryptoClient;
 import com.wind.integration.kms.WindKmsException;
@@ -31,7 +32,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.UnaryOperator;
-import java.util.logging.ConsoleHandler;
 import java.util.logging.Logger;
 
 /**
@@ -42,11 +42,7 @@ import java.util.logging.Logger;
  **/
 public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindCryptoClient {
 
-    private static final Logger LOGGER = Logger.getLogger(AlibabaCloudKmsCryptoClient.class.getName());
-
-    static {
-        LOGGER.addHandler(new ConsoleHandler());
-    }
+    private static final Logger LOGGER = JulLogFactory.getLogger(AlibabaCloudKmsCryptoClient.class);
 
     /**
      * 用于解密 kms ak/sk 的秘钥
@@ -117,7 +113,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
         AssertUtils.hasText(ak, "argument ak must not empty");
         AssertUtils.hasText(sk, "argument sk must not empty");
         AssertUtils.hasText(endpoint, "argument endpoint must not empty");
-        LOGGER.finer(String.format("alibaba cloud kms init, the first 5 characters of AK= %s", ak.substring(0, 5)));
+        LOGGER.info(String.format("alibaba cloud kms init, the first 5 characters of AK= %s", ak.substring(0, 5)));
         com.aliyun.teaopenapi.models.Config config = new com.aliyun.teaopenapi.models.Config()
                 .setAccessKeyId(ak)
                 .setAccessKeySecret(sk)

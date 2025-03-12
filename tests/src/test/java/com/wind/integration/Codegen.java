@@ -48,7 +48,7 @@ public class Codegen {
         Map<String, Class<?>> classes = ImmutableMap.of(
                 "系统配置", SystemConfig.class,
                 "数据字典", DictionaryMetadata.class
-                );
+        );
         DefaultServiceCodeGenerator generator = new DefaultServiceCodeGenerator(configuration);
         classes.forEach((desc, clazz) -> generator.gen(clazz, desc));
         Assertions.assertTrue(new File(outBasePath).exists());

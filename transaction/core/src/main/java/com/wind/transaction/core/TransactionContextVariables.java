@@ -23,7 +23,7 @@ public final class TransactionContextVariables implements WritableContextVariabl
     private final Map<String, Object> variables;
 
     private TransactionContextVariables(@NotNull Map<String, Object> variables) {
-        AssertUtils.notNull(variables,"argument variables must not null");
+        AssertUtils.notNull(variables, "argument variables must not null");
         this.variables = variables;
     }
 

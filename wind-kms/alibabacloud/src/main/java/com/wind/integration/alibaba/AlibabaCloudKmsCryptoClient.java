@@ -51,7 +51,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     /**
      * 用于解密 kms ak/sk 的秘钥
      */
-    private static final String KMS_KEY_ASE_KEY_FILE = "classpath:kms_key_ase_key.key";
+    private static final String KMS_KEY_ASE_KEY_FILE = "classpath*:kms_key_ase_key.key";
 
     private static final String ALIBABA_CLOUD_ACCESS_KEY_ID = "ALIBABA_CLOUD_K_AK";
 
@@ -81,7 +81,6 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
      */
     public static AlibabaCloudKmsCryptoClient of() {
         String key = loadFileAsText();
-        LOGGER.info("init Alibaba Cloud Kms Client");
         if (StringUtils.hasText(key)) {
             try {
                 BufferedReader reader = new BufferedReader(new StringReader(key));
@@ -118,6 +117,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
         AssertUtils.hasText(ak, "argument ak must not empty");
         AssertUtils.hasText(sk, "argument sk must not empty");
         AssertUtils.hasText(endpoint, "argument endpoint must not empty");
+        LOGGER.info(String.format("alibaba cloud kms init, ak = %s", ak));
         com.aliyun.teaopenapi.models.Config config = new com.aliyun.teaopenapi.models.Config()
                 .setAccessKeyId(ak)
                 .setAccessKeySecret(sk)

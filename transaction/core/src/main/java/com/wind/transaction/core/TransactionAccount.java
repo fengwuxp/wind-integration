@@ -26,20 +26,29 @@ public interface TransactionAccount {
      *
      * @return 账户总转入数额 （总转入）
      */
-    Integer getAmount();
+    Integer getDepositAmount();
 
     /**
      * 账户当下可用于支出的数额
-     * 可用余额 = 总转入额度 + 总退款额度 - 总支出额度 - 已冻结额度 - 手续费
+     * 可用余额 = 总转入额度 + 总退款额度 - 累计提现 - 总支出额度 - 已冻结额度 - 手续费
      *
      * @return 账户可用数额
      */
-    default Integer getAvailableAmount() {
-        return getAmount() + getRefundedAmount() - getExpensesAmount() - getFreezeAmount() - getFeeAmount();
+    default Integer getAvailableBalance() {
+        return getDepositAmount() + getRefundedAmount() - getWithdrawAmount() - getExpensesAmount() - getFreezeAmount() - getFeeAmount();
     }
 
     /**
-     * 累计账户由于未来某时刻支出需要临时冻结一部分余额，以保证在支付阶段不会由于 {@link #getAvailableAmount()} 不够导致支付失败
+     * 账户余额 = 可用余额 + 冻结金额
+     *
+     * @return 账户余额
+     */
+    default Integer getTotalBalance() {
+        return getAvailableBalance() + getFreezeAmount();
+    }
+
+    /**
+     * 累计账户由于未来某时刻支出需要临时冻结一部分余额，以保证在支付阶段不会由于 {@link #getAvailableBalance()} 不够导致支付失败
      *
      * @return 账户已冻结数额（已冻结）
      */
@@ -58,6 +67,13 @@ public interface TransactionAccount {
      * @return 已退款数额（总退款）
      */
     Integer getRefundedAmount();
+
+    /**
+     * 累计提现
+     *
+     * @return 累计账户已提现的数额
+     */
+    Integer getWithdrawAmount();
 
     /**
      * 累计手续费
@@ -81,7 +97,7 @@ public interface TransactionAccount {
      * @return 是否可用
      */
     default boolean isAvailable() {
-        return getAvailableAmount() > 0;
+        return getAvailableBalance() > 0;
     }
 
     /**

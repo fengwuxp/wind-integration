@@ -20,7 +20,7 @@ public interface AccountTransactionService {
     TransactionAccount getAccount(TransactionAccountId id);
 
     /**
-     * 转入金额到账户，仅累加 {@link TransactionAccount#getAmount()}
+     * 转入金额到账户，仅累加 {@link TransactionAccount#getDepositAmount()}
      *
      * @param request 转入请求
      * @return 账号交易流水号

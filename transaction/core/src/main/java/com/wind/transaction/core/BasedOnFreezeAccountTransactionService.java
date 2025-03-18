@@ -15,7 +15,7 @@ public interface BasedOnFreezeAccountTransactionService extends AccountTransacti
 
     /**
      * 冻结账户一部分额度，仅累加 {@link TransactionAccount#getFreezeAmount()}
-     * 冻结额度不能大于可用额度 {@link TransactionAccount#getAvailableAmount()}
+     * 冻结额度不能大于可用额度 {@link TransactionAccount#getAvailableBalance()}
      *
      * @param id      账户标识
      * @param request 冻结请求

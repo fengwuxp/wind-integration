@@ -30,16 +30,16 @@ public interface TransactionAccount {
 
     /**
      * 账户当下可用于支出的数额
-     * 可用余额 = 总转入额度 + 总退款额度 - 累计提现 - 总支出额度 - 已冻结额度 - 手续费
+     * 可用余额 = 累计转入额度 + 累计退款额度 - 累计提现 - 累计支出额度 - 累计冻结额度
      *
      * @return 账户可用数额
      */
     default Integer getAvailableBalance() {
-        return getDepositAmount() + getRefundedAmount() - getWithdrawAmount() - getExpensesAmount() - getFreezeAmount() - getFeeAmount();
+        return getDepositAmount() + getRefundedAmount() - getExpensesAmount() - getFreezeAmount();
     }
 
     /**
-     * 账户余额 = 可用余额 + 冻结金额
+     * 账户余额 = 可用余额 + 累计冻结金额
      *
      * @return 账户余额
      */
@@ -55,7 +55,7 @@ public interface TransactionAccount {
     Integer getFreezeAmount();
 
     /**
-     * 由于支付、转出、提现等累计的数额
+     * 累计支出 = 累计支付（消费）+ 累计提现 + 累计手续费
      *
      * @return 累计账户已支出的数额（总支出）
      */

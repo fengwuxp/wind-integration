@@ -9,6 +9,7 @@ import org.springframework.lang.Nullable;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -465,11 +466,31 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
     /**
      * 创建一个货币对象
      *
-     * @param amount 货币数额
+     * @param amount 货币数额，单位：分
      * @return 货币对象
      */
-    public com.wind.transaction.core.Money of(int amount) {
+    public Money of(int amount) {
         return Money.immutable(amount, this);
+    }
+
+    /**
+     * 创建一个货币对象
+     *
+     * @param amountYuan 货币数额, 单位：元
+     * @return 货币对象
+     */
+    public Money of(BigDecimal amountYuan) {
+        return Money.immutable(amountYuan, this);
+    }
+
+    /**
+     * 创建一个货币对象
+     *
+     * @param amountYuanText 货币数额, 单位：元
+     * @return 货币对象
+     */
+    public Money ofText(String amountYuanText) {
+        return Money.immutable(amountYuanText, this);
     }
 
     /**

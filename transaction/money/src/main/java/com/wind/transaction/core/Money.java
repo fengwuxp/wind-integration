@@ -1,9 +1,9 @@
 package com.wind.transaction.core;
 
-import com.wind.transaction.core.enums.CurrencyIsoCode;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.wind.common.exception.AssertUtils;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
@@ -140,18 +140,28 @@ public final class Money implements Serializable, Comparable<Money> {
         return new Money(amount, currency);
     }
 
+    /**
+     * 元转分：创建一个具有{@param amount} 数额的货币对象
+     *
+     * @param amountYuanText 数额(元)
+     * @param currency       货币类型
+     * @return 货币实例
+     */
+    public static Money immutable(String amountYuanText, CurrencyIsoCode currency) {
+        return immutable(new BigDecimal(amountYuanText), currency);
+    }
 
     /**
      * 元转分：创建一个具有{@param amount} 数额的货币对象
      *
-     * @param amount   数额(元)
-     * @param currency 货币类型
+     * @param amountYuan 数额(元)
+     * @param currency   货币类型
      * @return 货币实例
      */
-    public static Money immutable(@NotNull BigDecimal amount, @NotNull CurrencyIsoCode currency) {
-        AssertUtils.notNull(amount, "货币数额不能为空");
+    public static Money immutable(@NotNull BigDecimal amountYuan, @NotNull CurrencyIsoCode currency) {
+        AssertUtils.notNull(amountYuan, "货币数额不能为空");
         AssertUtils.notNull(currency, "货币类型不能为空");
-        int longAmount = amount.scaleByPowerOfTen(currency.getPrecision()).intValue();
+        int longAmount = amountYuan.scaleByPowerOfTen(currency.getPrecision()).intValue();
         return immutable(longAmount, currency);
     }
 }

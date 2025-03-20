@@ -1,5 +1,6 @@
 package com.wind.transaction.core.enums;
 
+import com.mybatisflex.annotation.EnumValue;
 import com.wind.common.enums.DescriptiveEnum;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -273,11 +274,16 @@ public enum InternationalRegionCode implements DescriptiveEnum {
     SS("SSD", "+211", "南苏丹共和国", "South Sudan"),
     AX("ALA", "+358", "奥兰区", "Åland Islands"),
     BQ("BES", "+599", "博奈尔", "Bonaire"),
-    XK("XKS", "+383", "科索沃共和国", "Republic of Kosovo");
+    XK("XKS", "+383", "科索沃共和国", "Republic of Kosovo"),
+    ;
 
     private static final Map<String, InternationalRegionCode> ALPHA_3_CODES = initAlpha3Codes();
 
-
+    /**
+     * 国家编码
+     * ISO 3166-1 三位字母代码
+     */
+    @EnumValue
     private final String countryCode;
 
     /**
@@ -308,33 +314,27 @@ public enum InternationalRegionCode implements DescriptiveEnum {
      * @return 相应的 CountryCodeEnum，如果未找到则为 null
      */
     @Nullable
-    public static InternationalRegionCode ofByCode(String code) {
-        if (StringUtils.hasText(code)) {
-            switch (code.length()) {
-                case 2:
-                    return getByAlpha2Code(code);
-                case 3:
-                    return getByAlpha3Code(code);
-                default:
-                    return null;
-            }
+    public static InternationalRegionCode getByCode(String code) {
+        if (!StringUtils.hasText(code)) {
+            return null;
         }
-        return null;
+        switch (code.length()) {
+            case 2:
+                return getByAlpha2Code(code);
+            case 3:
+                return getByAlpha3Code(code);
+            default:
+                return null;
+        }
     }
 
-    /**
-     * 通过 {@link #countryCallingCode} 交换 {@link InternationalRegionCode}
-     *
-     * @param callingCode 手机号码区号
-     * @return InternationalRegionCode
-     */
-    @Nullable
-    public static InternationalRegionCode ofByCallingCode(String callingCode) {
-        if (StringUtils.hasText(callingCode)) {
-            for (InternationalRegionCode internationalRegionCode : values()) {
-                if (internationalRegionCode.getCountryCallingCode().equals(callingCode)) {
-                    return internationalRegionCode;
-                }
+    public static InternationalRegionCode getByCallingCode(String callingCode) {
+        if (!StringUtils.hasText(callingCode)) {
+            return null;
+        }
+        for (InternationalRegionCode internationalRegionCode : values()) {
+            if (internationalRegionCode.getCountryCallingCode().equals(callingCode)) {
+                return internationalRegionCode;
             }
         }
         return null;

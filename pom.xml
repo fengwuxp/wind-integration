@@ -114,6 +114,11 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
+                <artifactId>wind-transaction-money</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
                 <artifactId>wind-office-excel</artifactId>
                 <version>${revision}</version>
             </dependency>

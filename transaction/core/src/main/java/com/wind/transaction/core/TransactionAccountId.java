@@ -1,12 +1,17 @@
 package com.wind.transaction.core;
 
-import com.wind.common.WindConstants;
+import com.wind.common.enums.DescriptiveEnum;
 import com.wind.common.exception.AssertUtils;
+import com.wind.core.WritableContextVariables;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.ToString;
+import org.springframework.lang.Nullable;
 
+import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 交易账户标识
@@ -16,19 +21,17 @@ import javax.validation.constraints.NotNull;
  **/
 @EqualsAndHashCode
 @ToString
-public class TransactionAccountId {
+public class TransactionAccountId implements WritableContextVariables {
 
     /**
      * 账号唯一标识
      */
-    @Getter
     private final String id;
 
     /**
      * 账号类型
      */
-    @Getter
-    private final String type;
+    private final DescriptiveEnum type;
 
     /**
      * 归属的用户
@@ -36,21 +39,50 @@ public class TransactionAccountId {
     @NotNull
     private final Object userId;
 
-    private TransactionAccountId(@NotNull String id, @NotNull String type, @NotNull Object userId) {
+    private TransactionAccountId(@NotNull String id, @NotNull DescriptiveEnum type, @NotNull Object userId) {
         AssertUtils.hasText(id, "argument id must not empty");
-        AssertUtils.hasText(type, "argument type must not empty");
+        AssertUtils.notNull(type, "argument type must not null");
         AssertUtils.notNull(userId, "argument userId must not null");
         this.id = id;
         this.type = type;
         this.userId = userId;
     }
 
-    public static TransactionAccountId of(String id, Object userId) {
-        return of(id, WindConstants.DEFAULT_TEXT, userId);
+    public static TransactionAccountId of(String id, DescriptiveEnum type, Object userId) {
+        return new TransactionAccountId(id, type, userId);
     }
 
-    public static TransactionAccountId of(String id, String type, Object userId) {
-        return new TransactionAccountId(id, type, userId);
+    /**
+     * 上下文变量
+     */
+    private final Map<String, Object> variables = new HashMap<>();
+
+    @Override
+    public TransactionAccountId putVariable(String name, @Nullable Object val) {
+        variables.put(name, val);
+        return this;
+    }
+
+    @Override
+    public WritableContextVariables removeVariable(@NotBlank String name) {
+        variables.remove(name);
+        return this;
+    }
+
+    @Override
+    public Map<String, Object> getContextVariables() {
+        return Collections.unmodifiableMap(variables);
+    }
+
+    @NotNull
+    public String getId() {
+        return id;
+    }
+
+    @SuppressWarnings("unchecked")
+    @NotNull
+    public <T> T getType() {
+        return (T) type;
     }
 
     @SuppressWarnings("unchecked")

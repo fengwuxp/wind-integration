@@ -15,7 +15,6 @@ public interface AccountTransactionService {
      *
      * @param id 交易账号 ID
      * @return 交易账号
-     * @return 账号交易流水号
      */
     TransactionAccount getAccount(TransactionAccountId id);
 

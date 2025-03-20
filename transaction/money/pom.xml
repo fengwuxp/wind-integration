@@ -9,16 +9,22 @@
         <version>${revision}</version>
     </parent>
 
-    <artifactId>wind-transaction-core</artifactId>
+    <artifactId>wind-transaction-money</artifactId>
     <dependencies>
         <dependency>
             <groupId>com.wind.middleware</groupId>
             <artifactId>wind-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.wind.integration</groupId>
-            <artifactId>wind-transaction-money</artifactId>
+            <groupId>com.mybatis-flex</groupId>
+            <artifactId>mybatis-flex-annotation</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
         </dependency>
     </dependencies>
+
 
 </project>

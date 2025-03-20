@@ -2,8 +2,6 @@ package com.wind.transaction.core;
 
 import com.wind.common.enums.DescriptiveEnum;
 
-import javax.validation.constraints.NotBlank;
-
 /**
  * 账号交易类型
  *
@@ -12,9 +10,4 @@ import javax.validation.constraints.NotBlank;
  **/
 public interface AccountTransactionType extends DescriptiveEnum {
 
-    /**
-     * @return 交易类型名称
-     */
-    @NotBlank
-    String name();
 }

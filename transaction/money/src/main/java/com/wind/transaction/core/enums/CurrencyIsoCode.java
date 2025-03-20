@@ -1,5 +1,6 @@
 package com.wind.transaction.core.enums;
 
+import com.mybatisflex.annotation.EnumValue;
 import com.wind.common.enums.DescriptiveEnum;
 import com.wind.common.exception.AssertUtils;
 import com.wind.transaction.core.Money;
@@ -9,17 +10,21 @@ import org.springframework.lang.Nullable;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
  * 币种类型
- * 参见：<a href="https://en.wikipedia.org/wiki/ISO_4217">ISO_4217</a>
+ * 参见：<a href="https://en.wikipedia.org/wiki/ISO_4217">...</a>
  *
  * @author wuxp
  * @date 2023-09-27 18:48
  **/
 @Getter
 public enum CurrencyIsoCode implements DescriptiveEnum {
+
+    UNKNOWN("-1", "unknown", "未知", "??"),
 
     USD("840", "USD", "美元", "$"),
 
@@ -353,23 +358,80 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     ZWL("932", "ZWL", "津巴布韋元", "$"),
 
-    // 虚拟货币和特殊需求
-    BTC("BTC", "BTC", "比特币", "₿", 8), // 比特币
-    ETH("ETH", "ETH", "以太坊", "Ξ", 8), // 以太币
-    USDT("USDT", "USDT", "泰达币", "$", 2), // 泰达币
-    UNKNOWN("-1", "unknown", "未知", "??", 2); // 未知币种
+    BRN("076", "BRN", "Brazilian cruzado novo", "BRN"),
+
+    /*---   虚拟货币和特殊需求  ---*/
+    // 比特币
+    BTC("BTC", "BTC", "比特币", "₿", 8),
+
+    // 以太币
+    ETH("ETH", "ETH", "以太坊", "Ξ", 8),
+
+    // 泰达币
+    USDT("000", "USDT", "泰达币", "$"),
     ;
+
+    /**
+     * 过时币种代码映射
+     *
+     * @key 过时代码
+     * @value 币种
+     */
+    private static final Map<String, CurrencyIsoCode> DEPRECATED_CODES = new HashMap<>();
+
+    // 参见：https://zh.wikipedia.org/wiki/ISO_4217#%E8%BF%87%E6%97%B6%E7%9A%84%E8%B4%A7%E5%B8%81%E4%BB%A3%E7%A0%81
+    static {
+        DEPRECATED_CODES.put("020", CurrencyIsoCode.EUR);
+        DEPRECATED_CODES.put("040", CurrencyIsoCode.EUR);
+        // BEF	056	2	比利时法郎（与LUF为货币联盟）	1832年	1998年
+        DEPRECATED_CODES.put("056", CurrencyIsoCode.EUR);
+        DEPRECATED_CODES.put("191", CurrencyIsoCode.EUR);
+        // 塞浦路斯镑（CYP）已于 2008 年 1 月 1 日正式停用，塞浦路斯改用 欧元（EUR，代码 978） 作为法定货币
+        DEPRECATED_CODES.put("196", CurrencyIsoCode.EUR);
+        // EEK	233	2	爱沙尼亚克朗	1992年	2010年
+        DEPRECATED_CODES.put("233", CurrencyIsoCode.EUR);
+        DEPRECATED_CODES.put("246", CurrencyIsoCode.EUR);
+        // 250 → 欧元（EUR）（适用于法国 🇫🇷）
+        DEPRECATED_CODES.put("250", CurrencyIsoCode.EUR);
+        // 德国马克（DEM）已于 2002 年 1 月 1 日正式停用，德国改用 欧元（EUR，代码 978） 作为法定货币。
+        // 276 → 欧元（EUR）（适用于德国 🇩🇪）
+        DEPRECATED_CODES.put("276", CurrencyIsoCode.EUR);
+        DEPRECATED_CODES.put("280", CurrencyIsoCode.EUR);
+        DEPRECATED_CODES.put("300", CurrencyIsoCode.EUR);
+
+        // 372 → 欧元（EUR）（适用于爱尔兰）
+        DEPRECATED_CODES.put("372", CurrencyIsoCode.EUR);
+        // 380 → 欧元（EUR）（适用于意大利 🇮🇹）
+        DEPRECATED_CODES.put("380", CurrencyIsoCode.EUR);
+        // 382 → 欧元（EUR）（适用于斯洛文尼亚 🇸🇮）
+        DEPRECATED_CODES.put("382", CurrencyIsoCode.EUR);
+
+        // 立陶宛立特（LTL）已于 2015 年 1 月 1 日正式停用，立陶宛改用 欧元（EUR，代码 978） 作为法定货币
+        DEPRECATED_CODES.put("440", CurrencyIsoCode.EUR);
+        // 442 → 欧元（EUR）（适用于卢森堡 🇱🇺）
+        DEPRECATED_CODES.put("442", CurrencyIsoCode.EUR);
+        DEPRECATED_CODES.put("428", CurrencyIsoCode.EUR);
+        DEPRECATED_CODES.put("470", CurrencyIsoCode.EUR);
+        // 528 → 欧元（EUR）（适用于荷兰 🇳🇱）
+        DEPRECATED_CODES.put("528", CurrencyIsoCode.EUR);
+        DEPRECATED_CODES.put("620", CurrencyIsoCode.EUR);
+        DEPRECATED_CODES.put("703", CurrencyIsoCode.EUR);
+        DEPRECATED_CODES.put("705", CurrencyIsoCode.EUR);
+        DEPRECATED_CODES.put("724", CurrencyIsoCode.EUR);
+    }
 
 
     /**
      * 货币国际代码
+     * 数字币代码段大于等于10000
      */
     private final String value;
 
     /**
      * 通用货币三字码
      */
-    private final String enCode;
+    @EnumValue
+    private final String enDesc;
 
     /**
      * 货币描述
@@ -388,70 +450,70 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
      */
     private final Integer precision;
 
-    CurrencyIsoCode(String value, String enCode, String desc, String sign) {
-        this(value, enCode, desc, sign, 2);
+    CurrencyIsoCode(String value, String enDesc, String desc, String sign) {
+        this(value, enDesc, desc, sign, 2);
     }
 
-    CurrencyIsoCode(String value, String enCode, String desc, String sign, Integer precision) {
+    CurrencyIsoCode(String value, String enDesc, String desc, String sign, Integer precision) {
         this.value = value;
-        this.enCode = enCode;
+        this.enDesc = enDesc;
         this.desc = desc;
         this.sign = sign;
         this.precision = precision;
     }
 
     /**
-     * 创建一个{@link Money}对象
+     * 创建一个货币对象
      *
      * @param amount 货币数额
      * @return 货币对象
      */
-    public Money of(int amount) {
+    public com.wind.transaction.core.Money of(int amount) {
         return Money.immutable(amount, this);
     }
 
     /**
-     * 通过 {@link #value} 或 {@link  #enCode} 交换 {@link CurrencyIsoCode}
+     * 通过 {@link #value} 或 {@link  #enDesc} 交换 {@link CurrencyIsoCode}
      *
      * @param currency 英文编码或数字编码
      * @return CurrencyIsoCode
      */
     @NotNull
-    public static CurrencyIsoCode requireOf(@NotBlank String currency) {
+    public static CurrencyIsoCode requireOf(String currency) {
         CurrencyIsoCode result = of(currency);
         if (result == null) {
             // 尝试使用币种名称交换
             return CurrencyIsoCode.valueOf(currency);
         }
-        AssertUtils.notNull(result, () -> String.format("unknown currency, enCode or Code = %s", currency));
+        AssertUtils.notNull(result, () -> String.format("unknown currency, enDesc or Code = %s", currency));
         return result;
     }
 
     /**
-     * 通过 {@link #value} 或 {@link  #enCode} 交换 {@link CurrencyIsoCode}
+     * 通过 {@link #value} 或 {@link  #enDesc} 交换 {@link CurrencyIsoCode}
      *
      * @param currency 英文编码或数字编码
-     * @return CurrencyIsoCode
+     * @return CurrencyType
      */
     @Nullable
     public static CurrencyIsoCode of(@NotBlank String currency) {
         CurrencyIsoCode result = ofByCode(currency);
         if (result == null) {
-            result = ofByEnCode(currency);
+            result = ofByEnDesc(currency);
         }
         return result;
     }
 
     /**
-     * 通过 {@link  #enCode} 交换 {@link CurrencyIsoCode}
+     * 通过 {@link  #enDesc} 交换 {@link CurrencyIsoCode}
      *
-     * @param enCode 英文编码
+     * @param enDesc 英文编码
      * @return CurrencyIsoCode
      */
     @Nullable
-    private static CurrencyIsoCode ofByEnCode(String enCode) {
+    private static CurrencyIsoCode ofByEnDesc(String enDesc) {
         return Arrays.stream(values())
-                .filter(currencyIsoCode -> Objects.equals(currencyIsoCode.getEnCode(), enCode))
+                .filter(currencyIsoCode -> Objects.equals(currencyIsoCode.getEnDesc(), enDesc))
                 .findFirst()
                 .orElse(null);
     }
@@ -459,14 +521,14 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
     /**
      * 通过 {@link #value} 交换 {@link CurrencyIsoCode}
      *
-     * @param value 数字编码
+     * @param code 数字编码
      * @return CurrencyIsoCode
      */
     @Nullable
-    private static CurrencyIsoCode ofByCode(String value) {
+    private static CurrencyIsoCode ofByCode(String code) {
         return Arrays.stream(values())
-                .filter(currencyIsoCode -> Objects.equals(currencyIsoCode.getValue(), value))
+                .filter(currencyIsoCode -> Objects.equals(currencyIsoCode.getValue(), code))
                 .findFirst()
-                .orElse(null);
+                .orElse(DEPRECATED_CODES.get(code));
     }
 }

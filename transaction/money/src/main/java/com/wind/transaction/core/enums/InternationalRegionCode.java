@@ -298,7 +298,6 @@ public enum InternationalRegionCode implements DescriptiveEnum {
     /**
      * 国家编码 三位数字代码
      */
-    @EnumValue
     private final String countryNumCode;
 
 

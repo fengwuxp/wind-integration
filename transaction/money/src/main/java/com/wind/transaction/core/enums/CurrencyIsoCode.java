@@ -17,7 +17,7 @@ import java.util.Objects;
 
 /**
  * 币种类型
- * 参见：<a href="https://en.wikipedia.org/wiki/ISO_4217">...</a>
+ * 参见：<a href="https://en.wikipedia.org/wiki/ISO_4217">ISO_4217 Currency Code</a>
  *
  * @author wuxp
  * @date 2023-09-27 18:48
@@ -359,8 +359,6 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     ZWL("932", "ZWL", "津巴布韋元", "$"),
 
-    BRN("076", "BRN", "Brazilian cruzado novo", "BRN"),
-
     /*---   虚拟货币和特殊需求  ---*/
     // 比特币
     BTC("BTC", "BTC", "比特币", "₿", 8),
@@ -419,6 +417,10 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
         DEPRECATED_CODES.put("703", CurrencyIsoCode.EUR);
         DEPRECATED_CODES.put("705", CurrencyIsoCode.EUR);
         DEPRECATED_CODES.put("724", CurrencyIsoCode.EUR);
+
+        // Brazilian cruzeiro 巴西
+        DEPRECATED_CODES.put("076", CurrencyIsoCode.BRL);
+        DEPRECATED_CODES.put("987", CurrencyIsoCode.BRL);
     }
 
 

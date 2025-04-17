@@ -359,6 +359,8 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     ZWL("932", "ZWL", "津巴布韋元", "$"),
 
+    ALL("008", "ALL", "阿尔巴尼亚", "Lek"),
+
     /*---   虚拟货币和特殊需求  ---*/
     // 比特币
     BTC("BTC", "BTC", "比特币", "₿", 8),

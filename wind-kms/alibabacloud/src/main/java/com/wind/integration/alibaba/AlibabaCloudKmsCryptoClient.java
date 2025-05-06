@@ -12,7 +12,7 @@ import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.exception.BaseException;
 import com.wind.common.exception.DefaultExceptionCode;
-import com.wind.common.jul.JulLogFactory;
+import com.wind.common.jul.WindJulLogFactory;
 import com.wind.integration.kms.WindCredentialsClient;
 import com.wind.integration.kms.WindCryptoClient;
 import com.wind.integration.kms.WindKmsException;
@@ -42,7 +42,7 @@ import java.util.logging.Logger;
  **/
 public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindCryptoClient {
 
-    private static final Logger LOGGER = JulLogFactory.getLogger(AlibabaCloudKmsCryptoClient.class);
+    private static final Logger LOGGER = WindJulLogFactory.getLogger(AlibabaCloudKmsCryptoClient.class);
 
     /**
      * 用于解密 kms ak/sk 的秘钥

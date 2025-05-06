@@ -1,6 +1,6 @@
 package com.wind.integration.alibaba;
 
-import com.wind.common.jul.JulLogFactory;
+import com.wind.common.jul.WindJulLogFactory;
 import com.wind.core.WindCredentialsProvider;
 import com.wind.integration.kms.WindCredentialsClient;
 
@@ -16,7 +16,7 @@ import java.util.logging.Logger;
  **/
 public class AlibabaCloudKmsCredentialsProvider implements WindCredentialsProvider {
 
-    private static final Logger LOGGER = JulLogFactory.getLogger(AlibabaCloudKmsCredentialsProvider.class);
+    private static final Logger LOGGER = WindJulLogFactory.getLogger(AlibabaCloudKmsCredentialsProvider.class);
 
     private final AtomicReference<WindCredentialsClient> client = new AtomicReference<>();
 

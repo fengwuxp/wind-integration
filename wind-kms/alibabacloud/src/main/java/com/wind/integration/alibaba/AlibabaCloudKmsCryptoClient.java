@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.UnaryOperator;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -45,15 +46,28 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     private static final Logger LOGGER = WindJulLogFactory.getLogger(AlibabaCloudKmsCryptoClient.class);
 
     /**
-     * 用于解密 kms ak/sk 的秘钥
+     * 用于解密 kms ak/sk 的秘钥文件路径
      */
-    private static final String KMS_KEY_ASE_KEY_FILE = "classpath*:kms_key_ase_key.key";
+    private static final String KMS_KEY_ASE_KEY_FILEPATH = "classpath*:kms_key_ase_key.key";
 
-    private static final String ALIBABA_CLOUD_ACCESS_KEY_ID = "ALIBABA_CLOUD_K_AK";
+    /**
+     * VPC 域名后缀
+     */
+    private static final String ALIBABA_CLOUD_KMS_VPC_DOMAIN_SUFFIX = ".cryptoservice.kms.aliyuncs.com";
 
-    private static final String ALIBABA_CLOUD_ACCESS_KEY_SECRET = "ALIBABA_CLOUD_K_SK";
+    /**
+     * kms 实例 id
+     */
+    private static final String ALIBABA_CLOUD_KMS_INSTANCE_ID_NAME = "ALIBABA_CLOUD_K_ID";
 
+    /**
+     * kms endpoint
+     */
     private static final String ALIBABA_CLOUD_ENDPOINT = "ALIBABA_CLOUD_K_ENDPOINT";
+
+    private static final String ALIBABA_CLOUD_ACCESS_KEY_NAME = "ALIBABA_CLOUD_K_AK";
+
+    private static final String ALIBABA_CLOUD_ACCESS_SECRET_NAME = "ALIBABA_CLOUD_K_SK";
 
     private final Client client;
 
@@ -97,8 +111,8 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
      */
     public static AlibabaCloudKmsCryptoClient of(UnaryOperator<String> decryptFunc) {
         // 必填，请确保代码运行环境设置了环境变量 ALIBABA_CLOUD_ACCESS_KEY_ID。
-        return form(decryptFunc.apply(requireEnv(ALIBABA_CLOUD_ACCESS_KEY_ID)),
-                decryptFunc.apply(requireEnv(ALIBABA_CLOUD_ACCESS_KEY_SECRET)), requireEnv(ALIBABA_CLOUD_ENDPOINT));
+        return form(decryptFunc.apply(requireEnv(ALIBABA_CLOUD_ACCESS_KEY_NAME)),
+                decryptFunc.apply(requireEnv(ALIBABA_CLOUD_ACCESS_SECRET_NAME)), getAlibabaCloudKmsEndpoint());
     }
 
     /**
@@ -113,7 +127,10 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
         AssertUtils.hasText(ak, "argument ak must not empty");
         AssertUtils.hasText(sk, "argument sk must not empty");
         AssertUtils.hasText(endpoint, "argument endpoint must not empty");
-        LOGGER.info(String.format("alibaba cloud kms init, the first 5 characters of AK= %s", ak.substring(0, 5)));
+        if (LOGGER.isLoggable(Level.INFO)) {
+            LOGGER.info(String.format("alibaba cloud kms init, the first 5 characters of AK= %s", ak.substring(0, 5)));
+            LOGGER.info("alibaba cloud kms, use endpoint = " + endpoint);
+        }
         com.aliyun.teaopenapi.models.Config config = new com.aliyun.teaopenapi.models.Config()
                 .setAccessKeyId(ak)
                 .setAccessKeySecret(sk)
@@ -188,7 +205,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     private static String loadFileAsText() {
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         try {
-            Resource[] resources = resolver.getResources(AlibabaCloudKmsCryptoClient.KMS_KEY_ASE_KEY_FILE);
+            Resource[] resources = resolver.getResources(AlibabaCloudKmsCryptoClient.KMS_KEY_ASE_KEY_FILEPATH);
             if (ObjectUtils.isEmpty(resources)) {
                 return WindConstants.EMPTY;
             }
@@ -202,5 +219,15 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
         String result = System.getProperty(name, System.getenv(name));
         AssertUtils.notNull(result, String.format("env name =%s not configure", name));
         return result;
+    }
+
+    private static String getAlibabaCloudKmsEndpoint() {
+        String instanceId = System.getProperty(ALIBABA_CLOUD_KMS_INSTANCE_ID_NAME, System.getenv(ALIBABA_CLOUD_KMS_INSTANCE_ID_NAME));
+        if (StringUtils.hasText(instanceId)) {
+            // 如果配置了 kms 示例 id，则使用 VPC （内网）域名
+            return instanceId + ALIBABA_CLOUD_KMS_VPC_DOMAIN_SUFFIX;
+        }
+        // 使用指定的端点
+        return requireEnv(ALIBABA_CLOUD_ENDPOINT);
     }
 }

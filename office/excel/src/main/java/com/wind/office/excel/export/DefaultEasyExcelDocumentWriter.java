@@ -7,9 +7,11 @@ import com.alibaba.excel.write.style.row.SimpleRowHeightStyleStrategy;
 import com.wind.common.WindConstants;
 import com.wind.office.excel.ExcelDocumentWriter;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
+import com.wind.office.excel.metadata.ExcelCellPrinter;
 import com.wind.script.spring.SpringExpressionEvaluator;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.format.Printer;
 import org.springframework.util.StringUtils;
 
 import java.io.OutputStream;
@@ -79,16 +81,20 @@ public class DefaultEasyExcelDocumentWriter implements ExcelDocumentWriter {
         EvaluationContext context = new StandardEvaluationContext(row);
         for (ExcelCellDescriptor writeHead : descriptors) {
             String expression = writeHead.getExpression();
-            Object val = StringUtils.hasText(expression) ? SpringExpressionEvaluator.DEFAULT.eval(expression, context) : row;
-            result.add(formatCellValue(writeHead, val));
+            Object cellValue = StringUtils.hasText(expression) ? SpringExpressionEvaluator.DEFAULT.eval(expression, context) : row;
+            result.add(formatCellValue(writeHead, row, cellValue));
         }
         return result;
     }
 
-    private String formatCellValue(ExcelCellDescriptor descriptor, Object val) {
-        if (val == null) {
+    private String formatCellValue(ExcelCellDescriptor descriptor, Object row, Object cellValue) {
+        if (cellValue == null) {
             return WindConstants.EMPTY;
         }
-        return descriptor.getPrinter().print(val, Locale.getDefault());
+        Printer<Object> printer = descriptor.getPrinter();
+        if (printer instanceof ExcelCellPrinter) {
+            return ((ExcelCellPrinter<Object>) printer).print(cellValue, row, Locale.getDefault());
+        }
+        return printer.print(cellValue, Locale.getDefault());
     }
 }

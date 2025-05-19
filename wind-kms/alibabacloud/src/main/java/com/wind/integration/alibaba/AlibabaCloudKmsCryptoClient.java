@@ -62,6 +62,8 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
 
     /**
      * kms endpoint
+     * 小规格 KMS 建议采用共享网关模式：https://help.aliyun.com/zh/kms/key-management-service/developer-reference/classic-kms-sdkclassic-kms-sdk/?spm=5176.2020520104.console-base_help.dexternal.56ab3a98uyH16c
+     * 避免 QPS  超限
      */
     private static final String ALIBABA_CLOUD_ENDPOINT = "ALIBABA_CLOUD_K_ENDPOINT";
 

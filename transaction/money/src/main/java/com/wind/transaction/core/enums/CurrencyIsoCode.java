@@ -33,6 +33,8 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     CNY("156", "CNY", "人民币", "￥"),
 
+    CNH("156", "CNH", "离岸人民币", "￥"),
+
     EUR("978", "EUR", "欧元", "€"),
 
     HKD("344", "HKD", "港币", "HK$"),

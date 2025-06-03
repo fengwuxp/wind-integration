@@ -43,26 +43,29 @@ public class SpringExpressionExportExcelTask extends AbstractDelegateDocumentTas
     protected void doTask() {
         int queryPage = 1;
         ExportExcelTaskInfo taskInfo = (ExportExcelTaskInfo) getDelegate();
-        while (!Thread.currentThread().isInterrupted()) {
-            OfficeTaskState state = stateSyncer.apply(getId());
-            if (state != null) {
-                updateState(state);
+        try {
+            while (!Thread.currentThread().isInterrupted()) {
+                OfficeTaskState state = stateSyncer.apply(getId());
+                if (state != null) {
+                    updateState(state);
+                }
+                List rows = fetcher.fetch(queryPage, taskInfo.getFetchSize());
+                this.addRows(rows);
+                if (OfficeTaskState.isFinished(getState())) {
+                    log.info("excel task is finished，id = {}, state = {}", getId(), getState());
+                    return;
+                }
+                if (rows.size() < taskInfo.getFetchSize()) {
+                    // 处理完成
+                    break;
+                }
+                queryPage++;
             }
-            List rows = fetcher.fetch(queryPage, taskInfo.getFetchSize());
-            this.addRows(rows);
-            if (OfficeTaskState.isFinished(getState())) {
-                log.info("excel task is finished，id = {}, state = {}", getId(), getState());
-                return;
+        } finally {
+            if (Thread.currentThread().isInterrupted()) {
+                log.info("excel task is interrupted，id = {}, state = {}", getId(), getState());
+                taskInfo.updateState(OfficeTaskState.INTERRUPT);
             }
-            if (rows.size() < taskInfo.getFetchSize()) {
-                // 处理完成
-                break;
-            }
-            queryPage++;
-        }
-        if (Thread.currentThread().isInterrupted()) {
-            log.info("excel task is interrupted，id = {}, state = {}", getId(), getState());
-            taskInfo.updateState(OfficeTaskState.INTERRUPT);
         }
     }
 

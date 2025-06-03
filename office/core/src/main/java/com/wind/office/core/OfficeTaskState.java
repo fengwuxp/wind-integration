@@ -22,11 +22,14 @@ public enum OfficeTaskState implements DescriptiveEnum {
 
     FAILED("执行失败"),
 
-    INTERRUPT("执行中断");
+    INTERRUPT("执行中断"),
+
+    CANCELED("任务取消"),
+    ;
 
     private final String desc;
 
     public static boolean isFinished(OfficeTaskState state) {
-        return state == COMPLETED || state == FAILED || state == INTERRUPT;
+        return state == COMPLETED || state == FAILED || state == INTERRUPT || state == CANCELED;
     }
 }

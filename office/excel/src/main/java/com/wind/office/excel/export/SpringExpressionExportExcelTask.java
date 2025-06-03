@@ -6,7 +6,6 @@ import com.wind.office.excel.ExportExcelDataFetcher;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
-import java.util.Objects;
 
 /**
  * 基于 spring expression 取值 excel 导出任务，不支持列合并等操作
@@ -29,12 +28,11 @@ public class SpringExpressionExportExcelTask extends AbstractDelegateDocumentTas
     protected void doTask() {
         int queryPage = 1;
         ExportExcelTaskInfo taskInfo = (ExportExcelTaskInfo) getDelegate();
-        while (true) {
+        while (!Thread.currentThread().isInterrupted()) {
             List rows = fetcher.fetch(queryPage, taskInfo.getFetchSize());
             this.addRows(rows);
-            if (Objects.equals(OfficeTaskState.INTERRUPT, getState())) {
-                log.info("excel task is interrupted，id = {}", getId());
-                updateState(OfficeTaskState.INTERRUPT);
+            if (OfficeTaskState.isFinished(getState())) {
+                log.info("excel task is finished，id = {}, state = {}", getId(), getState());
                 return;
             }
             if (rows.size() < taskInfo.getFetchSize()) {
@@ -42,6 +40,10 @@ public class SpringExpressionExportExcelTask extends AbstractDelegateDocumentTas
                 break;
             }
             queryPage++;
+        }
+        if (Thread.currentThread().isInterrupted()){
+            log.info("excel task is interrupted，id = {}, state = {}", getId(), getState());
+            taskInfo.updateState(OfficeTaskState.INTERRUPT);
         }
     }
 

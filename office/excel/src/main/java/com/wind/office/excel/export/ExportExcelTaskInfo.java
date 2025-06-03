@@ -107,8 +107,16 @@ public class ExportExcelTaskInfo implements OfficeDocumentTaskInfo {
     }
 
     public static ExportExcelTaskInfo of(String name, ExcelDocumentWriter writer, int batchSize) {
+        return of(RandomStringUtils.randomAlphanumeric(32), name, writer, batchSize);
+    }
+
+    public static ExportExcelTaskInfo of(Object id, String name, ExcelDocumentWriter writer) {
+        return of(id, name, writer, 3000);
+    }
+
+    public static ExportExcelTaskInfo of(Object id, String name, ExcelDocumentWriter writer, int batchSize) {
         return ExportExcelTaskInfo.builder()
-                .id(RandomStringUtils.randomAlphanumeric(32))
+                .id(String.valueOf(id))
                 .name(name)
                 .beginTime(new AtomicReference<>())
                 .endTime(new AtomicReference<>())

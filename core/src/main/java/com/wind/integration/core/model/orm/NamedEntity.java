@@ -6,6 +6,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 import javax.validation.constraints.NotBlank;
+import java.io.Serializable;
 
 /**
  * 有名字的实体
@@ -17,7 +18,7 @@ import javax.validation.constraints.NotBlank;
 @Setter
 @EqualsAndHashCode(callSuper = true)
 @ToString
-public abstract class NamedEntity<ID> extends BaseEntity<ID> {
+public abstract class NamedEntity<I extends Serializable> extends BaseEntity<I> {
 
     @NotBlank
     private String name;

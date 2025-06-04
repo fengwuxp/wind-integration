@@ -7,11 +7,13 @@ import lombok.Setter;
 import lombok.ToString;
 
 import javax.validation.constraints.NotNull;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
  * 通用基础实体类
  *
+ * @param <I> id 类型
  * @author wuxp
  * @date 2024-12-15 13:14
  **/
@@ -19,13 +21,13 @@ import java.time.LocalDateTime;
 @Setter
 @EqualsAndHashCode(of = "id")
 @ToString
-public abstract class BaseEntity<ID> implements IdObject<ID> {
+public abstract class BaseEntity<I extends Serializable> implements IdObject<I> {
 
     /**
      * id
      */
     @NotNull
-    private ID id;
+    private I id;
 
     /**
      * 创建时间

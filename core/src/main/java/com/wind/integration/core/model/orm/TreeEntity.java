@@ -8,6 +8,7 @@ import lombok.ToString;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Null;
+import java.io.Serializable;
 
 /**
  * 树形实体
@@ -19,13 +20,13 @@ import javax.validation.constraints.Null;
 @Setter
 @EqualsAndHashCode(callSuper = true)
 @ToString
-public abstract class TreeEntity<ID> extends NamedEntity<ID> {
+public abstract class TreeEntity<I extends Serializable> extends NamedEntity<I> {
 
     /**
      * 父资源，为 null 表示根节点
      */
     @Null
-    private ID parentId;
+    private I parentId;
 
     /**
      * 层级

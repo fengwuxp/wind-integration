@@ -21,13 +21,11 @@
         <module>office</module>
         <module>transaction</module>
         <module>extends/mybatis-flex-extends</module>
-        <module>modules/biz</module>
-        <module>modules/domain</module>
         <module>tests</module>
-        <module>modules/infrastructure</module>
         <module>dependencies</module>
         <module>wind-oss</module>
         <module>wind-kms</module>
+        <module>system-domain</module>
     </modules>
 
     <properties>

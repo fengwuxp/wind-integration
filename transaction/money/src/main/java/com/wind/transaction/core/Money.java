@@ -166,13 +166,6 @@ public final class Money implements Serializable, Comparable<Money> {
      * @param currency   货币类型
      * @return 货币实例
      */
-    /**
-     * 元转分：创建一个具有{@param amount} 数额的货币对象
-     *
-     * @param amountYuan 数额(元)
-     * @param currency   货币类型
-     * @return 货币实例
-     */
     public static Money immutable(@NotNull BigDecimal amountYuan, @NotNull CurrencyIsoCode currency) {
         AssertUtils.notNull(amountYuan, "argument amountYuan must not null");
         AssertUtils.notNull(currency, CURRENCY_ISO_CODE_NOT_NULL);

@@ -2,6 +2,7 @@ package com.wind.transaction.core;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.wind.common.annotations.VisibleForTesting;
 import com.wind.common.exception.AssertUtils;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.EqualsAndHashCode;
@@ -23,6 +24,11 @@ import java.util.Objects;
 public final class Money implements Serializable, Comparable<Money> {
 
     private static final long serialVersionUID = -7696239148769634763L;
+
+    private static final String CURRENCY_ISO_CODE_NOT_NULL = "currency iso code must not null";
+
+    @VisibleForTesting
+    static final String CURRENCY_ISO_CODE_NOT_MATCH = "currency mismatch";
 
     /**
      * 数额
@@ -58,7 +64,7 @@ public final class Money implements Serializable, Comparable<Money> {
      * @return 相加后的金额
      */
     public Money add(Money money) {
-        AssertUtils.isTrue(currency.equals(money.getCurrency()), "币种不一致");
+        AssertUtils.isTrue(currency.equals(money.getCurrency()), CURRENCY_ISO_CODE_NOT_MATCH);
         return Money.immutable(amount + money.getAmount(), currency);
     }
 
@@ -69,20 +75,22 @@ public final class Money implements Serializable, Comparable<Money> {
      * @return 相减后的金额
      */
     public Money subtract(Money money) {
-        AssertUtils.isTrue(currency.equals(money.getCurrency()), "币种不一致");
+        AssertUtils.isTrue(currency.equals(money.getCurrency()), CURRENCY_ISO_CODE_NOT_MATCH);
         return Money.immutable(amount - money.getAmount(), currency);
     }
 
     /**
-     * 获取货币Decimal
+     * 分转元
+     *
+     * @return 金额元
      */
     public BigDecimal fen2Yuan() {
-        return BigDecimal.valueOf(amount).scaleByPowerOfTen(-currency.getPrecision());
+        return fenToYuan(amount, currency);
     }
 
     @Override
     public int compareTo(Money money) {
-        AssertUtils.isTrue(Objects.equals(money.getCurrency(), getCurrency()), "currency inconsistency");
+        AssertUtils.isTrue(Objects.equals(money.getCurrency(), getCurrency()), CURRENCY_ISO_CODE_NOT_MATCH);
         if (money.getAmount() == getAmount()) {
             return 0;
         }
@@ -158,10 +166,36 @@ public final class Money implements Serializable, Comparable<Money> {
      * @param currency   货币类型
      * @return 货币实例
      */
+    /**
+     * 元转分：创建一个具有{@param amount} 数额的货币对象
+     *
+     * @param amountYuan 数额(元)
+     * @param currency   货币类型
+     * @return 货币实例
+     */
     public static Money immutable(@NotNull BigDecimal amountYuan, @NotNull CurrencyIsoCode currency) {
-        AssertUtils.notNull(amountYuan, "货币数额不能为空");
-        AssertUtils.notNull(currency, "货币类型不能为空");
+        AssertUtils.notNull(amountYuan, "argument amountYuan must not null");
+        AssertUtils.notNull(currency, CURRENCY_ISO_CODE_NOT_NULL);
         int longAmount = amountYuan.scaleByPowerOfTen(currency.getPrecision()).intValue();
         return immutable(longAmount, currency);
+    }
+
+    /**
+     * 分转元
+     *
+     * @return 金额元
+     */
+    public static BigDecimal fenToYuan(int amount, @NotNull CurrencyIsoCode currency) {
+        AssertUtils.notNull(currency, CURRENCY_ISO_CODE_NOT_NULL);
+        return BigDecimal.valueOf(amount).scaleByPowerOfTen(-currency.getPrecision());
+    }
+
+    /**
+     * 分转元
+     *
+     * @return 金额元
+     */
+    public static BigDecimal fenToYuan(int amount) {
+        return BigDecimal.valueOf(amount).scaleByPowerOfTen(-2);
     }
 }

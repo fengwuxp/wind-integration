@@ -5,6 +5,8 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static com.wind.transaction.core.Money.CURRENCY_ISO_CODE_NOT_MATCH;
+
 /**
  * @author wuxp
  * @date 2024-09-19 17:12
@@ -24,6 +26,6 @@ class MoneyTests {
         Assertions.assertEquals(o2, Money.immutable(2, CurrencyIsoCode.AED));
 
         BaseException exception = Assertions.assertThrows(BaseException.class, () -> o1.lte(Money.immutable(1, CurrencyIsoCode.BDT)));
-        Assertions.assertEquals("currency inconsistency", exception.getMessage());
+        Assertions.assertEquals(CURRENCY_ISO_CODE_NOT_MATCH, exception.getMessage());
     }
 }

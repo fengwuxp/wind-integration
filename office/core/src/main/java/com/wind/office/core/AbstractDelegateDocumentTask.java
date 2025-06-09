@@ -45,7 +45,6 @@ public abstract class AbstractDelegateDocumentTask implements OfficeDocumentTask
         return delegate.getState();
     }
 
-
     @Override
     public void updateState(OfficeTaskState newState) {
         delegate.updateState(newState);
@@ -80,8 +79,8 @@ public abstract class AbstractDelegateDocumentTask implements OfficeDocumentTask
             doTask();
             updateState(OfficeTaskState.COMPLETED);
         } catch (Throwable throwable) {
-            log.error("office document task exec error", throwable);
             updateState(OfficeTaskState.FAILED);
+            throw throwable;
         }
     }
 }

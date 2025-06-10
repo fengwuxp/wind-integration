@@ -33,7 +33,7 @@ public final class Money implements Serializable, Comparable<Money> {
     /**
      * 数额
      */
-    private final int amount;
+    private final long amount;
 
     /**
      * 币种
@@ -42,9 +42,19 @@ public final class Money implements Serializable, Comparable<Money> {
 
 
     @JsonCreator
-    public Money(@JsonProperty("amount") int amount, @JsonProperty("currency") CurrencyIsoCode currency) {
+    public Money(@JsonProperty("amount") long amount, @JsonProperty("currency") CurrencyIsoCode currency) {
         this.amount = amount;
         this.currency = currency;
+    }
+
+    @Deprecated
+    public int getAmount() {
+        return getLongAmount().intValue();
+    }
+
+    @NotNull
+    public Long getLongAmount() {
+        return amount;
     }
 
     /**
@@ -148,6 +158,10 @@ public final class Money implements Serializable, Comparable<Money> {
         return new Money(amount, currency);
     }
 
+    public static Money immutable(long amount, CurrencyIsoCode currency) {
+        return new Money(amount, currency);
+    }
+
     /**
      * 元转分：创建一个具有{@param amount} 数额的货币对象
      *
@@ -178,7 +192,7 @@ public final class Money implements Serializable, Comparable<Money> {
      *
      * @return 金额元
      */
-    public static BigDecimal fenToYuan(int amount, @NotNull CurrencyIsoCode currency) {
+    public static BigDecimal fenToYuan(long amount, @NotNull CurrencyIsoCode currency) {
         AssertUtils.notNull(currency, CURRENCY_ISO_CODE_NOT_NULL);
         return BigDecimal.valueOf(amount).scaleByPowerOfTen(-currency.getPrecision());
     }
@@ -188,7 +202,7 @@ public final class Money implements Serializable, Comparable<Money> {
      *
      * @return 金额元
      */
-    public static BigDecimal fenToYuan(int amount) {
+    public static BigDecimal fenToYuan(long amount) {
         return BigDecimal.valueOf(amount).scaleByPowerOfTen(-2);
     }
 }

@@ -183,8 +183,8 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     @Override
     public KmsSecretDetailsDTO getCredentials(String secretName, String version) {
         GetSecretValueRequest request = new GetSecretValueRequest();
-        request.secretName = secretName;
-        request.versionId = version;
+        request.setSecretName(secretName);
+        request.setVersionId(version);
         try {
             GetSecretValueResponse response = client.getSecretValue(request);
             KmsSecretDetailsDTO result = new KmsSecretDetailsDTO();

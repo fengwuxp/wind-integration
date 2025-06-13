@@ -1,6 +1,6 @@
 package com.wind.integration.system.model.rquest;
 
-import com.wind.integration.system.model.enums.SystemConfigContentType;
+import com.wind.integration.system.model.enums.WindConfigContentType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -30,8 +30,11 @@ public class SaveDictionaryMetadataRequest {
     @Schema(description = "字典所属分组")
     private String group;
 
+    @Schema(description = "字典所属业务分组")
+    private String businessGroup;
+
     @Schema(description = "字典内容类型")
-    private SystemConfigContentType contentType;
+    private WindConfigContentType contentType;
 
     @Schema(description = "字典内容")
     private String content;
@@ -45,7 +48,7 @@ public class SaveDictionaryMetadataRequest {
     @Schema(description = "字典描述")
     private String description;
 
-    @Schema(description = "")
+    @Schema(description = "字典名称")
     private String name;
 
     @Schema(description = "id")

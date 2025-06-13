@@ -1,6 +1,6 @@
 package com.wind.integration.system.model.dto;
 
-import com.wind.integration.system.model.enums.SystemConfigContentType;
+import com.wind.integration.system.model.enums.WindConfigContentType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -34,9 +34,13 @@ public class DictionaryMetadataDTO implements java.io.Serializable {
     @NotNull
     private String group;
 
+    @Schema(description = "字典所属业务分组")
+    @NotNull
+    private String businessGroup;
+
     @Schema(description = "字典内容类型")
     @NotNull
-    private SystemConfigContentType contentType;
+    private WindConfigContentType contentType;
 
     @Schema(description = "字典内容")
     @NotBlank

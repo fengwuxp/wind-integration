@@ -12,17 +12,19 @@ import lombok.Getter;
  **/
 @AllArgsConstructor
 @Getter
-public enum SystemConfigContentType implements DescriptiveEnum {
+public enum WindConfigContentType implements DescriptiveEnum {
 
     /**
      * json
      */
-    JSON("JSON"),
+    JSON("Json"),
 
     /**
      * text
      */
-    TEXT("TEXT"),
+    TEXT("Text"),
+
+    HTML("Html"),
     ;
 
     private final String desc;

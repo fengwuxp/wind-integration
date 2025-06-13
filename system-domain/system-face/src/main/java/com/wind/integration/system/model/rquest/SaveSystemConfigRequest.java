@@ -1,6 +1,6 @@
 package com.wind.integration.system.model.rquest;
 
-import com.wind.integration.system.model.enums.SystemConfigContentType;
+import com.wind.integration.system.model.enums.WindConfigContentType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -27,7 +27,7 @@ public class SaveSystemConfigRequest {
     private String content;
 
     @Schema(description = "配置内容类型")
-    private SystemConfigContentType contentType;
+    private WindConfigContentType contentType;
 
     @Schema(description = "配置分组")
     private String group;

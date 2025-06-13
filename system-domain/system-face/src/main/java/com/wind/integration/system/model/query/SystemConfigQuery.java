@@ -2,7 +2,7 @@ package com.wind.integration.system.model.query;
 
 import com.wind.common.query.supports.AbstractPageQuery;
 import com.wind.common.query.supports.DefaultOrderField;
-import com.wind.integration.system.model.enums.SystemConfigContentType;
+import com.wind.integration.system.model.enums.WindConfigContentType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -26,7 +26,7 @@ import java.time.LocalDateTime;
 public class SystemConfigQuery extends AbstractPageQuery<DefaultOrderField> {
 
     @Schema(description = "配置内容类型")
-    private SystemConfigContentType contentType;
+    private WindConfigContentType contentType;
 
     @Schema(description = "配置分组")
     private String group;

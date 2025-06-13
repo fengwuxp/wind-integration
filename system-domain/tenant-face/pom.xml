@@ -5,18 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.integration</groupId>
-        <artifactId>wind-integration</artifactId>
+        <artifactId>wind-system-domain</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <artifactId>wind-system-domain</artifactId>
-    <packaging>pom</packaging>
-
-    <modules>
-        <module>system-face</module>
-        <module>system-impl</module>
-        <module>tenant-face</module>
-    </modules>
+    <artifactId>wind-tenant-face</artifactId>
 
     <dependencies>
         <dependency>
@@ -24,8 +17,13 @@
             <artifactId>wind-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-integration-core</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.swagger.core.v3</groupId>
             <artifactId>swagger-annotations</artifactId>
         </dependency>
     </dependencies>
+
 </project>

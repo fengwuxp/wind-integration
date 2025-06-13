@@ -4,7 +4,7 @@ package com.wind.integration.system.services.dal.entities;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.orm.NamedEntity;
-import com.wind.integration.system.model.enums.SystemConfigContentType;
+import com.wind.integration.system.model.enums.WindConfigContentType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -36,16 +36,25 @@ public class DictionaryMetadata extends NamedEntity<Long> implements Serializabl
 
     /**
      * 字典所属分组
+     * 默认: default
      */
     @NotNull
     @Column(value = "dictionary_group")
     private String group;
 
     /**
+     * 字典业务分组
+     * 默认: default
+     */
+    @NotNull
+    @Column(value = "business_group")
+    private String businessGroup;
+
+    /**
      * 字典内容类型
      */
     @NotNull
-    private SystemConfigContentType contentType;
+    private WindConfigContentType contentType;
 
     /**
      * 字典内容

@@ -1,6 +1,6 @@
 package com.wind.integration.system.model.dto;
 
-import com.wind.integration.system.model.enums.SystemConfigContentType;
+import com.wind.integration.system.model.enums.WindConfigContentType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -31,7 +31,7 @@ public class SystemConfigDTO implements java.io.Serializable {
 
     @Schema(description = "配置内容类型")
     @NotNull
-    private SystemConfigContentType contentType;
+    private WindConfigContentType contentType;
 
     @Schema(description = "配置分组")
     @NotBlank

@@ -3,7 +3,7 @@ package com.wind.integration.system.services.dal.entities;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.orm.NamedEntity;
-import com.wind.integration.system.model.enums.SystemConfigContentType;
+import com.wind.integration.system.model.enums.WindConfigContentType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -37,7 +37,7 @@ public class SystemConfig extends NamedEntity<Long> implements Serializable {
      * 配置内容类型
      */
     @NotNull
-    private SystemConfigContentType contentType;
+    private WindConfigContentType contentType;
 
     /**
      * 配置分组

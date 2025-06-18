@@ -13,22 +13,8 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.mybatis-flex</groupId>
-            <artifactId>mybatis-flex-annotation</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.wind.integration</groupId>
-            <artifactId>wind-integration-core</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.wind.integration</groupId>
             <artifactId>wind-system-face</artifactId>
-            <version>1.0.29-SNAPSHOT</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.mybatis-flex</groupId>
-            <artifactId>mybatis-flex-core</artifactId>
         </dependency>
     </dependencies>
 

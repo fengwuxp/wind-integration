@@ -7,7 +7,7 @@ import lombok.Getter;
 import org.springframework.format.Parser;
 import org.springframework.format.Printer;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;

@@ -4,7 +4,7 @@ import com.wind.common.jul.WindJulLogFactory;
 import com.wind.core.WindCredentialsProvider;
 import com.wind.integration.kms.WindCredentialsClient;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 

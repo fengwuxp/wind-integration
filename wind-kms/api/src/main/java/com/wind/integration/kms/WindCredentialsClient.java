@@ -2,8 +2,8 @@ package com.wind.integration.kms;
 
 import com.wind.integration.kms.model.dto.KmsSecretDetailsDTO;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.Null;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Null;
 
 /**
  * 凭据管理 client

@@ -4,7 +4,7 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.integration.core.resources.TreeResources;
 import org.springframework.util.CollectionUtils;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

@@ -1,6 +1,6 @@
 package com.wind.integration.core.model;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * 支持环境隔离的对象

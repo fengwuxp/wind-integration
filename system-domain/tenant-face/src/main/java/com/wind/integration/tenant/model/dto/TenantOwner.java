@@ -5,9 +5,9 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.Pattern;
-import javax.validation.constraints.Size;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import static com.wind.integration.core.constant.CommonlyFieldValidationConstants.PASSWORD_MESSAGE;
 import static com.wind.integration.core.constant.CommonlyFieldValidationConstants.PASSWORD_REGEXP;

@@ -6,13 +6,14 @@ import com.wind.common.locks.JdkLockFactory;
 import com.wind.common.locks.LockFactory;
 import com.wind.common.spring.SpringApplicationContextUtils;
 import com.wind.integration.dal.MybatisFlexTestConfiguration;
-import com.wind.integration.mybatis.WindMyBatisFlexExtendsConfiguration;
 import com.wind.tools.h2.H2FunctionInitializer;
+import jakarta.annotation.PostConstruct;
 import lombok.AllArgsConstructor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.boot.autoconfigure.sql.init.SqlInitializationAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -26,7 +27,6 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.PostConstruct;
 import javax.sql.DataSource;
 
 /**
@@ -54,7 +54,6 @@ public abstract class AbstractServiceTest {
 
     @Configuration
     @Import({
-            WindMyBatisFlexExtendsConfiguration.class,
             MybatisFlexTestConfiguration.class,
             SpringApplicationContextUtils.class})
     static class TestConfig {
@@ -77,6 +76,7 @@ public abstract class AbstractServiceTest {
     @AllArgsConstructor
     @AutoConfiguration
     @AutoConfigureBefore(SqlInitializationAutoConfiguration.class)
+    @EnableConfigurationProperties(DataSourceProperties.class)
     public static class H2InitializationAutoConfiguration {
 
         private final DataSource dataSource;

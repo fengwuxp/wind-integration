@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.wind.middleware</groupId>
         <artifactId>wind-middleware</artifactId>
-        <version>1.0.29-SNAPSHOT</version>
+        <version>1.0.0-jdk21-SNAPSHOT</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -30,7 +30,7 @@
     </modules>
 
     <properties>
-        <revision>1.0.29-SNAPSHOT</revision>
+        <revision>1.0.0-jdk21-SNAPSHOT</revision>
         <easyexcel.version>3.3.2</easyexcel.version>
         <aliyun.oss.version>3.17.4</aliyun.oss.version>
         <aliyun.kms.version>1.2.3</aliyun.kms.version>
@@ -52,8 +52,8 @@
             <artifactId>annotations</artifactId>
         </dependency>
         <dependency>
-            <groupId>javax.validation</groupId>
-            <artifactId>validation-api</artifactId>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -135,17 +135,12 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
-                <artifactId>wind-system-domain</artifactId>
+                <artifactId>wind-system-face</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
-                <artifactId>wind-system-biz</artifactId>
-                <version>${revision}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.wind.integration</groupId>
-                <artifactId>wind-mybatis-dal</artifactId>
+                <artifactId>wind-system-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

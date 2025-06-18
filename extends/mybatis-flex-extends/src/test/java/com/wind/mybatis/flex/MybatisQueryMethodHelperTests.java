@@ -11,44 +11,50 @@ import org.junit.jupiter.api.Test;
  **/
 class MybatisQueryMethodHelperTests {
 
+    private final String tableName = "t_example";
 
     @Test
     void testMatchFullText() {
         QueryWrapper wrapper = QueryWrapper.create()
-                .and(MybatisQueryMethodHelper.matchFullText(new QueryColumn("t_example", "desc"), "zhans"));
+                .from(tableName)
+                .and(MybatisQueryMethodHelper.matchFullText(new QueryColumn(tableName, "desc"), "zhans"));
         String sql = wrapper.toSQL();
-        Assertions.assertEquals("SELECT * FROM  WHERE  MATCH(`t_example`.`desc`) AGAINST ('zhans' IN NATURAL LANGUAGE MODE) ", sql);
+        Assertions.assertEquals("SELECT * FROM `t_example` WHERE  MATCH(`t_example`.`desc`) AGAINST ('zhans' IN NATURAL LANGUAGE MODE) ", sql);
     }
 
     @Test
     void testMatchFullTextWithBoolean() {
         QueryWrapper wrapper = QueryWrapper.create()
-                .and(MybatisQueryMethodHelper.matchFullTextWithBoolean(new QueryColumn("t_example", "desc"), "zhans"));
+                .from(tableName)
+                .and(MybatisQueryMethodHelper.matchFullTextWithBoolean(new QueryColumn(tableName, "desc"), "zhans"));
         String sql = wrapper.toSQL();
-        Assertions.assertEquals("SELECT * FROM  WHERE  MATCH(`t_example`.`desc`) AGAINST ('zhans' IN BOOLEAN MODE) ", sql);
+        Assertions.assertEquals("SELECT * FROM `t_example` WHERE  MATCH(`t_example`.`desc`) AGAINST ('zhans' IN BOOLEAN MODE) ", sql);
     }
 
     @Test
     void testMatchFullTextWithBooleanDisableOperations() {
         QueryWrapper wrapper = QueryWrapper.create()
-                .and(MybatisQueryMethodHelper.matchFullTextWithBoolean(new QueryColumn("t_example", "desc"), "zhans*"));
+                .from(tableName)
+                .and(MybatisQueryMethodHelper.matchFullTextWithBoolean(new QueryColumn(tableName, "desc"), "zhans*"));
         String sql = wrapper.toSQL();
-        Assertions.assertEquals("SELECT * FROM  WHERE  MATCH(`t_example`.`desc`) AGAINST ('\"zhans*\"' IN BOOLEAN MODE) ", sql);
+        Assertions.assertEquals("SELECT * FROM `t_example` WHERE  MATCH(`t_example`.`desc`) AGAINST ('\"zhans*\"' IN BOOLEAN MODE) ", sql);
     }
 
     @Test
     void testMatchFullTextWithBooleanOperations() {
         QueryWrapper wrapper = QueryWrapper.create()
-                .and(MybatisQueryMethodHelper.matchFullTextWithBoolean(new QueryColumn("t_example", "desc"), "zhans*", true));
+                .from(tableName)
+                .and(MybatisQueryMethodHelper.matchFullTextWithBoolean(new QueryColumn(tableName, "desc"), "zhans*", true));
         String sql = wrapper.toSQL();
-        Assertions.assertEquals("SELECT * FROM  WHERE  MATCH(`t_example`.`desc`) AGAINST ('zhans*' IN BOOLEAN MODE) ", sql);
+        Assertions.assertEquals("SELECT * FROM `t_example` WHERE  MATCH(`t_example`.`desc`) AGAINST ('zhans*' IN BOOLEAN MODE) ", sql);
     }
 
     @Test
     void testMatchFullTextWithEmpty() {
         QueryWrapper wrapper = QueryWrapper.create()
-                .and(MybatisQueryMethodHelper.matchFullText(new QueryColumn("t_example", "desc"), ""));
+                .from(tableName)
+                .and(MybatisQueryMethodHelper.matchFullText(new QueryColumn(tableName, "desc"), ""));
         String sql = wrapper.toSQL();
-        Assertions.assertEquals("SELECT * FROM ", sql);
+        Assertions.assertEquals("SELECT * FROM `t_example`", sql);
     }
 }

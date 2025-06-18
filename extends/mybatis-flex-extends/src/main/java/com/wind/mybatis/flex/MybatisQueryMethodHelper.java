@@ -6,7 +6,7 @@ import com.mybatisflex.core.query.QueryCondition;
 import com.mybatisflex.core.query.RawQueryCondition;
 import org.springframework.lang.Nullable;
 
-import javax.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotEmpty;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;

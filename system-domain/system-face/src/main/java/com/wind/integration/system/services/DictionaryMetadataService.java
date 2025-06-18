@@ -5,8 +5,8 @@ import com.wind.integration.system.model.dto.DictionaryMetadataDTO;
 import com.wind.integration.system.model.query.DictionaryMetadataQuery;
 import com.wind.integration.system.model.rquest.SaveDictionaryMetadataRequest;
 
-import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 数据字典服务

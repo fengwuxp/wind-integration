@@ -63,9 +63,21 @@ public final class Money implements Serializable, Comparable<Money> {
      *
      * @return $10
      */
+    @Deprecated
     public String toText() {
-        return String.format("%s%s", currency.getSign(), this.fen2Yuan());
+        return toString();
     }
+
+    /**
+     * money 格式化
+     * eg: 10 CNY
+     *
+     * @return 10 CNY
+     */
+    public String formatWithCurrency() {
+        return String.format("%s %s", this.fen2Yuan(), currency.name());
+    }
+
 
     /**
      * money 加法
@@ -204,5 +216,10 @@ public final class Money implements Serializable, Comparable<Money> {
      */
     public static BigDecimal fenToYuan(long amount) {
         return BigDecimal.valueOf(amount).scaleByPowerOfTen(-2);
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s%s", currency.getSign(), this.fen2Yuan());
     }
 }

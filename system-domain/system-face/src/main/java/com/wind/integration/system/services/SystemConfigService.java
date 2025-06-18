@@ -5,8 +5,8 @@ import com.wind.integration.system.model.dto.SystemConfigDTO;
 import com.wind.integration.system.model.query.SystemConfigQuery;
 import com.wind.integration.system.model.rquest.SaveSystemConfigRequest;
 
-import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 系统配置服务

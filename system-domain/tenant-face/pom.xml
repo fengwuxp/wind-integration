@@ -11,19 +11,4 @@
 
     <artifactId>wind-tenant-face</artifactId>
 
-    <dependencies>
-        <dependency>
-            <groupId>com.wind.middleware</groupId>
-            <artifactId>wind-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.wind.integration</groupId>
-            <artifactId>wind-integration-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.swagger.core.v3</groupId>
-            <artifactId>swagger-annotations</artifactId>
-        </dependency>
-    </dependencies>
-
 </project>

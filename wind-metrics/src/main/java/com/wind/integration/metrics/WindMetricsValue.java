@@ -1,7 +1,7 @@
 package com.wind.integration.metrics;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 基础的指标指描述对象，它包含名称和值

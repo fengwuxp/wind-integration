@@ -5,8 +5,8 @@ import com.aliyun.oss.internal.OSSUtils;
 import com.wind.common.WindConstants;
 import lombok.Data;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 阿里云 oss 配置

@@ -2,7 +2,7 @@ package com.wind.integration.core.message;
 
 import org.springframework.lang.Nullable;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * 消息模板定义，通过消息模板生成消息

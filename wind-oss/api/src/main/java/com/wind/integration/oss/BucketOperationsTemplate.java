@@ -2,8 +2,8 @@ package com.wind.integration.oss;
 
 import com.wind.integration.oss.model.WindOssFile;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;

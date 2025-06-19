@@ -5,10 +5,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.wind.common.annotations.VisibleForTesting;
 import com.wind.common.exception.AssertUtils;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import jakarta.validation.constraints.NotNull;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-import jakarta.validation.constraints.NotNull;
+import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -23,6 +24,7 @@ import java.util.Objects;
 @EqualsAndHashCode
 public final class Money implements Serializable, Comparable<Money> {
 
+    @Serial
     private static final long serialVersionUID = -7696239148769634763L;
 
     private static final String CURRENCY_ISO_CODE_NOT_NULL = "currency iso code must not null";
@@ -39,7 +41,6 @@ public final class Money implements Serializable, Comparable<Money> {
      * 币种
      */
     private final CurrencyIsoCode currency;
-
 
     @JsonCreator
     public Money(@JsonProperty("amount") long amount, @JsonProperty("currency") CurrencyIsoCode currency) {

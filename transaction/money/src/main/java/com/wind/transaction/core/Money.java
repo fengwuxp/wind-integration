@@ -47,13 +47,12 @@ public final class Money implements Serializable, Comparable<Money> {
         this.currency = currency;
     }
 
-    @Deprecated
     public int getAmount() {
-        return getLongAmount().intValue();
+        return Math.toIntExact(amount);
     }
 
-    @NotNull
-    public Long getLongAmount() {
+
+    public long getLongAmount() {
         return amount;
     }
 

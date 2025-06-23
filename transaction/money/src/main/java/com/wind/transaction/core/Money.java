@@ -78,7 +78,6 @@ public final class Money implements Serializable, Comparable<Money> {
         return String.format("%s %s", this.fen2Yuan(), currency.name());
     }
 
-
     /**
      * money 加法
      *

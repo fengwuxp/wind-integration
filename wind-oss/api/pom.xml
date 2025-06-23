@@ -22,11 +22,5 @@
             <groupId>com.wind.middleware</groupId>
             <artifactId>wind-core</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.apache.xmlbeans</groupId>
-            <artifactId>xmlbeans</artifactId>
-            <version>3.1.0</version>
-            <scope>compile</scope>
-        </dependency>
     </dependencies>
 </project>

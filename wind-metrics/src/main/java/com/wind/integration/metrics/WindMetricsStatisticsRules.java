@@ -5,12 +5,12 @@ import java.util.Map;
 
 /**
  * 指标统计规则
- * 根据 {@link MetricsCalculateExpression#eval} 计算的结果，对指标增量或全量的更新
+ * 根据 {@link WindMetricsCalculateExpression#eval} 计算的结果，对指标增量或全量的更新
  *
  * @author wuxp
  * @date 2025-06-17 14:46
  **/
-public interface MetricsStatisticsRules {
+public interface WindMetricsStatisticsRules {
 
     /**
      * 根据业务对象统计指标

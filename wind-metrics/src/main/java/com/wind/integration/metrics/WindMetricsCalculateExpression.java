@@ -4,12 +4,12 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * 指标计算表达式
+ * 指标计算表达式，一般用于增量统计。
  *
  * @author wuxp
  * @date 2025-06-17 14:25
  **/
-public interface MetricsCalculateExpression<M> {
+public interface WindMetricsCalculateExpression<M> {
 
     /**
      * 指标计算规则
@@ -18,9 +18,9 @@ public interface MetricsCalculateExpression<M> {
      * @param variables 计算变量
      * @return 计算结果
      */
-    WindMetricsObject<M> eval(Object o, Map<String, Object> variables);
+    WindMetricsValue<M> eval(Object o, Map<String, Object> variables);
 
-    default WindMetricsObject<M> eval(Object o) {
+    default WindMetricsValue<M> eval(Object o) {
         return eval(o, Collections.emptyMap());
     }
 }

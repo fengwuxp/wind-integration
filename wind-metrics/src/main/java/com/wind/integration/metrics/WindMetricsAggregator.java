@@ -1,7 +1,7 @@
 package com.wind.integration.metrics;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 聚合指标构建器，用于将一个或多个指标名称映射到目标对象字段，最终构建一个指标对象实例。

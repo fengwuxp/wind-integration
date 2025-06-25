@@ -3,8 +3,8 @@ package com.wind.integration.metrics;
 import com.wind.integration.metrics.fields.MultipleValueMetricsField;
 import com.wind.integration.metrics.fields.SingleValueMetricsField;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 聚合一个或多个指标转换为指标（java）对象的工厂

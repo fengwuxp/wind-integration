@@ -17,11 +17,11 @@ public interface WindMetricsAggregator<T> {
     /**
      * 指标对象名称和字段关系
      *
-     * @param name      指标名称
-     * @param filedName 指标对象字段名称
+     * @param metricsName 指标名称
+     * @param filedName   指标对象字段名称
      * @return this
      */
-    WindMetricsAggregator<T> named(@NotBlank String name, @NotBlank String filedName);
+    WindMetricsAggregator<T> named(@NotBlank String metricsName, @NotBlank String filedName);
 
     /**
      * @param query 查询条件

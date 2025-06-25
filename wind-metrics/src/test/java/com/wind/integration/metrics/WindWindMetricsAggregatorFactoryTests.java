@@ -38,7 +38,7 @@ class WindWindMetricsAggregatorFactoryTests {
         }
 
         @Override
-        public <T> WindMetricsAggregator<T> factory(String name, Class<T> objectType) {
+        public <T> WindMetricsAggregator<T> factory(String metricsName, Class<T> objectType) {
             return factory(objectType);
         }
     }
@@ -56,8 +56,8 @@ class WindWindMetricsAggregatorFactoryTests {
         }
 
         @Override
-        public WindMetricsAggregator<T> named(String name, String filedName) {
-            fieldMappings.put(name, filedName);
+        public WindMetricsAggregator<T> named(String metricsName, String filedName) {
+            fieldMappings.put(metricsName, filedName);
             return this;
         }
 

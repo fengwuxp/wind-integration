@@ -6,7 +6,6 @@ import com.wind.common.locks.JdkLockFactory;
 import com.wind.common.locks.LockFactory;
 import com.wind.common.spring.SpringApplicationContextUtils;
 import com.wind.integration.dal.MybatisFlexTestConfiguration;
-import com.wind.integration.mybatis.WindMyBatisFlexExtendsConfiguration;
 import com.wind.tools.h2.H2FunctionInitializer;
 import lombok.AllArgsConstructor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -54,7 +53,6 @@ public abstract class AbstractServiceTest {
 
     @Configuration
     @Import({
-            WindMyBatisFlexExtendsConfiguration.class,
             MybatisFlexTestConfiguration.class,
             SpringApplicationContextUtils.class})
     static class TestConfig {

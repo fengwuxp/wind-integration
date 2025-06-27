@@ -75,6 +75,11 @@
             <artifactId>mybatis-flex-codegen</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-system-impl</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

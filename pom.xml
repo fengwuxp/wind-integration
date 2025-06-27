@@ -144,6 +144,11 @@
                 <version>${revision}</version>
             </dependency>
             <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-system-impl</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
                 <groupId>com.alibaba</groupId>
                 <artifactId>easyexcel</artifactId>
                 <version>${easyexcel.version}</version>

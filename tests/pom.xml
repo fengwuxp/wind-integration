@@ -71,19 +71,8 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.wind.integration</groupId>
-            <artifactId>wind-mybatis-dal</artifactId>
-            <version>${revision}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>com.wind.tools</groupId>
             <artifactId>mybatis-flex-codegen</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.wind.integration</groupId>
-            <artifactId>wind-system-biz</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

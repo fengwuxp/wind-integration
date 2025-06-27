@@ -148,7 +148,7 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
-                <artifactId>wind-system-domain</artifactId>
+                <artifactId>wind-system-face</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

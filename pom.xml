@@ -19,8 +19,8 @@
     <modules>
         <module>core</module>
         <module>office</module>
+        <module>extends</module>
         <module>transaction</module>
-        <module>extends/mybatis-flex-extends</module>
         <module>tests</module>
         <module>dependencies</module>
         <module>wind-oss</module>
@@ -136,6 +136,11 @@
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>mybatis-flex-extends</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-infra-commons</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

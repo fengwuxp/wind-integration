@@ -1,5 +1,6 @@
 package com.wind.integration.metrics.fields;
 
+import com.wind.integration.metrics.WindMetricsEvaluator;
 import com.wind.integration.metrics.WindMetricsValue;
 
 /**
@@ -8,7 +9,7 @@ import com.wind.integration.metrics.WindMetricsValue;
  * @author wuxp
  * @date 2025-06-17 14:14
  **/
-public interface SingleValueMetricsField<M extends Number> extends WindMetricsValue<M> {
+public interface SingleValueMetricsField<M extends Number> extends WindMetricsValue<M>, WindMetricsEvaluator<M> {
 
     /**
      * 设置指标值

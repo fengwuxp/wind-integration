@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.fields;
 
 import com.alibaba.fastjson2.JSON;
+import com.wind.integration.metrics.WindMetricsEvaluator;
 import com.wind.integration.metrics.WindMetricsValue;
 
 import javax.validation.constraints.NotNull;
@@ -14,7 +15,7 @@ import java.util.Optional;
  * @author wuxp
  * @date 2025-06-17 14:16
  **/
-public interface MultipleValueMetricsField<M> extends WindMetricsValue<M> {
+public interface MultipleValueMetricsField<M> extends WindMetricsValue<M> , WindMetricsEvaluator<M> {
 
     /**
      * 获取所有子指标

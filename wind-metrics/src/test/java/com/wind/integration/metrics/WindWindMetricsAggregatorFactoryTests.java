@@ -115,6 +115,11 @@ class WindWindMetricsAggregatorFactoryTests {
         public Integer getValue() {
             return val;
         }
+
+        @Override
+        public Integer evaluate(WindMetricsAggregationQuery query) {
+            return getValue();
+        }
     }
 
     @Data

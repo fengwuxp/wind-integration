@@ -1,5 +1,6 @@
 package com.wind.integration.infrastructure.dal;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
@@ -8,7 +9,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 
-import javax.validation.constraints.NotNull;
+
 import java.util.function.Supplier;
 
 /**

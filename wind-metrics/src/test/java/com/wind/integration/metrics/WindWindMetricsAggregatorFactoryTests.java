@@ -22,8 +22,8 @@ class WindWindMetricsAggregatorFactoryTests {
     @Test
     void testFactory() {
         ExamlpeObject example = factory.factory(ExamlpeObject.class)
-                .named("success_total", ExamlpeObject.Fields.successTotal)
-                .named("total_amount", ExamlpeObject.Fields.totalAmount)
+                .named(ExamlpeObject.Fields.successTotal, "success_total")
+                .named(ExamlpeObject.Fields.totalAmount, "total_amount")
                 .aggregate(WindMetricsAggregationQuery.of("example", 1L));
         Assertions.assertNotNull(example.successTotal);
     }
@@ -56,8 +56,8 @@ class WindWindMetricsAggregatorFactoryTests {
         }
 
         @Override
-        public WindMetricsAggregator<T> named(String metricsName, String filedName) {
-            fieldMappings.put(metricsName, filedName);
+        public WindMetricsAggregator<T> named(String filedName, String metricsName) {
+            fieldMappings.put(filedName, metricsName);
             return this;
         }
 
@@ -66,8 +66,8 @@ class WindWindMetricsAggregatorFactoryTests {
             try {
                 T bean = classType.newInstance();
                 for (Map.Entry<String, String> entry : fieldMappings.entrySet()) {
-                    String name = entry.getKey();
-                    String filedName = entry.getValue();
+                    String filedName = entry.getKey();
+                    String name = entry.getValue();
                     Field field = bean.getClass().getDeclaredField(filedName);
                     field.setAccessible(true);
                     field.set(bean, new MockSingleValueMetricsField(name).getValue());

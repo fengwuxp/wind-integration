@@ -101,6 +101,9 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     ARS("032", "ARS", "阿根廷比索", "$"),
 
+    @Deprecated
+    ARA("032", "ARA", "阿根廷奥斯特拉尔", "$"),
+
     KES("4217", "KES", "肯尼亚先令", "Ksh"),
 
     QAR("634", "QAR", "卡塔尔里亚尔", "ر.ق"),
@@ -363,6 +366,8 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     ALL("008", "ALL", "阿尔巴尼亚", "Lek"),
 
+
+
     /*---   虚拟货币和特殊需求  ---*/
     // 比特币
     BTC("BTC", "BTC", "比特币", "₿", 8),
@@ -425,6 +430,8 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
         // Brazilian cruzeiro 巴西
         DEPRECATED_CODES.put("076", CurrencyIsoCode.BRL);
         DEPRECATED_CODES.put("987", CurrencyIsoCode.BRL);
+
+        DEPRECATED_CODES.put("032", CurrencyIsoCode.ARS);
     }
 
 

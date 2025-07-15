@@ -218,6 +218,9 @@ public final class Money implements Serializable, Comparable<Money> {
 
     @Override
     public String toString() {
+        if (amount < 0) {
+            return String.format("-%s%s", currency.getSign(), this.fen2Yuan().abs());
+        }
         return String.format("%s%s", currency.getSign(), this.fen2Yuan());
     }
 }

@@ -28,4 +28,10 @@ class MoneyTests {
         BaseException exception = Assertions.assertThrows(BaseException.class, () -> o1.lte(Money.immutable(1, CurrencyIsoCode.BDT)));
         Assertions.assertEquals(CURRENCY_ISO_CODE_NOT_MATCH, exception.getMessage());
     }
+
+    @Test
+    void testNegative() {
+        Assertions.assertEquals("$1.00", Money.immutable(100, CurrencyIsoCode.USD).toString());
+        Assertions.assertEquals("-$1.00", Money.immutable(-100, CurrencyIsoCode.USD).toString());
+    }
 }

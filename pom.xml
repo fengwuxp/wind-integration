@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.wind.middleware</groupId>
         <artifactId>wind-middleware</artifactId>
-        <version>1.0.30-SNAPSHOT</version>
+        <version>1.0.0</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -30,7 +30,7 @@
     </modules>
 
     <properties>
-        <revision>1.0.30-SNAPSHOT</revision>
+        <revision>1.0.0</revision>
         <easyexcel.version>3.3.2</easyexcel.version>
         <aliyun.oss.version>3.17.4</aliyun.oss.version>
         <aliyun.kms.version>1.2.3</aliyun.kms.version>

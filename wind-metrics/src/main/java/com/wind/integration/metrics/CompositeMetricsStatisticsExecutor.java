@@ -20,14 +20,14 @@ public class CompositeMetricsStatisticsExecutor implements WindMetricsStatistics
     public void execute(Object businessObject, Map<String, Object> variables) {
         AssertUtils.notNull(businessObject, "argument businessObject must not null");
         for (WindMetricsStatisticsExecutor delegate : delegates) {
-            if (delegate.supports(businessObject)) {
+            if (delegate.supports(businessObject.getClass())) {
                 delegate.execute(businessObject, variables);
             }
         }
     }
 
     @Override
-    public boolean supports(Object businessObject) {
+    public boolean supports(Class<?> businessObjectType) {
         return true;
     }
 }

@@ -32,8 +32,8 @@ public interface WindMetricsStatisticsExecutor<E> {
     /**
      * 判断是否支持
      *
-     * @param businessObject 业务对象
+     * @param businessObjectType 业务对象类型
      * @return true:支持
      */
-    boolean supports(Object businessObject);
+    boolean supports(Class<?> businessObjectType);
 }

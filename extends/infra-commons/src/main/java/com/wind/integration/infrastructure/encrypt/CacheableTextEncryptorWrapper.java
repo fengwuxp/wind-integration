@@ -4,9 +4,11 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.wind.common.annotations.VisibleForTesting;
 import com.wind.security.crypto.symmetric.AesTextEncryptor;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.security.crypto.keygen.KeyGenerators;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 
@@ -48,8 +50,8 @@ public class CacheableTextEncryptorWrapper implements TextEncryptor {
 
     @Override
     public String decrypt(String encryptedText) {
-        String localEncrypt = decryptedCaches.get(encryptedText, key -> {
-            String val = delegate.decrypt(key);
+        String localEncrypt = decryptedCaches.get(DigestUtils.sha256Hex(encryptedText.getBytes(StandardCharsets.UTF_8)), k -> {
+            String val = delegate.decrypt(encryptedText);
             return localTextEncryptor.encrypt(val);
         });
         return localTextEncryptor.decrypt(localEncrypt);

@@ -35,5 +35,5 @@ public interface WindMetricsStatisticsExecutor<E> {
      * @param businessObject 业务对象
      * @return true:支持
      */
-    boolean supports(E businessObject);
+    boolean supports(Object businessObject);
 }

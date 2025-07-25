@@ -9,7 +9,6 @@ import jakarta.validation.constraints.NotNull;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-import jakarta.validation.constraints.NotNull;
 import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -53,20 +52,8 @@ public final class Money implements Serializable, Comparable<Money> {
         return Math.toIntExact(amount);
     }
 
-
     public long getLongAmount() {
         return amount;
-    }
-
-    /**
-     * 转换为标准币种显示格式
-     * eg: $10
-     *
-     * @return $10
-     */
-    @Deprecated
-    public String toText() {
-        return toString();
     }
 
     /**

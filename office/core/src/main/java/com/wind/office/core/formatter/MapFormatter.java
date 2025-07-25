@@ -5,7 +5,6 @@ import org.springframework.format.Formatter;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
-import javax.annotation.Nonnull;
 import java.util.Locale;
 import java.util.Map;
 
@@ -37,7 +36,7 @@ public class MapFormatter<T> implements Formatter<T> {
         return null;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public String print(@NonNull T value, @Nullable Locale locale) {
         return (String) this.dataSource.get(String.valueOf(value));

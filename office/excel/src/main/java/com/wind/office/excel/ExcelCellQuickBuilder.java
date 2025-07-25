@@ -8,12 +8,12 @@ import com.wind.common.util.WindReflectUtils;
 import com.wind.office.core.formatter.DefaultFormatterFactory;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.format.Printer;
+import org.springframework.lang.Nullable;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
-import javax.annotation.Nullable;
-import jakarta.validation.constraints.NotNull;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
 import java.lang.reflect.Member;
@@ -71,7 +71,8 @@ public final class ExcelCellQuickBuilder {
                         return buildExcelCellDescriptor(method);
                     }
                     throw BaseException.common("not found name = " + filedName + " field");
-                }).collect(Collectors.toList());
+                })
+                .toList();
     }
 
     private static ExcelCellDescriptor buildExcelCellDescriptor(Field field) {
@@ -96,7 +97,7 @@ public final class ExcelCellQuickBuilder {
             result.addAll(Arrays.stream(getterMethods)
                     .map(ExcelCellQuickBuilder::convertGetMethodNameToFieldName)
                     .filter(name -> !result.contains(name))
-                    .collect(Collectors.toList()));
+                    .toList());
             return result;
         }
         return orderedFields;
@@ -114,11 +115,11 @@ public final class ExcelCellQuickBuilder {
 
     private static Printer<?> ofPrinter(String name, Member member) {
         Printer<?> printer = EXCEL_CELL_PRINTER.get().apply(name, member);
-        if (member instanceof Field) {
-            return printer == null ? createDefaultPrinterByClass(((Field) member).getType()) : printer;
+        if (member instanceof Field field) {
+            return printer == null ? createDefaultPrinterByClass(field.getType()) : printer;
         }
-        if (member instanceof Method) {
-            return printer == null ? createDefaultPrinterByClass(((Method) member).getReturnType()) : printer;
+        if (member instanceof Method method) {
+            return printer == null ? createDefaultPrinterByClass(method.getReturnType()) : printer;
         }
         return null;
     }
@@ -152,13 +153,11 @@ public final class ExcelCellQuickBuilder {
         public String apply(AnnotatedElement annotatedElement) {
             Schema annotation = annotatedElement.getAnnotation(Schema.class);
             if (annotation == null) {
-                if (annotatedElement instanceof Field) {
-                    return ((Field) annotatedElement).getName();
-                } else if (annotatedElement instanceof Method) {
-                    return convertGetMethodNameToFieldName((Method) annotatedElement);
-                } else {
-                    return WindConstants.EMPTY;
-                }
+                return switch (annotatedElement) {
+                    case Field field -> field.getName();
+                    case Method method -> convertGetMethodNameToFieldName(method);
+                    default -> WindConstants.EMPTY;
+                };
             }
             String result = annotation.description();
             return StringUtils.hasText(result) ? result : annotation.name();

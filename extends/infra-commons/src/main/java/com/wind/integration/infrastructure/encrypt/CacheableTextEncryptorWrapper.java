@@ -26,20 +26,21 @@ public class CacheableTextEncryptorWrapper implements TextEncryptor {
 
     private final Cache<String, String> decryptedCaches;
 
-    public CacheableTextEncryptorWrapper(TextEncryptor delegate, Duration cacheExpire) {
+    public CacheableTextEncryptorWrapper(TextEncryptor delegate, Duration cacheExpire, int maxSize) {
         this.delegate = delegate;
         this.decryptedCaches = Caffeine.newBuilder()
-                .expireAfterWrite(cacheExpire)
-                .maximumSize(3600)
+                .expireAfterAccess(cacheExpire)
+                .maximumSize(maxSize)
                 .build();
         this.localTextEncryptor = new AesTextEncryptor(generateAesKey(), generateSalt());
     }
 
     public CacheableTextEncryptorWrapper(TextEncryptor delegate) {
-        this(delegate, Duration.ofMinutes(5));
+        // 16 * 1024 = 16384
+        this(delegate, Duration.ofMinutes(15), 16384);
     }
 
-    public static CacheableTextEncryptorWrapper kms() {
+    public static CacheableTextEncryptorWrapper alibabaKms() {
         return new CacheableTextEncryptorWrapper(new AlibabaKmsEncryptor());
     }
 

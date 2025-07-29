@@ -1,6 +1,7 @@
 package com.wind.office.excel.metadata;
 
 import com.wind.common.exception.BaseException;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.format.Printer;
 
 import java.util.Locale;
@@ -15,17 +16,23 @@ import java.util.Locale;
 public interface ExcelCellPrinter<T> extends Printer<T> {
 
     @Override
-    default String print(T object, Locale locale) {
-        throw new BaseException("unsupported, please use: String print(T cellValue, Object row, Locale locale)");
+    default @NotNull String print(T object, Locale locale) {
+        throw new BaseException("unsupported, please use: String print(T cellValue, String expression, Object row, Locale locale)");
     }
+
+    @Deprecated
+    String print(T cellValue, Object row, Locale locale);
 
     /**
      * Print the object of type T for display.
      *
-     * @param cellValue excel cell data
-     * @param row       excel row data
-     * @param locale    the current user locale
+     * @param cellValue  excel cell data
+     * @param expression getter cell value expression
+     * @param row        excel row data
+     * @param locale     the current user locale
      * @return the printed text string
      */
-    String print(T cellValue, Object row, Locale locale);
+    default String print(T cellValue, String expression, Object row, Locale locale) {
+        return print(cellValue, row, locale);
+    }
 }

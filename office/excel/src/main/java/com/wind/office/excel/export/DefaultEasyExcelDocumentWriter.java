@@ -4,15 +4,8 @@ import com.alibaba.excel.write.builder.ExcelWriterBuilder;
 import com.alibaba.excel.write.builder.ExcelWriterSheetBuilder;
 import com.alibaba.excel.write.handler.WriteHandler;
 import com.alibaba.excel.write.style.row.SimpleRowHeightStyleStrategy;
-import com.wind.common.WindConstants;
 import com.wind.office.excel.ExcelDocumentWriter;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
-import com.wind.office.excel.metadata.ExcelCellPrinter;
-import com.wind.script.spring.SpringExpressionEvaluator;
-import org.springframework.expression.EvaluationContext;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
-import org.springframework.format.Printer;
-import org.springframework.util.StringUtils;
 
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -21,7 +14,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
@@ -35,14 +27,14 @@ public class DefaultEasyExcelDocumentWriter implements ExcelDocumentWriter {
 
     private final List<Object> rows;
 
-    private final List<ExcelCellDescriptor> descriptors;
-
     private final ExcelWriterSheetBuilder sheetBuilder;
+
+    private final SpringExpressionRowDataFormatter formatter;
 
     private DefaultEasyExcelDocumentWriter(List<ExcelCellDescriptor> descriptors, ExcelWriterSheetBuilder sheetBuilder) {
         this.rows = new ArrayList<>(2000);
-        this.descriptors = descriptors;
         this.sheetBuilder = sheetBuilder;
+        this.formatter = new SpringExpressionRowDataFormatter(descriptors);
     }
 
     public static DefaultEasyExcelDocumentWriter of(OutputStream output, List<ExcelCellDescriptor> descriptors) {
@@ -67,7 +59,7 @@ public class DefaultEasyExcelDocumentWriter implements ExcelDocumentWriter {
 
     @Override
     public void write(Collection<Object> rows) {
-        this.rows.addAll(rows.stream().map(this::format).collect(Collectors.toList()));
+        this.rows.addAll(rows.stream().map(formatter::formatRows).collect(Collectors.toList()));
     }
 
     @Override
@@ -76,25 +68,4 @@ public class DefaultEasyExcelDocumentWriter implements ExcelDocumentWriter {
         rows.clear();
     }
 
-    private List<String> format(Object row) {
-        List<String> result = new ArrayList<>();
-        EvaluationContext context = new StandardEvaluationContext(row);
-        for (ExcelCellDescriptor writeHead : descriptors) {
-            String expression = writeHead.getExpression();
-            Object cellValue = StringUtils.hasText(expression) ? SpringExpressionEvaluator.DEFAULT.eval(expression, context) : row;
-            result.add(formatCellValue(writeHead, row, cellValue));
-        }
-        return result;
-    }
-
-    private String formatCellValue(ExcelCellDescriptor descriptor, Object row, Object cellValue) {
-        if (cellValue == null) {
-            return WindConstants.EMPTY;
-        }
-        Printer<Object> printer = descriptor.getPrinter();
-        if (printer instanceof ExcelCellPrinter) {
-            return ((ExcelCellPrinter<Object>) printer).print(cellValue, row, Locale.getDefault());
-        }
-        return printer.print(cellValue, Locale.getDefault());
-    }
 }

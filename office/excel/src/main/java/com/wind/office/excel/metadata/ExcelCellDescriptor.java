@@ -44,7 +44,6 @@ public final class ExcelCellDescriptor {
     private final Map<Class<?>, ExcelCellAttribute<?>> attributes;
 
     private ExcelCellDescriptor(String title, String expression, Collection<ExcelCellAttribute<?>> attributes) {
-        AssertUtils.hasText(title, "argument title must not empty");
         this.title = title;
         this.expression = expression;
         this.attributes = attributes.stream().collect(Collectors.toMap(ExcelCellAttribute::getClass, Function.identity()));
@@ -71,6 +70,10 @@ public final class ExcelCellDescriptor {
                 .orElseGet(() -> (value, locale) -> value);
     }
 
+    public boolean hasPrinter() {
+        return findAttribute(CellPrinter.class).isPresent();
+    }
+
     @SuppressWarnings("unchecked")
     public <T> Optional<ExcelCellAttribute<T>> findAttribute(Class<? extends ExcelCellAttribute<T>> clazz) {
         ExcelCellAttribute<T> result = (ExcelCellAttribute<T>) attributes.get(clazz);
@@ -85,6 +88,10 @@ public final class ExcelCellDescriptor {
         return new ExcelCellDescriptorBuilder(SpringI18nMessageUtils.getMessage(title, title), expression);
     }
 
+    public static ExcelCellDescriptorBuilder withExpression(String expression) {
+        return new ExcelCellDescriptorBuilder(null, expression);
+    }
+
     public static ExcelCellDescriptor of(String title, String expression) {
         return builder(title, expression).build();
     }
@@ -94,6 +101,11 @@ public final class ExcelCellDescriptor {
                 .width(width)
                 .build();
     }
+
+    public static ExcelCellDescriptor expression(String expression) {
+        return withExpression(expression).build();
+    }
+
 
     @AllArgsConstructor
     public static class ExcelCellDescriptorBuilder {
@@ -110,12 +122,19 @@ public final class ExcelCellDescriptor {
         }
 
         public <T> ExcelCellDescriptorBuilder printer(Printer<T> printer) {
+            AssertUtils.isTrue(attributes.stream().noneMatch(CellPrinter.class::isInstance), "Printer already exists");
             this.attributes.add(new CellPrinter(printer));
             return this;
         }
 
         public <T> ExcelCellDescriptorBuilder parser(Parser<T> parser) {
+            AssertUtils.isTrue(attributes.stream().noneMatch(CellPrinter.class::isInstance), "Parser already exists");
             this.attributes.add(new CellParser(parser));
+            return this;
+        }
+
+        public ExcelCellDescriptorBuilder attributes(Collection<ExcelCellAttribute<?>> attributes) {
+            this.attributes.addAll(attributes);
             return this;
         }
 

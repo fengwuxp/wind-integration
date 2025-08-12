@@ -193,8 +193,8 @@ public final class Money implements Serializable, Comparable<Money> {
     public static Money immutable(@NotNull BigDecimal amountYuan, @NotNull CurrencyIsoCode currency) {
         AssertUtils.notNull(amountYuan, "argument amountYuan must not null");
         AssertUtils.notNull(currency, CURRENCY_ISO_CODE_NOT_NULL);
-        int longAmount = amountYuan.scaleByPowerOfTen(currency.getPrecision()).intValue();
-        return immutable(longAmount, currency);
+        long amount = amountYuan.scaleByPowerOfTen(currency.getPrecision()).longValue();
+        return immutable(amount, currency);
     }
 
     /**

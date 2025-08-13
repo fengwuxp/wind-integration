@@ -33,7 +33,7 @@ public final class Money implements Serializable, Comparable<Money> {
     static final String CURRENCY_ISO_CODE_NOT_MATCH = "currency mismatch";
 
     /**
-     * 数额
+     * 数额，单位: 分
      */
     private final long amount;
 
@@ -48,12 +48,13 @@ public final class Money implements Serializable, Comparable<Money> {
         this.currency = currency;
     }
 
-    public int getAmount() {
+    /**
+     * 注意：单位为分，仅在金额不会超过 {@link Integer#MAX_VALUE} 时使用
+     *
+     * @return 金额值（int）
+     */
+    public int getIntAmount() {
         return Math.toIntExact(amount);
-    }
-
-    public long getLongAmount() {
-        return amount;
     }
 
     /**

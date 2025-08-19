@@ -288,6 +288,9 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     RON("946", "RON", "罗马尼亚列伊", "L"),
 
+    @Deprecated
+    ROL("642", "ROL", "罗马尼亚列伊（第三版）", "L"),
+
     RSD("941", "RSD", "塞爾維亞第納爾", "din"),
 
     RWF("646", "RWF", "卢旺达法郎", "RF"),
@@ -367,7 +370,6 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
     ALL("008", "ALL", "阿尔巴尼亚", "Lek"),
 
 
-
     /*---   虚拟货币和特殊需求  ---*/
     // 比特币
     BTC("BTC", "BTC", "比特币", "₿", 8),
@@ -432,6 +434,9 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
         DEPRECATED_CODES.put("987", CurrencyIsoCode.BRL);
 
         DEPRECATED_CODES.put("032", CurrencyIsoCode.ARS);
+
+        // 罗马尼亚列伊
+        DEPRECATED_CODES.put("642", CurrencyIsoCode.RON);
     }
 
 

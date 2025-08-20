@@ -21,7 +21,7 @@ public interface TemplateMessageFactory<T> {
      * @return 消息列表
      */
     @SuppressWarnings({"rawtypes", "unckeced"})
-    Collection<MessageDefinition<?>> getMessages(String templateId, T source, Map<String, Object> extraVariables);
+    Collection<MessageDefinition> getMessages(String templateId, T source, Map<String, Object> extraVariables);
 
     /**
      * 根据业务数据转换消息
@@ -31,7 +31,7 @@ public interface TemplateMessageFactory<T> {
      * @return 消息列表
      */
     @SuppressWarnings({"rawtypes", "unckeced"})
-    default Collection<MessageDefinition<?>> getMessages(String templateId, T source) {
+    default Collection<MessageDefinition> getMessages(String templateId, T source) {
         return getMessages(templateId, source, Collections.emptyMap());
     }
 

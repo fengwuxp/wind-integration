@@ -55,7 +55,7 @@ public final class WindResourcesUtils {
                         .getOrDefault(node.getId(), Collections.emptyList())
                         .stream()
                         .sorted(Comparator.comparing(T::getOrderIndex))
-                        .collect(Collectors.toList());
+                        .toList();
                 childrenSetter.accept(node, children);
             }
         }
@@ -68,6 +68,6 @@ public final class WindResourcesUtils {
         return levels.getOrDefault(minLevel, Collections.emptyList())
                 .stream()
                 .sorted(Comparator.comparing(T::getOrderIndex))
-                .collect(Collectors.toList());
+                .toList();
     }
 }

@@ -44,6 +44,8 @@ public final class Money implements Serializable, Comparable<Money> {
 
     @JsonCreator
     public Money(@JsonProperty("amount") long amount, @JsonProperty("currency") CurrencyIsoCode currency) {
+        AssertUtils.isTrue(amount >= 0, "amount must >= 0");
+        AssertUtils.notNull(currency, "argument currency must not null");
         this.amount = amount;
         this.currency = currency;
     }

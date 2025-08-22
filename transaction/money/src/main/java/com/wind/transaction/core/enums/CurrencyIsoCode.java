@@ -432,11 +432,12 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
         // Brazilian cruzeiro 巴西
         DEPRECATED_CODES.put("076", CurrencyIsoCode.BRL);
         DEPRECATED_CODES.put("987", CurrencyIsoCode.BRL);
-
+        // 阿根廷比索
         DEPRECATED_CODES.put("032", CurrencyIsoCode.ARS);
-
         // 罗马尼亚列伊
         DEPRECATED_CODES.put("642", CurrencyIsoCode.RON);
+        // 波兰兹罗提
+        DEPRECATED_CODES.put("616", CurrencyIsoCode.PLN);
     }
 
 

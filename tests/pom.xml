@@ -13,21 +13,64 @@
 
     <properties>
         <maven.deploy.skip>true</maven.deploy.skip>
-        <code.coverage.project.folder>${basedir}/../</code.coverage.project.folder>
-        <code.coverage.overall.data.folder>${basedir}/target/</code.coverage.overall.data.folder>
     </properties>
 
     <dependencies>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.junit.vintage</groupId>
-                    <artifactId>junit-vintage-engine</artifactId>
-                </exclusion>
-            </exclusions>
-            <scope>test</scope>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-integration-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-infra-commons</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>mybatis-flex-extends</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-office-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-metrics</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-office-excel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-oss-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-oss-alibabacloud</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-oss-spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-kms-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-kms-alibabacloud</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-system-face</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-system-impl</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.tools</groupId>
+            <artifactId>mybatis-flex-codegen</artifactId>
         </dependency>
         <dependency>
             <groupId>com.wind.tools</groupId>
@@ -60,25 +103,19 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.wind.tools</groupId>
-            <artifactId>mybatis-flex-codegen</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.wind.integration</groupId>
-            <artifactId>wind-system-impl</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.wind.integration</groupId>
-            <artifactId>wind-infra-commons</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/com.github.codemonstur/embedded-redis -->
-        <dependency>
             <groupId>com.github.codemonstur</groupId>
             <artifactId>embedded-redis</artifactId>
-            <version>1.4.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.junit.vintage</groupId>
+                    <artifactId>junit-vintage-engine</artifactId>
+                </exclusion>
+            </exclusions>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -88,17 +125,6 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <configuration>
-                    <!-- 排除模型类采集 -->
-                    <excludes>
-                        <exclude>**/model/**</exclude>
-                        <exclude>**/entities/**</exclude>
-                        <exclude>**/risk/**/dto/**</exclude>
-                        <exclude>com/capte/nobe/risk/RiskParameterParser.class</exclude>
-                        <exclude>com/capte/nobe/risk/RiskMetricNameConstants.class</exclude>
-                        <exclude>com/capte/nobe/risk/EasyRulesConstants.class</exclude>
-                    </excludes>
-                </configuration>
                 <executions>
                     <execution>
                         <id>report-aggregate</id>
@@ -107,25 +133,7 @@
                             <goal>report-aggregate</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>../target/site/jacoco</outputDirectory>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>merge-results</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>merge</goal>
-                        </goals>
-                        <configuration>
-                            <fileSets>
-                                <fileSet>
-                                    <directory>${code.coverage.project.folder}</directory>
-                                    <includes>
-                                        <include>**/target/jacoco.exec</include>
-                                    </includes>
-                                </fileSet>
-                            </fileSets>
-                            <destFile>${code.coverage.overall.data.folder}/aggregate.exec</destFile>
+                            <outputDirectory>${project.build.directory}/site/jacoco</outputDirectory>
                         </configuration>
                     </execution>
                 </executions>

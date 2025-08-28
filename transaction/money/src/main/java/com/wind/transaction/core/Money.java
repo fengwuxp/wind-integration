@@ -44,7 +44,6 @@ public final class Money implements Serializable, Comparable<Money> {
 
     @JsonCreator
     public Money(@JsonProperty("amount") long amount, @JsonProperty("currency") CurrencyIsoCode currency) {
-        AssertUtils.isTrue(amount >= 0, "amount must >= 0");
         AssertUtils.notNull(currency, "argument currency must not null");
         this.amount = amount;
         this.currency = currency;
@@ -210,13 +209,10 @@ public final class Money implements Serializable, Comparable<Money> {
 
     @Override
     public String toString() {
+        if (amount < 0) {
+            return String.format("-%s%s", currency.getSign(), this.fen2Yuan().abs());
+        }
         return String.format("%s%s", currency.getSign(), this.fen2Yuan());
     }
 
-    /**
-     * @return 负数金额字符串
-     */
-    public String asNegativeString() {
-        return String.format("-%s%s", currency.getSign(), this.fen2Yuan());
-    }
 }

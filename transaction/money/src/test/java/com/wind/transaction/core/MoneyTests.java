@@ -32,6 +32,6 @@ class MoneyTests {
     @Test
     void testNegative() {
         Assertions.assertEquals("$1.00", Money.immutable(100, CurrencyIsoCode.USD).toString());
-        Assertions.assertEquals("-$1.00", Money.immutable(100, CurrencyIsoCode.USD).asNegativeString());
+        Assertions.assertEquals("-$1.00", Money.immutable(-100, CurrencyIsoCode.USD).toString());
     }
 }

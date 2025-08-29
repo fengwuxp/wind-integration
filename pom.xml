@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.wind.middleware</groupId>
         <artifactId>wind-middleware</artifactId>
-        <version>1.0.1-jdk21-SNAPSHOT</version>
+        <version>1.0.2-jdk21-SNAPSHOT</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -30,7 +30,7 @@
     </modules>
 
     <properties>
-        <revision>1.0.1-jdk21-SNAPSHOT</revision>
+        <revision>1.0.2-jdk21-SNAPSHOT</revision>
         <knife4j.version>4.5.0</knife4j.version>
         <easyexcel.version>4.0.3</easyexcel.version>
         <apache-hc4.version>4.5.14</apache-hc4.version>
@@ -60,6 +60,11 @@
             <artifactId>jakarta.validation-api</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context-indexer</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
@@ -67,6 +72,7 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>

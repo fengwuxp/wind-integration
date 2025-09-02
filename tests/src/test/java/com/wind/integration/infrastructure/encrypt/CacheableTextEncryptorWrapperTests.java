@@ -23,7 +23,7 @@ class CacheableTextEncryptorWrapperTests {
     @Test
     void testDecrypt() {
         for (int i = 0; i < 1000; i++) {
-            String value = RandomStringUtils.random(32);
+            String value = RandomStringUtils.secure().next(32);
             String encrypt = encryptor.encrypt(value);
             Assertions.assertEquals(value, encryptor.decrypt(encrypt));
         }

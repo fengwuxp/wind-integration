@@ -60,8 +60,8 @@ class SpringExpressionExportExcelTaskTest {
     }
 
     private static ImmutableMap<String, String> mockRowData() {
-        return ImmutableMap.of("name", RandomStringUtils.randomAlphanumeric(12),
-                "age", RandomStringUtils.randomNumeric(2));
+        return ImmutableMap.of("name", RandomStringUtils.secure().nextAlphanumeric(12),
+                "age", RandomStringUtils.secure().nextNumeric(2));
     }
 
     private ExcelCellDescriptor mockExcelHead(String name, int width) {

@@ -15,7 +15,7 @@ class EnvIsolationNameMapperTest {
 
     @Test
     void testName() {
-        String name = RandomStringUtils.randomAlphanumeric(32);
+        String name = RandomStringUtils.secure().nextAlphanumeric(32);
         Assertions.assertEquals("dev@" + name, nameMapper.map(name));
         Assertions.assertEquals(name, nameMapper.unmap(nameMapper.map(name)));
     }

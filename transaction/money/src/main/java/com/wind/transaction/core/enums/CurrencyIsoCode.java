@@ -438,6 +438,9 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
         DEPRECATED_CODES.put("642", CurrencyIsoCode.RON);
         // 波兰兹罗提
         DEPRECATED_CODES.put("616", CurrencyIsoCode.PLN);
+
+        // 土耳其里拉
+        DEPRECATED_CODES.put("792", CurrencyIsoCode.TRY);
     }
 
 

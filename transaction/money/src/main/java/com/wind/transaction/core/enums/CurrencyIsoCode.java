@@ -104,7 +104,7 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
     @Deprecated
     ARA("032", "ARA", "阿根廷奥斯特拉尔", "$"),
 
-    KES("4217", "KES", "肯尼亚先令", "Ksh"),
+    KES("404", "KES", "肯尼亚先令", "Ksh"),
 
     QAR("634", "QAR", "卡塔尔里亚尔", "ر.ق"),
 

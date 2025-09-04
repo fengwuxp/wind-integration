@@ -4,7 +4,7 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * kms 加解密 client
+ * KMS 加解密 Client API 抽象，用于适配不同的云厂商或 KMS 实现
  *
  * @author wuxp
  * @date 2025-02-17 18:01

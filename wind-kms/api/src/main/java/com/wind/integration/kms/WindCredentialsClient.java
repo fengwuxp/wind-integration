@@ -1,12 +1,11 @@
 package com.wind.integration.kms;
 
 import com.wind.integration.kms.model.dto.KmsSecretDetailsDTO;
-
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Null;
 
 /**
- * 凭据管理 client
+ * 凭据管理 Client API 抽象，用于适配不同的凭据托管实现
  *
  * @author wuxp
  * @date 2025-02-17 18:11

@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * oss client
+ * OSS Client API 抽象, 用于适配不同的云厂商或 OSS 实现
  *
  * @author wuxp
  * @date 2024-12-17 18:48

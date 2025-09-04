@@ -1,5 +1,7 @@
 package com.wind.integration.kms.model.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
@@ -14,6 +16,7 @@ public class KmsSecretDetailsDTO {
     /**
      * 凭据名称
      */
+    @NotBlank
     private String secretName;
 
     /**
@@ -24,10 +27,12 @@ public class KmsSecretDetailsDTO {
     /**
      * 凭据内容
      */
+    @NotBlank
     private String content;
 
     /**
      * 原始数据
      */
+    @NotNull
     private Object raw;
 }

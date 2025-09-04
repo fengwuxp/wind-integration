@@ -1,5 +1,6 @@
 package com.wind.integration.oss.model;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import jakarta.validation.constraints.NotBlank;
@@ -36,11 +37,13 @@ public class WindOssFile {
     /**
      * 初始文件名
      */
+    @NotBlank
     private String originalName;
 
     /**
      * 文件 hash 值
      */
+    @NotBlank
     private String hash;
 
     /**
@@ -51,6 +54,7 @@ public class WindOssFile {
     /**
      * 文件上传时间
      */
+    @NotBlank
     private LocalDateTime gmtCreate;
 
     /**

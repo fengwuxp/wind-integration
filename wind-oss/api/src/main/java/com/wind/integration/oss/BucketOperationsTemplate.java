@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * oss bucket 操作 template
+ * 对 单个 oss bucket 操作 Template
  *
  * @author wuxp
  * @date 2024-12-27 15:14

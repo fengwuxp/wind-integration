@@ -33,6 +33,7 @@
         <revision>1.0.1-jdk21-SNAPSHOT</revision>
         <knife4j.version>4.5.0</knife4j.version>
         <easyexcel.version>4.0.3</easyexcel.version>
+        <hutoo.version>5.8.39</hutoo.version>
         <apache-hc4.version>4.5.14</apache-hc4.version>
         <apache-http-async4.version>4.1.5</apache-http-async4.version>
         <aliyun.oss.version>3.17.4</aliyun.oss.version>
@@ -198,6 +199,21 @@
                 <groupId>com.aliyun</groupId>
                 <artifactId>tea-openapi</artifactId>
                 <version>${aliyun.tea-openapi.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>jakarta.mail</groupId>
+                <artifactId>jakarta.mail-api</artifactId>
+                <version>${jakarta-mail.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>jakarta.activation</groupId>
+                <artifactId>jakarta.activation-api</artifactId>
+                <version>${jakarta-mail.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-core</artifactId>
+                <version>${hutoo.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.github.codemonstur</groupId>

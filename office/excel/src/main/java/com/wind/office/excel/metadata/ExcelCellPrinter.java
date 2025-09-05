@@ -2,6 +2,7 @@ package com.wind.office.excel.metadata;
 
 import com.wind.common.exception.BaseException;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.format.Printer;
 
 import java.util.Locale;
@@ -16,12 +17,9 @@ import java.util.Locale;
 public interface ExcelCellPrinter<T> extends Printer<T> {
 
     @Override
-    default @NotNull String print(T object, Locale locale) {
+    default @NotNull String print(@Nullable T object, @NotNull Locale locale) {
         throw new BaseException("unsupported, please use: String print(T cellValue, String expression, Object row, Locale locale)");
     }
-
-    @Deprecated
-    String print(T cellValue, Object row, Locale locale);
 
     /**
      * Print the object of type T for display.
@@ -32,7 +30,5 @@ public interface ExcelCellPrinter<T> extends Printer<T> {
      * @param locale     the current user locale
      * @return the printed text string
      */
-    default String print(T cellValue, String expression, Object row, Locale locale) {
-        return print(cellValue, row, locale);
-    }
+    String print(@Nullable T cellValue, @NotNull String expression, @NotNull Object row, @NotNull Locale locale);
 }

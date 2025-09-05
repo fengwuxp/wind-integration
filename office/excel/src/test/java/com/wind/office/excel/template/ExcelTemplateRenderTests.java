@@ -30,7 +30,7 @@ class ExcelTemplateRenderTests {
                 // 设置标题和字段取值表达式
                 .titles(Arrays.asList(
                         ExcelCellDescriptor.builder("姓名", "name")
-                                .printer((ExcelCellPrinter<String>) (cellValue, row, locale) -> cellValue + "-001")
+                                .printer((ExcelCellPrinter<String>) (cellValue, expression, row, locale) -> cellValue + "-001")
                                 .build(),
                         ExcelCellDescriptor.of("年龄", "age")
                 ))

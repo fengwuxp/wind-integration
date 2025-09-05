@@ -2,16 +2,15 @@ package com.wind.transaction.core.request;
 
 
 import com.wind.transaction.core.AccountTransactionType;
-import com.wind.transaction.core.TransactionContextVariables;
 import com.wind.transaction.core.Money;
+import com.wind.transaction.core.TransactionContextVariables;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
-
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 
 /**
  * 预存款账户转入\转出请求
@@ -60,5 +59,6 @@ public class TransferRequest {
     /**
      * 上下文透传变量
      */
-    private TransactionContextVariables contextVariables;
+    @NotNull
+    private TransactionContextVariables contextVariables = TransactionContextVariables.of();
 }

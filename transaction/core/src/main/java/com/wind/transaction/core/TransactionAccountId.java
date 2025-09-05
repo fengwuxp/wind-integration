@@ -3,12 +3,12 @@ package com.wind.transaction.core;
 import com.wind.common.enums.DescriptiveEnum;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.WritableContextVariables;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.springframework.lang.Nullable;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,11 +26,13 @@ public class TransactionAccountId implements WritableContextVariables {
     /**
      * 账号唯一标识
      */
+    @NotNull
     private final String id;
 
     /**
      * 账号类型
      */
+    @NotNull
     private final DescriptiveEnum type;
 
     /**
@@ -38,6 +40,12 @@ public class TransactionAccountId implements WritableContextVariables {
      */
     @NotNull
     private final Object userId;
+
+    /**
+     * 上下文变量
+     */
+    @NotNull
+    private final Map<String, Object> variables = new HashMap<>();
 
     private TransactionAccountId(@NotNull String id, @NotNull DescriptiveEnum type, @NotNull Object userId) {
         AssertUtils.hasText(id, "argument id must not empty");
@@ -51,11 +59,6 @@ public class TransactionAccountId implements WritableContextVariables {
     public static TransactionAccountId of(String id, DescriptiveEnum type, Object userId) {
         return new TransactionAccountId(id, type, userId);
     }
-
-    /**
-     * 上下文变量
-     */
-    private final Map<String, Object> variables = new HashMap<>();
 
     @Override
     public TransactionAccountId putVariable(String name, @Nullable Object val) {

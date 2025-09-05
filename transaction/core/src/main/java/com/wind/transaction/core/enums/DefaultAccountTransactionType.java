@@ -12,17 +12,17 @@ import lombok.Getter;
  **/
 @AllArgsConstructor
 @Getter
-public enum DefaultTransactionType implements AccountTransactionType {
+public enum DefaultAccountTransactionType implements AccountTransactionType {
 
     /**
-     * 存款（充值）
+     * 充值
      */
-    DEPOSIT("存款（充值）"),
+    TOP_UP("充值"),
 
     /**
      * 取款（提现）
      */
-    WITHDRAW("取款（提现）"),
+    WITHDRAWAL("提现"),
 
     /**
      * 支付
@@ -35,9 +35,14 @@ public enum DefaultTransactionType implements AccountTransactionType {
     REFUND("退款"),
 
     /**
-     * 手续费或服务费
+     * 服务费
      */
-    FEE("手续费");
+    SERVICE_FEE("服务费"),
+
+    /**
+     * 交易手续费
+     */
+    TRANSACTION_FEE("交易手续费");
 
     private final String desc;
 }

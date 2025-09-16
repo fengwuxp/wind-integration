@@ -5,6 +5,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.wind.common.annotations.VisibleForTesting;
 import com.wind.security.crypto.symmetric.AesTextEncryptor;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.security.crypto.keygen.KeyGenerators;
 
@@ -24,7 +25,7 @@ public class CacheableTextEncryptorWrapper implements TextEncryptor {
 
     private final AesTextEncryptor localTextEncryptor;
 
-    private final Cache<String, String> decryptedCaches;
+    private final Cache<@NotNull String, String> decryptedCaches;
 
     public CacheableTextEncryptorWrapper(TextEncryptor delegate, Duration cacheExpire, int maxSize) {
         this.delegate = delegate;
@@ -36,8 +37,7 @@ public class CacheableTextEncryptorWrapper implements TextEncryptor {
     }
 
     public CacheableTextEncryptorWrapper(TextEncryptor delegate) {
-        // 16 * 1024 = 16384
-        this(delegate, Duration.ofMinutes(15), 16384);
+        this(delegate, Duration.ofMinutes(45), 32 * 1024);
     }
 
     public static CacheableTextEncryptorWrapper alibabaKms() {

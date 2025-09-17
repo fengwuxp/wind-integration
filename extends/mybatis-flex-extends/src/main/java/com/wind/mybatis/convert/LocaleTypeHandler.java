@@ -1,10 +1,7 @@
 package com.wind.mybatis.convert;
 
-/**
- * @author wuxp
- * @date 2024-12-16 09:49
- **/
 
+import com.wind.common.WindConstants;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
 import org.springframework.lang.Nullable;
@@ -15,6 +12,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Locale;
 
+/**
+ * Locale 类型处理器
+ *
+ * @author wuxp
+ * @date 2024-12-16 09:49
+ **/
 public class LocaleTypeHandler extends BaseTypeHandler<Locale> {
 
     @Override
@@ -43,16 +46,16 @@ public class LocaleTypeHandler extends BaseTypeHandler<Locale> {
         if (localeText == null || localeText.trim().isEmpty()) {
             return null;
         }
-        String[] parts = localeText.split("_");
+        String[] parts = localeText.split(WindConstants.UNDERLINE);
         if (parts.length == 1) {
             // 只有语言代码
-            return new Locale(parts[0]);
+            return Locale.of(parts[0]);
         } else if (parts.length == 2) {
             // 包含语言和国家
-            return new Locale(parts[0], parts[1]);
+            return Locale.of(parts[0], parts[1]);
         } else if (parts.length == 3) {
             // 包含语言、国家和变体
-            return new Locale(parts[0], parts[1], parts[2]);
+            return Locale.of(parts[0], parts[1], parts[2]);
         }
         throw new IllegalArgumentException("Invalid locale format: " + localeText);
     }

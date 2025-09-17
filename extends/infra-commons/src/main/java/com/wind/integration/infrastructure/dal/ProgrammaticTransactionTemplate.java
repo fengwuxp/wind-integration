@@ -9,11 +9,10 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 
-
 import java.util.function.Supplier;
 
 /**
- * 编程式事务调用
+ * 编程式事务模板操作
  */
 @AllArgsConstructor
 @Slf4j
@@ -46,13 +45,13 @@ public class ProgrammaticTransactionTemplate {
         try {
             function.run();
             this.platformTransactionManager.commit(transaction);
-        } catch (Throwable e) {
+        } catch (Throwable throwable) {
             try {
                 this.platformTransactionManager.rollback(transaction);
-            } catch (Throwable ee) {
-                log.error("transaction rollback error,message:{}", ee.getMessage(), ee);
+            } catch (Throwable exception) {
+                log.error("transaction rollback error, message = {}", exception.getMessage(), exception);
             }
-            throw e;
+            throw throwable;
         }
     }
 
@@ -102,14 +101,14 @@ public class ProgrammaticTransactionTemplate {
             T result = supplier.get();
             this.platformTransactionManager.commit(transaction);
             return result;
-        } catch (Throwable e) {
+        } catch (Throwable throwable) {
             try {
                 this.platformTransactionManager.rollback(transaction);
-            } catch (Throwable ee) {
-                log.error("transaction rollback error,message:{}", ee.getMessage(), ee);
+            } catch (Throwable exception) {
+                log.error("transaction rollback error, message = {}", exception.getMessage(), exception);
             }
             if (fallback == null) {
-                throw e;
+                throw throwable;
             }
             return fallback.get();
         }

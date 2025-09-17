@@ -102,7 +102,7 @@ public final class MybatisQueryHelper {
      * @return 统一分页对象
      */
     public static <T, R> Pagination<R> convert(Page<T> data, AbstractPageQuery<?> req, Function<T, R> converter) {
-        List<R> records = data.getRecords().stream().map(converter).collect(Collectors.toList());
+        List<R> records = data.getRecords().stream().map(converter).toList();
         return Pagination.of(records, req, data.getTotalRow());
     }
 

@@ -6,7 +6,7 @@ import com.wind.common.util.ServiceInfoUtils;
 import com.wind.integration.core.model.EnvIsolationObject;
 
 /**
- * 环境隔离字段 {@link com.mybatisflex.annotation.InsertListener}
+ * 环境隔离字段插入是自动设置 {@link com.mybatisflex.annotation.InsertListener}
  *
  * @author wuxp
  * @date 2024-12-15 13:09

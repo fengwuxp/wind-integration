@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 
 
 /**
- * 以加锁的方式执行操作
+ * 锁操作模板方法
  */
 @Slf4j
 @AllArgsConstructor

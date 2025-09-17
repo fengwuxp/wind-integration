@@ -9,16 +9,10 @@ import org.redisson.api.NameMapper;
  * @author wuxp
  * @date 2023-11-10 07:53
  **/
-public class EnvIsolationNameMapper implements NameMapper {
-
-    private final String env;
+public record EnvIsolationNameMapper(String env) implements NameMapper {
 
     public EnvIsolationNameMapper() {
         this(ServiceInfoUtils.getSpringProfilesActive());
-    }
-
-    public EnvIsolationNameMapper(String env) {
-        this.env = env;
     }
 
     @Override

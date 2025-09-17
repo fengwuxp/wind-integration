@@ -4,7 +4,6 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.DateTimeSequenceGenerator;
 import com.wind.sequence.time.SequenceTimeScopeType;
-import lombok.AllArgsConstructor;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.redisson.api.RAtomicLong;
 import org.redisson.api.RedissonClient;
@@ -18,10 +17,7 @@ import java.util.Date;
  * @author wuxp
  * @date 2023-11-29 14:35
  **/
-@AllArgsConstructor
-public class RedissonNumericSequenceGenerator {
-
-    private final RedissonClient redissonClient;
+public record RedissonNumericSequenceGenerator(RedissonClient redissonClient) {
 
     /**
      * 以小时为维度全局自增

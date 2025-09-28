@@ -6,9 +6,8 @@ import com.wind.common.annotations.VisibleForTesting;
 import com.wind.common.exception.AssertUtils;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
 
+import java.beans.Transient;
 import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -17,12 +16,12 @@ import java.util.Objects;
 /**
  * 用于描述货币的对象，包括货币数额和币种
  *
+ * @param amount   数额，单位: 分
+ * @param currency 币种
  * @author wuxp
  * @date 2023-10-06 09:01
- **/
-@Getter
-@EqualsAndHashCode
-public final class Money implements Serializable, Comparable<Money> {
+ */
+public record Money(long amount, CurrencyIsoCode currency) implements Serializable, Comparable<Money> {
 
     @Serial
     private static final long serialVersionUID = -7696239148769634763L;
@@ -32,21 +31,21 @@ public final class Money implements Serializable, Comparable<Money> {
     @VisibleForTesting
     static final String CURRENCY_ISO_CODE_NOT_MATCH = "currency mismatch";
 
-    /**
-     * 数额，单位: 分
-     */
-    private final long amount;
-
-    /**
-     * 币种
-     */
-    private final CurrencyIsoCode currency;
-
     @JsonCreator
     public Money(@JsonProperty("amount") long amount, @JsonProperty("currency") CurrencyIsoCode currency) {
         AssertUtils.notNull(currency, "argument currency must not null");
         this.amount = amount;
         this.currency = currency;
+    }
+
+    @Transient
+    public long getAmount(){
+        return amount;
+    }
+
+    @Transient
+    public CurrencyIsoCode getCurrency() {
+        return currency;
     }
 
     /**
@@ -75,8 +74,8 @@ public final class Money implements Serializable, Comparable<Money> {
      * @return 相加后的金额
      */
     public Money add(Money money) {
-        AssertUtils.isTrue(currency.equals(money.getCurrency()), CURRENCY_ISO_CODE_NOT_MATCH);
-        return Money.immutable(amount + money.getAmount(), currency);
+        AssertUtils.isTrue(currency.equals(money.currency()), CURRENCY_ISO_CODE_NOT_MATCH);
+        return Money.immutable(amount + money.amount(), currency);
     }
 
     /**
@@ -86,8 +85,8 @@ public final class Money implements Serializable, Comparable<Money> {
      * @return 相减后的金额
      */
     public Money subtract(Money money) {
-        AssertUtils.isTrue(currency.equals(money.getCurrency()), CURRENCY_ISO_CODE_NOT_MATCH);
-        return Money.immutable(amount - money.getAmount(), currency);
+        AssertUtils.isTrue(currency.equals(money.currency()), CURRENCY_ISO_CODE_NOT_MATCH);
+        return Money.immutable(amount - money.amount(), currency);
     }
 
     /**
@@ -101,11 +100,11 @@ public final class Money implements Serializable, Comparable<Money> {
 
     @Override
     public int compareTo(Money money) {
-        AssertUtils.isTrue(Objects.equals(money.getCurrency(), getCurrency()), CURRENCY_ISO_CODE_NOT_MATCH);
-        if (money.getAmount() == getAmount()) {
+        AssertUtils.isTrue(Objects.equals(money.currency(), currency()), CURRENCY_ISO_CODE_NOT_MATCH);
+        if (money.amount() == amount()) {
             return 0;
         }
-        return getAmount() < money.getAmount() ? -1 : 1;
+        return amount() < money.amount() ? -1 : 1;
     }
 
     /**

@@ -33,7 +33,7 @@
         <revision>1.0.0-SNAPSHOT</revision>
         <knife4j.version>4.5.0</knife4j.version>
         <easyexcel.version>4.0.3</easyexcel.version>
-        <hutoo.version>5.8.39</hutoo.version>
+        <hutool.version>5.8.39</hutool.version>
         <apache-hc4.version>4.5.14</apache-hc4.version>
         <apache-http-async4.version>4.1.5</apache-http-async4.version>
         <aliyun.oss.version>3.17.4</aliyun.oss.version>
@@ -213,7 +213,7 @@
             <dependency>
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-core</artifactId>
-                <version>${hutoo.version}</version>
+                <version>${hutool.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.github.codemonstur</groupId>

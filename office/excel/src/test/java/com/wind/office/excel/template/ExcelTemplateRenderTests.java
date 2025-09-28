@@ -80,7 +80,7 @@ class ExcelTemplateRenderTests {
                 .build();
 
         render.render();
-        Assertions.assertNotNull(render.getFilepath());
+        Assertions.assertNotNull(render.filepath());
 //        Assertions.assertTrue(Files.deleteIfExists(render.getFilepath()));
     }
 

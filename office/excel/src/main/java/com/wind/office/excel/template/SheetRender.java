@@ -20,19 +20,7 @@ import java.util.stream.Collectors;
  * @author wuxp
  * @date 2025-07-28 13:32
  **/
-class SheetRender {
-
-    private final int index;
-
-    private final String sheetName;
-
-    private final List<SheetDataSupplier> suppliers;
-
-    SheetRender(int index, String sheetName, List<SheetDataSupplier> suppliers) {
-        this.index = index;
-        this.sheetName = sheetName;
-        this.suppliers = suppliers;
-    }
+record SheetRender(int index, String sheetName, List<SheetDataSupplier> suppliers) {
 
     static SheetRenderBuilder builder(int index, String sheetName) {
         return new SheetRenderBuilder(index, sheetName);

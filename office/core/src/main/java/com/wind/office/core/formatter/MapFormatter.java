@@ -14,13 +14,7 @@ import java.util.Map;
  * @author wuxp
  */
 @Slf4j
-public class MapFormatter<T> implements Formatter<T> {
-
-    private final Map<String, Object> dataSource;
-
-    public MapFormatter(Map<String, Object> source) {
-        this.dataSource = source;
-    }
+public record MapFormatter<T>(Map<String, Object> dataSource) implements Formatter<T> {
 
     @Nullable
     @SuppressWarnings("unchecked")

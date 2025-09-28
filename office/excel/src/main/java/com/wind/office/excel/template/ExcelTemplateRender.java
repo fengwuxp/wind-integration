@@ -11,7 +11,6 @@ import com.wind.common.exception.BaseException;
 import com.wind.common.exception.DefaultExceptionCode;
 import com.wind.office.excel.ExportExcelDataFetcher;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
-import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.format.Printer;
 import org.springframework.util.CollectionUtils;
@@ -57,29 +56,12 @@ import java.util.stream.Collectors;
  * render.render();
  * }</pre>
  *
+ * @param filepath     excel 文件保存路径
+ * @param sheetRenders excel sheet render
  * @author wuxp
  * @date 2025-07-28 13:02
- **/
-public class ExcelTemplateRender {
-
-    /**
-     * excel 文件保存路径
-     */
-    @Getter
-    private final Path filepath;
-
-    private final List<WriteHandler> writeHandlers;
-
-    /**
-     * excel sheet render
-     */
-    private final List<SheetRender> sheetRenders;
-
-    private ExcelTemplateRender(Path filepath, List<WriteHandler> writeHandlers, List<SheetRender> sheetRenders) {
-        this.filepath = filepath;
-        this.writeHandlers = writeHandlers;
-        this.sheetRenders = sheetRenders;
-    }
+ */
+public record ExcelTemplateRender(Path filepath, List<WriteHandler> writeHandlers, List<SheetRender> sheetRenders) {
 
     /**
      * 渲染 excel

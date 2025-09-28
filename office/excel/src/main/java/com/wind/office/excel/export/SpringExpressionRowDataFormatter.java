@@ -37,7 +37,7 @@ public class SpringExpressionRowDataFormatter {
         List<String> result = new ArrayList<>();
         if (row instanceof Collection<?>) {
             // 集合
-            return ((Collection<?>) row).stream().map(String::valueOf).collect(Collectors.toList());
+            return ((Collection<?>) row).stream().map(String::valueOf).toList();
         } else {
             EvaluationContext context = new StandardEvaluationContext(row);
             for (ExcelCellDescriptor descriptor : cellDescriptors) {

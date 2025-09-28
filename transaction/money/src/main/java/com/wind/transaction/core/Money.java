@@ -8,6 +8,7 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.experimental.FieldNameConstants;
 
 import java.beans.Transient;
 import java.io.Serial;
@@ -23,6 +24,7 @@ import java.util.Objects;
  **/
 @Getter
 @EqualsAndHashCode
+@FieldNameConstants
 public final class Money implements Serializable, Comparable<Money> {
 
     @Serial
@@ -44,7 +46,7 @@ public final class Money implements Serializable, Comparable<Money> {
     private final CurrencyIsoCode currency;
 
     @JsonCreator
-    public Money(@JsonProperty("amount") long amount, @JsonProperty("currency") CurrencyIsoCode currency) {
+    public Money(@JsonProperty(Fields.amount) long amount, @JsonProperty(Fields.currency) CurrencyIsoCode currency) {
         AssertUtils.notNull(currency, "argument currency must not null");
         this.amount = amount;
         this.currency = currency;

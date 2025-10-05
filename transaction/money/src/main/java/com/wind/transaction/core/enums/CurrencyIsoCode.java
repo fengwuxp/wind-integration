@@ -83,6 +83,13 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     BRL("986", "BRL", "巴西雷亚尔", "R$"),
 
+    @Deprecated
+    BRN("076", "BRN", "巴西雷亚尔", "R$"),
+    @Deprecated
+    BRE("076", "BRE", "巴西雷亚尔", "R$"),
+    @Deprecated
+    BRR("987", "BRR", "巴西雷亚尔", "R$"),
+
     PEN("604", "PEN", "秘鲁新索尔", "S/"),
 
     MXN("484", "MXN", "墨西哥比索", "Mex$"),
@@ -368,7 +375,6 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
     ZWL("932", "ZWL", "津巴布韋元", "$"),
 
     ALL("008", "ALL", "阿尔巴尼亚", "Lek"),
-
 
     /*---   虚拟货币和特殊需求  ---*/
     // 比特币

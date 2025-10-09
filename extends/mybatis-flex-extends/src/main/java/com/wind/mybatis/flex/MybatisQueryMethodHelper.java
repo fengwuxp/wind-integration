@@ -92,7 +92,7 @@ public final class MybatisQueryMethodHelper {
     public static String findInSet(QueryColumn column, @NotEmpty Set<String> texts) {
         StringBuilder conditions = new StringBuilder();
         for (String name : texts) {
-            if (conditions.length() > 0) {
+            if (!conditions.isEmpty()) {
                 conditions.append(" OR ");
             }
             conditions.append(String.format("FIND_IN_SET ('%s', %s) > 0", name, buildField(column)));

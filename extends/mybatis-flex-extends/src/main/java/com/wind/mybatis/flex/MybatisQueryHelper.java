@@ -3,6 +3,7 @@ package com.wind.mybatis.flex;
 
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryCondition;
 import com.mybatisflex.core.query.QueryOrderBy;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.query.WindQuery;
@@ -12,10 +13,12 @@ import com.wind.common.query.supports.AbstractPageQuery;
 import com.wind.common.query.supports.Pagination;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.common.query.supports.QueryOrderType;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * mybatis flex query helper
@@ -40,11 +43,13 @@ public final class MybatisQueryHelper {
      * @param query 查询请求
      * @return mybatis flex 分页对象
      */
+    @NotNull
     public static <T> Page<T> of(AbstractPageQuery<?> query) {
         Integer querySize = Math.min(query.getQuerySize(), query.getMaxQuerySize());
         return new Page<>(query.getQueryPage(), querySize);
     }
 
+    @NotNull
     public static QueryWrapper from(WindQuery<? extends QueryOrderField> query) {
         return from(query, null);
     }
@@ -57,6 +62,7 @@ public final class MybatisQueryHelper {
      * @param tableAlias 表别名
      * @return QueryWrapper
      */
+    @NotNull
     public static QueryWrapper from(WindQuery<? extends QueryOrderField> query, String tableAlias) {
         if (query.shouldOrderBy()) {
             QueryWrapper result = QueryWrapper.create();
@@ -95,6 +101,54 @@ public final class MybatisQueryHelper {
         return result;
     }
 
+    /**
+     * 获取基于数值型游标字段的查询条件（适用于自增ID、时间戳等数值类型）
+     *
+     * <p>说明：
+     * <ul>
+     *   <li>游标分页的核心是“稳定排序 + 唯一游标字段”，例如 {@code ORDER BY created_time DESC, id DESC}。</li>
+     *   <li>若查询上一页（存在 prevCursor），则比较符号要与排序方向相反。</li>
+     *   <li>若查询下一页（不存在 prevCursor，仅 nextCursor），则比较符号要与排序方向保持一致。</li>
+     * </ul>
+     *
+     * <p>示例（ASC 排序）：
+     * <pre>{@code
+     *   WHERE id > :cursor ORDER BY id ASC LIMIT 20
+     * }</pre>
+     * <p>示例（DESC 排序）：
+     * <pre>{@code
+     *   WHERE id < :cursor ORDER BY id DESC LIMIT 20
+     * }</pre>
+     */
+    @NotNull
+    public static QueryCondition cursorConditionWithNumId(QueryColumn cursorColumn, AbstractCursorQuery<?> query) {
+        return cursorConditionWithId(cursorColumn, query, query::asPrevNumberId, query::asNextNumberId);
+    }
+
+    /**
+     * 获取基于字符串型游标字段的查询条件（适用于 UUID、雪花ID、复合编码等文本类型）
+     *
+     * <p>说明：
+     * <ul>
+     *   <li>字符串比较使用字典序（lexicographical order）。例如："10" < "2"。</li>
+     *   <li>若字符串ID可转为数值且保证等长（如雪花ID），则字典序排序与数值排序一致。</li>
+     *   <li>其余逻辑与数值型一致，上一页与下一页通过 < / > 控制方向。</li>
+     * </ul>
+     */
+    @NotNull
+    public static QueryCondition cursorConditionWithTextId(QueryColumn cursorColumn, AbstractCursorQuery<?> query) {
+        return cursorConditionWithId(cursorColumn, query, query::asPrevTextId, query::asNextTextId);
+    }
+
+    private static QueryCondition cursorConditionWithId(QueryColumn cursorColumn, AbstractCursorQuery<?> query, Supplier<Object> prevIdGetter, Supplier<Object> nextIdGetter) {
+        boolean asc = query.cursorFieldIsAcs();
+        if (query.getPrevCursor() != null) {
+            // 查询上一页  ASC 排序时下一页游标用 <, DESC 排序时下一页游标用 >
+            return asc ? cursorColumn.lt(prevIdGetter.get()) : cursorColumn.gt(prevIdGetter.get());
+        }
+        // 查询下一页 ASC 排序时下一页游标用 >, DESC 排序时下一页游标用 <
+        return asc ? cursorColumn.gt(nextIdGetter.get()) : cursorColumn.lt(nextIdGetter.get());
+    }
 
     /**
      * 将 mybatis plus 的分页对象转换为统一分页对象
@@ -104,6 +158,7 @@ public final class MybatisQueryHelper {
      * @param converter 转换实体为 DOT 的函数
      * @return 统一分页对象
      */
+    @NotNull
     public static <T, R> Pagination<R> convert(Page<T> data, AbstractPageQuery<?> query, Function<T, R> converter) {
         List<R> records = data.getRecords().stream().map(converter).toList();
         return Pagination.of(records, query, data.getTotalRow());
@@ -117,6 +172,7 @@ public final class MybatisQueryHelper {
      * @param records DTO 列表
      * @return 统一分页对象
      */
+    @NotNull
     public static <T, R> Pagination<R> convert(Page<T> data, AbstractPageQuery<?> query, List<R> records) {
         return Pagination.of(records, query, data.getTotalRow());
     }
@@ -129,9 +185,10 @@ public final class MybatisQueryHelper {
      * @param converter 转换实体为 DOT 的函数
      * @return 统一分页对象
      */
+    @NotNull
     public static <T, R> CursorPagination<R> convert(List<T> data, AbstractCursorQuery<?> query, Function<T, R> converter) {
         List<R> records = data.stream().map(converter).toList();
-        return CursorPagination.next(records, query);
+        return CursorPagination.of(records, query);
     }
 
 }

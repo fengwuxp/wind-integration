@@ -1,7 +1,7 @@
 package com.wind.office.excel.template;
 
 import com.wind.office.excel.ExportExcelDataFetcher;
-import com.wind.office.excel.export.SpringExpressionRowDataFormatter;
+import com.wind.office.excel.export.SpringExpressionObjectToRowConverter;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -11,7 +11,6 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 /**
  * sheet 数据 提供者
@@ -30,13 +29,13 @@ abstract class SheetDataSupplier implements Supplier<List<List<String>>> {
 
     private final int fetchSize;
 
-    private final SpringExpressionRowDataFormatter formatter;
+    private final SpringExpressionObjectToRowConverter rowConverter;
 
     protected SheetDataSupplier(@NotNull List<ExcelCellDescriptor> titles, @NotNull List<ExportExcelDataFetcher<?>> fetchers, int fetchSize) {
         this.titles = titles;
         this.fetchers = fetchers;
         this.fetchSize = fetchSize;
-        this.formatter = SpringExpressionRowDataFormatter.of(titles);
+        this.rowConverter = SpringExpressionObjectToRowConverter.of(titles);
     }
 
     @Override
@@ -46,7 +45,7 @@ abstract class SheetDataSupplier implements Supplier<List<List<String>>> {
         List<String> titleRows = titles.stream()
                 .map(ExcelCellDescriptor::getTitle)
                 .filter(StringUtils::hasText)
-                .collect(Collectors.toList());
+                .toList();
         if (!titleRows.isEmpty()) {
             result.add(titleRows);
         }
@@ -55,7 +54,7 @@ abstract class SheetDataSupplier implements Supplier<List<List<String>>> {
             while (true) {
                 List<?> records = fetcher.fetch(queryPage, fetchSize);
                 for (Object row : records) {
-                    result.add(formatter.formatRows(row));
+                    result.add(rowConverter.convert(row));
                 }
                 if (records.size() < fetchSize) {
                     break;

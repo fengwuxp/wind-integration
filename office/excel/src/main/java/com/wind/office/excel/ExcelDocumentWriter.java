@@ -25,7 +25,7 @@ public interface ExcelDocumentWriter {
      *
      * @param rows 行数据列表
      */
-    void write(Collection<Object> rows);
+    void write(Collection<?> rows);
 
     /**
      * 写入完成

@@ -1,6 +1,8 @@
 package com.wind.office.excel.read;
 
 import com.wind.office.excel.ExcelDocumentImportWriter;
+import com.wind.office.excel.ExcelDocumentReader;
+import com.wind.office.excel.ExcelTestsUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -16,9 +18,8 @@ class DefaultEasyExcelDocumentReaderTests {
 
     @Test
     void testRead() throws Exception {
-        List<BasedFieldNameRowToObjectConverterTests.User> users = new ArrayList<>();
-        DefaultEasyExcelDocumentReader reader = DefaultEasyExcelDocumentReader.of(BasedFieldNameRowToObjectConverterTests.User.class,
-                (ExcelDocumentImportWriter<BasedFieldNameRowToObjectConverterTests.User>) users::addAll);
+        List<ExcelTestsUtils.User> users = new ArrayList<>();
+        ExcelDocumentReader reader = DefaultEasyExcelDocumentReader.of(ExcelTestsUtils.User.class, (ExcelDocumentImportWriter<ExcelTestsUtils.User>) users::addAll);
         try (InputStream inputStream = getClass().getResourceAsStream("/excel-read-test.xlsx")) {
             reader.read(inputStream, rows -> {
 

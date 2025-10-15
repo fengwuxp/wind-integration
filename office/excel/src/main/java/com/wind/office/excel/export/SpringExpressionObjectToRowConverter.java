@@ -1,6 +1,7 @@
 package com.wind.office.excel.export;
 
 import com.wind.common.WindConstants;
+import com.wind.office.excel.convert.ExcelObjectToRowConverter;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
 import com.wind.office.excel.metadata.ExcelCellPrinter;
 import com.wind.script.spring.SpringExpressionEvaluator;
@@ -15,18 +16,19 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Spring Expression 数据格式化
+ * 基于 Spring Expression 对象转 excel 行数据
  *
  * @author wuxp
  * @date 2025-07-28 20:34
  **/
-public record SpringExpressionRowDataFormatter(List<ExcelCellDescriptor> cellDescriptors) {
+public record SpringExpressionObjectToRowConverter(List<ExcelCellDescriptor> cellDescriptors) implements ExcelObjectToRowConverter {
 
-    public static SpringExpressionRowDataFormatter of(List<ExcelCellDescriptor> cellDescriptors) {
-        return new SpringExpressionRowDataFormatter(cellDescriptors);
+    public static SpringExpressionObjectToRowConverter of(List<ExcelCellDescriptor> cellDescriptors) {
+        return new SpringExpressionObjectToRowConverter(cellDescriptors);
     }
 
-    public List<String> formatRows(Object row) {
+    @Override
+    public List<String> convert(@org.jetbrains.annotations.NotNull Object row) {
         List<String> result = new ArrayList<>();
         if (row instanceof Collection<?>) {
             // 集合

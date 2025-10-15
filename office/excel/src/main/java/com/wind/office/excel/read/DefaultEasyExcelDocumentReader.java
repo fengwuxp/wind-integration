@@ -91,6 +91,9 @@ public record DefaultEasyExcelDocumentReader(ExcelRowToObjectConverter<?> conver
         }
 
         private void writeRows() {
+            if (caches.isEmpty()) {
+                return;
+            }
             writer.write(caches);
             listener.onWrite(caches);
             caches.clear();

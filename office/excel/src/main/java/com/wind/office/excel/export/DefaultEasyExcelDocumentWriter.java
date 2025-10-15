@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * @author wuxp
  * @date 2024-01-03 13:19
- * @github https://github.com/alibaba/easyexcel
+ * @github <a href="https://github.com/alibaba/easyexcel">easyexcel</a>
  **/
 public class DefaultEasyExcelDocumentWriter implements ExcelDocumentWriter {
 
@@ -41,11 +41,11 @@ public class DefaultEasyExcelDocumentWriter implements ExcelDocumentWriter {
 
     private final ExcelWriter excelWriter;
 
-    private final SpringExpressionRowDataFormatter formatter;
+    private final SpringExpressionObjectToRowConverter formatter;
 
     private DefaultEasyExcelDocumentWriter(List<ExcelCellDescriptor> descriptors, ExcelWriter excelWriter) {
         this.excelWriter = excelWriter;
-        this.formatter = new SpringExpressionRowDataFormatter(descriptors);
+        this.formatter = new SpringExpressionObjectToRowConverter(descriptors);
         buildNextSheet();
     }
 
@@ -70,12 +70,12 @@ public class DefaultEasyExcelDocumentWriter implements ExcelDocumentWriter {
     }
 
     @Override
-    public void write(Collection<Object> rows) {
+    public void write(Collection<?> rows) {
         if (sheetRowCount.get() + rows.size() >= EXCEL_SINGLE_SHEET_MAX_ROW_SIZE) {
             // 超过单个 sheet 最大行数
             buildNextSheet();
         }
-        excelWriter.write(rows.stream().map(formatter::formatRows).toList(), currentSheet.get());
+        excelWriter.write(rows.stream().map(formatter::convert).toList(), currentSheet.get());
         sheetRowCount.set(sheetRowCount.get() + rows.size());
     }
 

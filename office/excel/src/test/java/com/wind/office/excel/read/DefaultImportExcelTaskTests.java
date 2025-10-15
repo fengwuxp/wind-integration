@@ -3,19 +3,15 @@ package com.wind.office.excel.read;
 import com.wind.office.core.OfficeTaskState;
 import com.wind.office.excel.ExcelCellQuickBuilder;
 import com.wind.office.excel.ExcelDocumentImportWriter;
+import com.wind.office.excel.ExcelTestsUtils;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.InputStream;
-import java.net.URL;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * @author wuxp
@@ -23,37 +19,44 @@ import java.util.Objects;
  **/
 class DefaultImportExcelTaskTests {
 
-    private DefaultImportExcelTask task;
-
-    @BeforeEach
-    void createAndRunTask() {
-        InputStream inputStream = getClass().getResourceAsStream("/excel-read-test.xlsx");
-        List<ExcelCellDescriptor> descriptors = ExcelCellQuickBuilder.forClass(BasedFieldNameRowToObjectConverterTests.User.class);
-        ImportExcelTaskInfo taskInfo = ImportExcelTaskInfo.of(descriptors, inputStream);
-        List<BasedFieldNameRowToObjectConverterTests.User> users = new ArrayList<>();
-        DefaultEasyExcelDocumentReader reader = DefaultEasyExcelDocumentReader.of(BasedFieldNameRowToObjectConverterTests.User.class,
-                (ExcelDocumentImportWriter<BasedFieldNameRowToObjectConverterTests.User>) users::addAll);
-        task = new DefaultImportExcelTask(taskInfo, reader);
-        task.run();
-        Assertions.assertEquals(9000, users.size());
-        Assertions.assertEquals(users.size(), task.getRowSize());
-    }
 
     @Test
     void testImportExcelTask() {
+        DefaultImportExcelTask task = createAndRunTask("excel-read-test.xlsx");
         Assertions.assertEquals(OfficeTaskState.COMPLETED, task.getState());
+        Assertions.assertEquals(9000, task.getRowSize());
+    }
+
+    @Test
+    void testImportCsvTask() {
+        DefaultImportExcelTask task = createAndRunTask("csv-read-test.csv");
+        Assertions.assertEquals(OfficeTaskState.COMPLETED, task.getState());
+        Assertions.assertEquals(2, task.getRowSize());
     }
 
     @Test
     void testMockExportFailureRowsTask() throws Exception {
-        task.addFailedRows(List.of(
+        DefaultImportExcelTask task = createAndRunTask("excel-read-test.xlsx");
+        List<Object> rows = List.of(
                 List.of("zhans", "18", "mock error"),
                 List.of("lis", "23")
-        ));
-        URL baseUrl = Objects.requireNonNull(DefaultImportExcelTaskTests.class.getResource("/"));
-        Path filepath = Paths.get(Paths.get(baseUrl.toURI()).toString(), "import-failure-rows.xlsx");
-        Files.deleteIfExists(filepath);
-        task.writeFailedRows(Files.newOutputStream(filepath));
+        );
+        task.addFailedRows(rows);
+        task.writeFailedRows(Files.newOutputStream(ExcelTestsUtils.getClasspathFilepath("import-failure-rows.xlsx")));
+        Assertions.assertEquals(rows.size(), task.getFailedRowSize());
+    }
+
+    private DefaultImportExcelTask createAndRunTask(String filename) {
+        InputStream inputStream = getClass().getResourceAsStream("/%s".formatted(filename));
+        List<ExcelCellDescriptor> descriptors = ExcelCellQuickBuilder.forClass(ExcelTestsUtils.User.class);
+        ImportExcelTaskInfo taskInfo = ImportExcelTaskInfo.of(descriptors, inputStream);
+        List<ExcelTestsUtils.User> users = new ArrayList<>();
+        DefaultEasyExcelDocumentReader reader = DefaultEasyExcelDocumentReader.of(ExcelTestsUtils.User.class,
+                (ExcelDocumentImportWriter<ExcelTestsUtils.User>) users::addAll);
+        DefaultImportExcelTask result = new DefaultImportExcelTask(taskInfo, reader);
+        result.run();
+        Assertions.assertEquals(users.size(), result.getRowSize());
+        return result;
     }
 
 

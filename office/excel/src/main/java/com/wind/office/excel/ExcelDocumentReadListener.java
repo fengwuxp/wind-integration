@@ -16,7 +16,7 @@ public interface ExcelDocumentReadListener {
      *
      * @param rows 写入的数据
      */
-    void onWrite(Collection<?> rows);
+    void onWrite(Collection<Object> rows);
 
     /**
      * 数据处理异常回调

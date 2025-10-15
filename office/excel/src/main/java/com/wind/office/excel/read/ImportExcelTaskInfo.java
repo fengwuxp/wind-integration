@@ -79,6 +79,10 @@ public class ImportExcelTaskInfo implements OfficeDocumentTaskInfo {
         failedRows.addAll(rows);
     }
 
+    public boolean hasFailedRows() {
+        return !failedRows.isEmpty();
+    }
+
     @Override
     public void updateState(OfficeTaskState newState) {
         if (Objects.equals(newState, OfficeTaskState.EXECUTING)) {

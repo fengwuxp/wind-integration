@@ -1,6 +1,6 @@
 package com.wind.office.excel.read;
 
-import com.alibaba.excel.EasyExcel;
+import com.alibaba.excel.EasyExcelFactory;
 import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.exception.BaseException;
@@ -112,7 +112,7 @@ public class DefaultImportExcelTask extends AbstractDelegateDocumentTask {
             } else {
                 titles.add("Failure Reason");
             }
-            EasyExcel.write(output)
+            EasyExcelFactory.write(output)
                     .head(titles.stream().map(Collections::singletonList).toList())
                     .needHead(true)
                     .charset(StandardCharsets.UTF_8)

@@ -4,8 +4,6 @@ import com.wind.common.WindConstants;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
 import com.wind.office.excel.metadata.ExcelCellPrinter;
 import com.wind.script.spring.SpringExpressionEvaluator;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.format.Printer;
@@ -15,7 +13,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
-import java.util.stream.Collectors;
 
 /**
  * Spring Expression 数据格式化
@@ -23,11 +20,7 @@ import java.util.stream.Collectors;
  * @author wuxp
  * @date 2025-07-28 20:34
  **/
-@AllArgsConstructor
-public class SpringExpressionRowDataFormatter {
-
-    @Getter
-    private final List<ExcelCellDescriptor> cellDescriptors;
+public record SpringExpressionRowDataFormatter(List<ExcelCellDescriptor> cellDescriptors) {
 
     public static SpringExpressionRowDataFormatter of(List<ExcelCellDescriptor> cellDescriptors) {
         return new SpringExpressionRowDataFormatter(cellDescriptors);

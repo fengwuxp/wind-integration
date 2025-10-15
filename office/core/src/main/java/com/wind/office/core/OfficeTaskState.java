@@ -18,6 +18,8 @@ public enum OfficeTaskState implements DescriptiveEnum {
 
     EXECUTING("执行中"),
 
+    PART_COMPLETED("部分完成"),
+
     COMPLETED("处理成功"),
 
     FAILED("执行失败"),

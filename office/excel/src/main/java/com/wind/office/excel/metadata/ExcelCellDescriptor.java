@@ -2,12 +2,13 @@ package com.wind.office.excel.metadata;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.i18n.SpringI18nMessageUtils;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.springframework.format.Parser;
 import org.springframework.format.Printer;
+import org.springframework.lang.Nullable;
 
-import jakarta.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
@@ -63,11 +64,11 @@ public final class ExcelCellDescriptor {
                 .orElseGet(() -> (value, locale) -> String.valueOf(value));
     }
 
-    @NotNull
+    @Nullable
     public Parser<Object> getParser() {
         return findAttribute(CellParser.class)
                 .map(ExcelCellAttribute::getValue)
-                .orElseGet(() -> (value, locale) -> value);
+                .orElse(null);
     }
 
     public boolean hasPrinter() {

@@ -1,6 +1,5 @@
 package com.wind.office.excel.export;
 
-import com.google.common.collect.ImmutableMap;
 import com.wind.office.core.OfficeTaskState;
 import com.wind.office.excel.ExcelDocumentWriter;
 import com.wind.office.excel.ExportExcelDataFetcher;
@@ -18,9 +17,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
-class SpringExpressionExportExcelTaskTest {
+class SpringExpressionExportExcelTaskTests {
 
     private SpringExpressionExportExcelTask task;
 
@@ -31,7 +31,7 @@ class SpringExpressionExportExcelTaskTest {
                 mockExcelHead("age", 10),
                 mockExcelHead("sex", 5)
         );
-        URL baseUrl = Objects.requireNonNull(SpringExpressionExportExcelTaskTest.class.getResource("/"));
+        URL baseUrl = Objects.requireNonNull(SpringExpressionExportExcelTaskTests.class.getResource("/"));
         Path filepath = Paths.get(Paths.get(baseUrl.toURI()).toString(), "test.xlsx");
         Files.deleteIfExists(filepath);
         ExcelDocumentWriter writer = DefaultEasyExcelDocumentWriter.of(Files.newOutputStream(filepath), heads);
@@ -59,8 +59,8 @@ class SpringExpressionExportExcelTaskTest {
         };
     }
 
-    private static ImmutableMap<String, String> mockRowData() {
-        return ImmutableMap.of("name", RandomStringUtils.secure().nextAlphanumeric(12),
+    private static Map<String, String> mockRowData() {
+        return Map.of("name", RandomStringUtils.secure().nextAlphanumeric(12),
                 "age", RandomStringUtils.secure().nextNumeric(2));
     }
 

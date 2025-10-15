@@ -34,7 +34,7 @@ class DefaultEasyExcelDocumentWriterTests {
     }
 
     private void writeExcel(int pageCount, int pageSize) throws URISyntaxException, IOException {
-        URL baseUrl = Objects.requireNonNull(SpringExpressionExportExcelTaskTest.class.getResource("/"));
+        URL baseUrl = Objects.requireNonNull(SpringExpressionExportExcelTaskTests.class.getResource("/"));
         Path filepath = Paths.get(Paths.get(baseUrl.toURI()).toString(), "excel_write_%d.xlsx".formatted(pageCount));
         try (OutputStream out = new FileOutputStream(filepath.toFile())) {
             List<ExcelCellDescriptor> descriptors = List.of(

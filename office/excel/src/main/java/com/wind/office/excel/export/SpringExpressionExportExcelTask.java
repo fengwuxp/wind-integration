@@ -17,11 +17,6 @@ import java.util.function.Function;
 @Slf4j
 public class SpringExpressionExportExcelTask extends AbstractDelegateDocumentTask {
 
-    /**
-     * 单个 sheet 最大行数
-     */
-    private static final int EXCEL_SINGLE_SHEET_MAX_ROW_SIZE = 1048575;
-
     private final ExportExcelDataFetcher<?> fetcher;
 
     /**
@@ -36,8 +31,7 @@ public class SpringExpressionExportExcelTask extends AbstractDelegateDocumentTas
         this(taskInfo, fetcher, id -> null);
     }
 
-    public SpringExpressionExportExcelTask(ExportExcelTaskInfo taskInfo, ExportExcelDataFetcher<?> fetcher,
-                                           Function<String, OfficeTaskState> stateSyncer) {
+    public SpringExpressionExportExcelTask(ExportExcelTaskInfo taskInfo, ExportExcelDataFetcher<?> fetcher, Function<String, OfficeTaskState> stateSyncer) {
         super(taskInfo);
         this.fetcher = fetcher;
         this.stateSyncer = stateSyncer;
@@ -48,7 +42,6 @@ public class SpringExpressionExportExcelTask extends AbstractDelegateDocumentTas
     protected void doTask() {
         int queryPage = 1;
         ExportExcelTaskInfo taskInfo = (ExportExcelTaskInfo) getDelegate();
-        int count = fetcher.count();
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 OfficeTaskState state = stateSyncer.apply(getId());
@@ -69,7 +62,7 @@ public class SpringExpressionExportExcelTask extends AbstractDelegateDocumentTas
             }
         } finally {
             if (Thread.currentThread().isInterrupted()) {
-                log.info("excel task is interrupted，id = {}, state = {}", getId(), getState());
+                log.info("export excel task is interrupted, id = {}, state = {}", getId(), getState());
                 taskInfo.updateState(OfficeTaskState.INTERRUPT);
             }
         }

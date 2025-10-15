@@ -1,28 +1,30 @@
-package com.wind.office.excel.export;
+package com.wind.office.excel.read;
 
 import com.wind.office.core.OfficeDocumentTaskInfo;
 import com.wind.office.core.OfficeTaskState;
-import com.wind.office.excel.ExcelDocumentWriter;
+import com.wind.office.excel.metadata.ExcelCellDescriptor;
 import lombok.Builder;
 import lombok.Getter;
 import org.apache.commons.lang3.RandomStringUtils;
 
-import java.beans.Transient;
+import java.io.InputStream;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * excel 导出文档任务 Info
+ * excel 导入文档任务 Info
  *
  * @author wuxp
- * @date 2023-10-27 18:31
+ * @date 2025-10-15 11:04
  **/
 @Getter
 @Builder
-public class ExportExcelTaskInfo implements OfficeDocumentTaskInfo {
+public class ImportExcelTaskInfo implements OfficeDocumentTaskInfo {
 
     private final String id;
 
@@ -36,20 +38,11 @@ public class ExportExcelTaskInfo implements OfficeDocumentTaskInfo {
 
     private final AtomicInteger rowSize = new AtomicInteger(0);
 
-    private final AtomicInteger failedRowSize = new AtomicInteger(0);
+    private final List<Object> failedRows = new ArrayList<>();
 
-    /**
-     * 一次抓取数据的大小
-     */
-    private final int fetchSize;
+    private final List<ExcelCellDescriptor> descriptors;
 
-    private final ExcelDocumentWriter writer;
-
-
-    @Transient
-    public ExcelDocumentWriter getWriter() {
-        return writer;
-    }
+    private final InputStream document;
 
     @Override
     public OfficeTaskState getState() {
@@ -63,7 +56,7 @@ public class ExportExcelTaskInfo implements OfficeDocumentTaskInfo {
 
     @Override
     public int getFailedRowSize() {
-        return failedRowSize.get();
+        return failedRows.size();
     }
 
     @Override
@@ -78,13 +71,12 @@ public class ExportExcelTaskInfo implements OfficeDocumentTaskInfo {
 
     @Override
     public void addRows(Collection<Object> rows) {
-        writer.write(rows);
         rowSize.addAndGet(rows.size());
     }
 
     @Override
     public void addFailedRows(Collection<Object> rows) {
-        failedRowSize.addAndGet(rows.size());
+        failedRows.addAll(rows);
     }
 
     @Override
@@ -93,36 +85,29 @@ public class ExportExcelTaskInfo implements OfficeDocumentTaskInfo {
             this.beginTime.set(LocalDateTime.now());
         }
         if (OfficeTaskState.isFinished(newState)) {
-            if (Objects.equals(newState, OfficeTaskState.COMPLETED)) {
-                writer.finish();
-            }
             this.endTime.set(LocalDateTime.now());
         }
         this.state.set(newState);
     }
 
-    public static ExportExcelTaskInfo of(String name, ExcelDocumentWriter writer) {
-        return of(name, writer, 3000);
+    public static ImportExcelTaskInfo of(List<ExcelCellDescriptor> descriptors, InputStream document) {
+        String id = RandomStringUtils.secure().nextAlphanumeric(32);
+        return of(id, id, descriptors, document);
     }
 
-    public static ExportExcelTaskInfo of(String name, ExcelDocumentWriter writer, int batchSize) {
-        return of(RandomStringUtils.secure().nextAlphanumeric(32), name, writer, batchSize);
+    public static ImportExcelTaskInfo of(String name, List<ExcelCellDescriptor> descriptors, InputStream document) {
+        return of(RandomStringUtils.secure().nextAlphanumeric(32), name, descriptors, document);
     }
 
-    public static ExportExcelTaskInfo of(Object id, String name, ExcelDocumentWriter writer) {
-        return of(id, name, writer, 3000);
-    }
-
-    public static ExportExcelTaskInfo of(Object id, String name, ExcelDocumentWriter writer, int batchSize) {
-        return ExportExcelTaskInfo.builder()
+    public static ImportExcelTaskInfo of(Object id, String name, List<ExcelCellDescriptor> descriptors, InputStream document) {
+        return ImportExcelTaskInfo.builder()
                 .id(String.valueOf(id))
                 .name(name)
                 .beginTime(new AtomicReference<>())
                 .endTime(new AtomicReference<>())
                 .state(new AtomicReference<>(OfficeTaskState.WAIT))
-                .fetchSize(batchSize)
-                .writer(writer)
+                .descriptors(descriptors)
+                .document(document)
                 .build();
     }
-
 }

@@ -7,6 +7,7 @@ import com.alibaba.excel.write.builder.ExcelWriterSheetBuilder;
 import com.alibaba.excel.write.handler.WriteHandler;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.excel.write.style.row.SimpleRowHeightStyleStrategy;
+import com.wind.office.excel.ExcelCellQuickBuilder;
 import com.wind.office.excel.ExcelDocumentWriter;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
 
@@ -47,6 +48,10 @@ public class DefaultEasyExcelDocumentWriter implements ExcelDocumentWriter {
         this.excelWriter = excelWriter;
         this.formatter = new SpringExpressionObjectToRowConverter(descriptors);
         buildNextSheet();
+    }
+
+    public static DefaultEasyExcelDocumentWriter of(OutputStream output, Class<?> clazz) {
+        return of(output, ExcelCellQuickBuilder.forClass(clazz));
     }
 
     public static DefaultEasyExcelDocumentWriter of(OutputStream output, List<ExcelCellDescriptor> descriptors) {

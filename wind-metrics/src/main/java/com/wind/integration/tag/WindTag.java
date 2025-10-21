@@ -1,11 +1,10 @@
 package com.wind.integration.tag;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-
+import com.wind.common.exception.AssertUtils;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -29,15 +28,15 @@ public interface WindTag {
      * @return 标签名称
      */
     @NotBlank
-    String getName();
+    String name();
 
     /**
      * @return 标签值
      */
     @NotBlank
-    String getValue();
+    String value();
 
-    static WindTag of(String name, String value) {
+    static WindTag of(@NotBlank String name, @NotNull String value) {
         return new ImmutableTag(name, value);
     }
 
@@ -65,8 +64,8 @@ public interface WindTag {
         }
         Map<String, Set<String>> result = new HashMap<>();
         for (WindTag tag : tags) {
-            Set<String> values = result.computeIfAbsent(tag.getName(), k -> new HashSet<>());
-            values.add(tag.getValue());
+            Set<String> values = result.computeIfAbsent(tag.name(), k -> new HashSet<>());
+            values.add(tag.value());
         }
         return result;
     }
@@ -82,15 +81,14 @@ public interface WindTag {
         if (tags == null || tags.isEmpty()) {
             return Collections.emptySet();
         }
-        return tags.stream().map(WindTag::getValue).filter(Objects::nonNull).collect(Collectors.toSet());
+        return tags.stream().map(WindTag::value).filter(Objects::nonNull).collect(Collectors.toSet());
     }
 
-    @AllArgsConstructor
-    @Getter
-    class ImmutableTag implements WindTag {
 
-        private final String name;
-
-        private final String value;
+    record ImmutableTag(String name, String value) implements WindTag {
+        public ImmutableTag {
+            AssertUtils.hasText(name, "argument name must not empty");
+            AssertUtils.notNull(value, "argument value must not null");
+        }
     }
 }

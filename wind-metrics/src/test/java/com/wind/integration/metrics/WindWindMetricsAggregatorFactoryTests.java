@@ -1,12 +1,12 @@
 package com.wind.integration.metrics;
 
+import com.wind.common.util.WindReflectUtils;
 import com.wind.integration.metrics.fields.SingleValueMetricsField;
 import lombok.Data;
 import lombok.experimental.FieldNameConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -63,19 +63,11 @@ class WindWindMetricsAggregatorFactoryTests {
 
         @Override
         public T aggregate(WindMetricsAggregationQuery query) {
-            try {
-                T bean = classType.newInstance();
-                for (Map.Entry<String, String> entry : fieldMappings.entrySet()) {
-                    String filedName = entry.getKey();
-                    String name = entry.getValue();
-                    Field field = bean.getClass().getDeclaredField(filedName);
-                    field.setAccessible(true);
-                    field.set(bean, new MockSingleValueMetricsField(name).getValue());
-                }
-                return bean;
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+            Map<String, Object> fieldValues = new HashMap<>();
+            for (Map.Entry<String, String> entry : fieldMappings.entrySet()) {
+                fieldValues.put(entry.getKey(), new MockSingleValueMetricsField(entry.getValue()).getValue());
             }
+            return WindReflectUtils.newInstance(classType, fieldValues);
         }
     }
 

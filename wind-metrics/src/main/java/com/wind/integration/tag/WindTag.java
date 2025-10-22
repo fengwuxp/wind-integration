@@ -1,9 +1,10 @@
 package com.wind.integration.tag;
 
-import com.wind.common.exception.AssertUtils;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -28,13 +29,13 @@ public interface WindTag {
      * @return 标签名称
      */
     @NotBlank
-    String name();
+    String getName();
 
     /**
      * @return 标签值
      */
     @NotBlank
-    String value();
+    String getValue();
 
     static WindTag of(@NotBlank String name, @NotNull String value) {
         return new ImmutableTag(name, value);
@@ -64,8 +65,8 @@ public interface WindTag {
         }
         Map<String, Set<String>> result = new HashMap<>();
         for (WindTag tag : tags) {
-            Set<String> values = result.computeIfAbsent(tag.name(), k -> new HashSet<>());
-            values.add(tag.value());
+            Set<String> values = result.computeIfAbsent(tag.getName(), k -> new HashSet<>());
+            values.add(tag.getValue());
         }
         return result;
     }
@@ -81,14 +82,16 @@ public interface WindTag {
         if (tags == null || tags.isEmpty()) {
             return Collections.emptySet();
         }
-        return tags.stream().map(WindTag::value).filter(Objects::nonNull).collect(Collectors.toSet());
+        return tags.stream().map(WindTag::getValue).filter(Objects::nonNull).collect(Collectors.toSet());
     }
 
+    @AllArgsConstructor
+    @Getter
+    class ImmutableTag implements WindTag {
 
-    record ImmutableTag(String name, String value) implements WindTag {
-        public ImmutableTag {
-            AssertUtils.hasText(name, "argument name must not empty");
-            AssertUtils.notNull(value, "argument value must not null");
-        }
+        private final String name;
+
+        private final String value;
     }
 }
+

@@ -140,14 +140,19 @@ public final class MybatisQueryHelper {
         return cursorConditionWithId(cursorColumn, query, query::asPrevTextId, query::asNextTextId);
     }
 
+    /**
+     * 下一页
+     * 正序： id > : lastCursor      {1...10,11...20,21...30}
+     * 倒序： id < : lastCursor      {99...90,89...80,79...70}
+     * 上一页：
+     * 正序: id < : firstCursor       {1...10,11...20,21...30}
+     * 倒序: id > : firstCursor       {99...90,89...80,79...70}
+     */
     private static QueryCondition cursorConditionWithId(QueryColumn cursorColumn, AbstractCursorQuery<?> query, Supplier<Object> prevIdGetter, Supplier<Object> nextIdGetter) {
         boolean asc = query.cursorFieldIsAcs();
-        if (query.getPrevCursor() != null) {
-            // 查询上一页  ASC 排序时下一页游标用 <, DESC 排序时下一页游标用 >
-            return asc ? cursorColumn.lt(prevIdGetter.get()) : cursorColumn.gt(prevIdGetter.get());
-        }
-        // 查询下一页 ASC 排序时下一页游标用 >, DESC 排序时下一页游标用 <
-        return asc ? cursorColumn.gt(nextIdGetter.get()) : cursorColumn.lt(nextIdGetter.get());
+        // 前后翻页的排序方式相反，此处只需要按照翻页方向获取游标 id 即可
+        Object cursorId = query.getPrevCursor() == null ? nextIdGetter.get() : prevIdGetter.get();
+        return asc ? cursorColumn.gt(cursorId) : cursorColumn.lt(cursorId);
     }
 
     /**

@@ -32,6 +32,8 @@ public final class MybatisQueryHelper {
      */
     public static final String DEFAULT_TABLE_ALIAS = "t";
 
+    private static final QueryColumn CURSOR_ID_COLUMN = new QueryColumn("id");
+
     private MybatisQueryHelper() {
         throw new AssertionError();
     }
@@ -72,6 +74,11 @@ public final class MybatisQueryHelper {
                     orderField = String.format("%s.%s", tableAlias, orderField);
                 }
                 result.orderBy(orderField, Objects.equals(Objects.requireNonNull(query.getOrderTypes())[i], QueryOrderType.ASC));
+            }
+            if (query instanceof AbstractCursorQuery<? extends QueryOrderField> cursorQuery) {
+                // 如果是游标查询，自动设置游标条件、分页大小
+                result.and(MybatisQueryHelper.cursorConditionWithNumId(CURSOR_ID_COLUMN, cursorQuery))
+                        .limit(query.getQuerySize());
             }
             return result;
         }

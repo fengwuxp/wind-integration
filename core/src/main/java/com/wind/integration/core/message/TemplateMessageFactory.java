@@ -1,5 +1,8 @@
 package com.wind.integration.core.message;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -7,10 +10,11 @@ import java.util.Map;
 /**
  * 模板消息工厂
  *
+ * @param <S> 业务数据类型
  * @author wuxp
  * @date 2023-09-28 15:31
  **/
-public interface TemplateMessageFactory<T> {
+public interface TemplateMessageFactory<S> {
 
     /**
      * 根据业务数据转换消息
@@ -21,7 +25,8 @@ public interface TemplateMessageFactory<T> {
      * @return 消息列表
      */
     @SuppressWarnings({"rawtypes", "unckeced"})
-    Collection<MessageDefinition> getMessages(String templateId, T source, Map<String, Object> extraVariables);
+    @NotNull
+    Collection<MessageDefinition> getMessages(String templateId, S source, Map<String, Object> extraVariables);
 
     /**
      * 根据业务数据转换消息
@@ -31,13 +36,15 @@ public interface TemplateMessageFactory<T> {
      * @return 消息列表
      */
     @SuppressWarnings({"rawtypes", "unckeced"})
-    default Collection<MessageDefinition> getMessages(String templateId, T source) {
+    @NotNull
+    default Collection<MessageDefinition> getMessages(String templateId, S source) {
         return getMessages(templateId, source, Collections.emptyMap());
     }
 
     /**
      * @return 模板消息工厂唯一标识
      */
+    @NotBlank
     default String getName() {
         return getClass().getName();
     }

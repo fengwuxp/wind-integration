@@ -1,6 +1,8 @@
 package com.wind.integration.core.message;
 
 
+import jakarta.validation.constraints.NotNull;
+
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
@@ -18,11 +20,13 @@ public interface MessageDefinition<T> {
     /**
      * @return 消息标题
      */
+    @NotNull
     String getTitle();
 
     /**
      * @return 消息内容
      */
+    @NotNull
     T getMessage();
 
     /**
@@ -30,6 +34,7 @@ public interface MessageDefinition<T> {
      *
      * @return 例如：html\text\markdown 等
      */
+    @NotNull
     String getFormat();
 
     /**
@@ -37,6 +42,7 @@ public interface MessageDefinition<T> {
      *
      * @return 消息接收者
      */
+    @NotNull
     Set<String> getReceivers();
 
     /**
@@ -44,6 +50,7 @@ public interface MessageDefinition<T> {
      *
      * @return 元数据
      */
+    @NotNull
     default Map<String, Object> getMetadata() {
         return Collections.emptyMap();
     }

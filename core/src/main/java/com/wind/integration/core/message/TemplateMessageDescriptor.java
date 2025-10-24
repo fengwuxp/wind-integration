@@ -1,5 +1,7 @@
 package com.wind.integration.core.message;
 
+import jakarta.validation.constraints.NotBlank;
+
 /**
  * 模板消息描述符，用于描述具体一个业务场景的消息
  * 建议使用枚举实现
@@ -14,6 +16,7 @@ public interface TemplateMessageDescriptor {
      *
      * @return 一般消息模板的配置编码
      */
+    @NotBlank
     String getTemplateId();
 
     /**
@@ -22,5 +25,6 @@ public interface TemplateMessageDescriptor {
      * @return 消息工厂名称（唯一标识）
      * @see TemplateMessageFactory#getName()
      */
+    @NotBlank
     String getFactoryName();
 }

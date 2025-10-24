@@ -1,6 +1,8 @@
 package com.wind.integration.core.message;
 
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -37,4 +39,12 @@ public interface MessageDefinition<T> {
      */
     Set<String> getReceivers();
 
+    /**
+     * 获取消息元数据
+     *
+     * @return 元数据
+     */
+    default Map<String, Object> getMetadata() {
+        return Collections.emptyMap();
+    }
 }

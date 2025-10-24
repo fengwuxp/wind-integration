@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
+ * 组合消息发送者
+ *
  * @author wuxp
  * @date 2023-09-28 15:35
  **/

@@ -1,5 +1,7 @@
 package com.wind.office.excel;
 
+import com.alibaba.excel.annotation.ExcelProperty;
+import com.alibaba.excel.converters.integer.IntegerNumberConverter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -46,8 +48,11 @@ public abstract class ExcelTestsUtils {
     public static class User {
 
         @Schema(name = "姓名")
+        @ExcelProperty("姓名")
         private String name;
 
+        @Schema(name = "年龄")
+        @ExcelProperty(value = "年龄", converter = IntegerNumberConverter.class)
         private Integer age;
 
     }

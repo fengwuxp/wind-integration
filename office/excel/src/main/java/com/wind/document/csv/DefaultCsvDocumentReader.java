@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.springframework.core.io.InputStreamSource;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -39,8 +40,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public record DefaultCsvDocumentReader(ExcelRowToObjectConverter<?> converter, ExcelDocumentImportWriter writer) implements ExcelDocumentReader {
 
     @Override
-    public void read(InputStream input, ExcelDocumentReadListener listener) {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
+    public void read(InputStreamSource source, ExcelDocumentReadListener listener) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(source.getInputStream(), StandardCharsets.UTF_8))) {
             CSVFormat format = CSVFormat.DEFAULT
                     .builder()
                     .setIgnoreEmptyLines(true)

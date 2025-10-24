@@ -85,7 +85,6 @@ public final class MybatisQueryHelper {
         return QueryWrapper.create();
     }
 
-
     /**
      * 通过 query 获取 flex QueryOrderBy[]
      *

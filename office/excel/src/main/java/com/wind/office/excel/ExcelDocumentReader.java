@@ -1,5 +1,7 @@
 package com.wind.office.excel;
 
+import org.springframework.core.io.InputStreamSource;
+
 import java.io.InputStream;
 
 /**
@@ -13,8 +15,18 @@ public interface ExcelDocumentReader {
     /**
      * 读取文档
      *
+     * @param source   输入流来源
+     * @param listener 监听器
+     */
+    void read(InputStreamSource source, ExcelDocumentReadListener listener);
+
+    /**
+     * 读取文档
+     *
      * @param input    输入流
      * @param listener 监听器
      */
-    void read(InputStream input, ExcelDocumentReadListener listener);
+    default void read(InputStream input, ExcelDocumentReadListener listener) {
+        read(() -> input, listener);
+    }
 }

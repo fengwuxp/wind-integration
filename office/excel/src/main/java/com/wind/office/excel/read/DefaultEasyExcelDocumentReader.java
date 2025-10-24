@@ -3,6 +3,8 @@ package com.wind.office.excel.read;
 import com.alibaba.excel.EasyExcelFactory;
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.event.AnalysisEventListener;
+import com.wind.common.exception.BaseException;
+import com.wind.common.exception.DefaultExceptionCode;
 import com.wind.office.excel.ExcelCellQuickBuilder;
 import com.wind.office.excel.ExcelDocumentImportWriter;
 import com.wind.office.excel.ExcelDocumentReadListener;
@@ -11,6 +13,7 @@ import com.wind.office.excel.convert.ExcelRowToObjectConverter;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.InputStreamSource;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -30,14 +33,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 public record DefaultEasyExcelDocumentReader(ExcelRowToObjectConverter<?> converter, ExcelDocumentImportWriter writer) implements ExcelDocumentReader {
 
     @Override
-    public void read(InputStream input, ExcelDocumentReadListener listener) {
-        EasyExcelFactory.read(input)
-                .headRowNumber(1)
-                .ignoreEmptyRow(true)
-                .autoCloseStream(true)
-                .charset(StandardCharsets.UTF_8)
-                .registerReadListener(new BatchWriteListener(writer, converter::convert, listener))
-                .doReadAll();
+    public void read(InputStreamSource source, ExcelDocumentReadListener listener) {
+        try (InputStream input = source.getInputStream()) {
+            EasyExcelFactory.read(input)
+                    .headRowNumber(1)
+                    .ignoreEmptyRow(true)
+                    .autoCloseStream(true)
+                    .charset(StandardCharsets.UTF_8)
+                    .registerReadListener(new BatchWriteListener(writer, converter::convert, listener))
+                    .doReadAll();
+        } catch (Exception exception) {
+            throw new BaseException(DefaultExceptionCode.COMMON_FRIENDLY_ERROR, "read excel data exception", exception);
+        }
     }
 
     @SuppressWarnings({"rawtypes"})

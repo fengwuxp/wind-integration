@@ -146,7 +146,7 @@ public final class WindEasyExcelUtils {
         try (InputStream input = source.getInputStream()) {
             ReadDataListener<T> listener = new ReadDataListener<>();
             // 注意：EasyExcel 会在读取完成后自动关闭流
-            EasyExcelFactory.read(source.getInputStream(), clazz, listener).ignoreEmptyRow(true)
+            EasyExcelFactory.read(input, clazz, listener).ignoreEmptyRow(true)
                     .sheet(sheetNo).headRowNumber(headRowNumber).doRead();
             return listener.getRecords();
         } catch (Exception exception) {
@@ -212,7 +212,9 @@ public final class WindEasyExcelUtils {
     public static void write(@NotNull OutputStream output, @NotEmpty List<ExcelCellDescriptor> descriptors, @NotEmpty List<?> records) {
         AssertUtils.notNull(output, "argument output must not null");
         AssertUtils.notEmpty(descriptors, "argument records must not empty");
-        DefaultEasyExcelDocumentWriter.of(output, descriptors).write(records);
+        DefaultEasyExcelDocumentWriter writer = DefaultEasyExcelDocumentWriter.of(output, descriptors);
+        writer.write(records);
+        writer.finish();
     }
 
 

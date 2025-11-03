@@ -8,8 +8,7 @@ import org.redisson.api.RAtomicLong;
 import org.redisson.api.RedissonClient;
 
 import java.time.Duration;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -74,8 +73,8 @@ public record RedissonNumericSequenceGenerator(RedissonClient redissonClient) {
         RAtomicLong counter = redissonClient.getAtomicLong(genKey(key));
         long seq = counter.incrementAndGet();
         if (seq <= 1) {
-            // 1 天后过期
-            counter.expire(Duration.ofHours(24));
+            // 时间大于 1 天过期（避免冬令时夏令时切换导致的错误）
+            counter.expire(Duration.ofHours(26));
         }
         AssertUtils.isTrue(String.valueOf(seq).length() <= length, "sequence exceeds maximum length");
         String format = "%0" + length + "d";
@@ -83,8 +82,7 @@ public record RedissonNumericSequenceGenerator(RedissonClient redissonClient) {
     }
 
     private String genKey(String key) {
-        ZonedDateTime utcNow = ZonedDateTime.now(ZoneOffset.UTC);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(SequenceTimeScopeType.DAY.getPattern());
-        return utcNow.format(formatter) + "_" + key;
+        return LocalDateTime.now().format(formatter) + "_" + key;
     }
 }

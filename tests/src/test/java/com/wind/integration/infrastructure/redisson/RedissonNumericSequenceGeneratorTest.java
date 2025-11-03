@@ -18,7 +18,7 @@ import static org.mockito.ArgumentMatchers.anyString;
  * @author wuxp
  * @date 2023-11-29 14:53
  **/
-public class RedissonNumericSequenceGeneratorTest {
+class RedissonNumericSequenceGeneratorTest {
 
     private RedissonNumericSequenceGenerator generator;
 

@@ -4,12 +4,13 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.DateTimeSequenceGenerator;
 import com.wind.sequence.time.SequenceTimeScopeType;
-import org.apache.commons.lang3.time.DateFormatUtils;
 import org.redisson.api.RAtomicLong;
 import org.redisson.api.RedissonClient;
 
 import java.time.Duration;
-import java.util.Date;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * 基于 redisson 的全局数字 seq 自增器
@@ -82,6 +83,8 @@ public record RedissonNumericSequenceGenerator(RedissonClient redissonClient) {
     }
 
     private String genKey(String key) {
-        return DateFormatUtils.format(new Date(), SequenceTimeScopeType.DAY.getPattern()) + "_" + key;
+        ZonedDateTime utcNow = ZonedDateTime.now(ZoneOffset.UTC);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(SequenceTimeScopeType.DAY.getPattern());
+        return utcNow.format(formatter) + "_" + key;
     }
 }

@@ -6,6 +6,7 @@ import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryCondition;
 import com.mybatisflex.core.query.QueryOrderBy;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.cursor.AbstractCursorQuery;
 import com.wind.common.query.cursor.CursorPagination;
@@ -14,6 +15,7 @@ import com.wind.common.query.supports.Pagination;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.common.query.supports.QueryOrderType;
 import jakarta.validation.constraints.NotNull;
+import lombok.EqualsAndHashCode;
 
 import java.util.List;
 import java.util.Objects;
@@ -77,8 +79,7 @@ public final class MybatisQueryHelper {
             }
             if (query instanceof AbstractCursorQuery<? extends QueryOrderField> cursorQuery) {
                 // 如果是游标查询，自动设置游标条件、分页大小
-                result.and(MybatisQueryHelper.cursorConditionWithNumId(CURSOR_ID_COLUMN, cursorQuery))
-                        .limit(query.getQuerySize());
+                result.and(MybatisQueryHelper.cursorConditionWithNumId(CURSOR_ID_COLUMN, cursorQuery)).limit(query.getQuerySize());
             }
             return result;
         }
@@ -189,7 +190,7 @@ public final class MybatisQueryHelper {
     }
 
     /**
-     * 将 mybatis plus 的分页对象转换为统一分页对象
+     * 构建游标分页对象
      *
      * @param data      查询结果数据
      * @param query     游标查询请求
@@ -198,8 +199,134 @@ public final class MybatisQueryHelper {
      */
     @NotNull
     public static <T, R> CursorPagination<R> convert(List<T> data, AbstractCursorQuery<?> query, Function<T, R> converter) {
-        List<R> records = data.stream().map(converter).toList();
-        return CursorPagination.of(records, query);
+        return convert(-1, data, query, converter);
     }
 
+    /**
+     * 构建游标分页对象
+     *
+     * @param total     查询结果总数
+     * @param data      查询结果数据
+     * @param query     游标查询请求
+     * @param converter 转换实体为 DOT 的函数
+     * @return 统一分页对象
+     */
+    @NotNull
+    public static <T, R> CursorPagination<R> convert(long total, List<T> data, AbstractCursorQuery<?> query, Function<T, R> converter) {
+        List<R> records = data.stream().map(converter).toList();
+        return CursorPagination.of(total, records, query);
+    }
+
+    /**
+     * 构建分页对象构建器
+     * <pre>{@code
+     *   MybatisQueryHelper.<User, UserDTO>query(queryWrapper)
+     *                 .counter(userMapper::selectCountByQuery)
+     *                 .queryResulter(userMapper::selectListByQuery)
+     *                 .converter(UserConverter.INSTANCE::convertToUserDTO)
+     *                 .cursor(query);
+     * }</pre>
+     *
+     * @param queryWrapper 查询条件
+     * @return 查询执行器
+     */
+    @NotNull
+    public static <T, R> WindQueryExecutor<T, R> query(@NotNull QueryWrapper queryWrapper) {
+        AssertUtils.notNull(queryWrapper, "argument queryWrapper must not null");
+        return new WindQueryExecutor<>(queryWrapper);
+    }
+
+    /**
+     * 构建分页对象构建器
+     *
+     * @param queryWrapper 查询条件
+     * @param entityType   实体类型
+     * @param resultType   结果类型
+     * @return 查询执行器
+     */
+    public static <T, R> WindQueryExecutor<T, R> query(@NotNull QueryWrapper queryWrapper, Class<T> entityType, Class<R> resultType) {
+        AssertUtils.notNull(entityType, "argument entityType must not null");
+        AssertUtils.notNull(resultType, "argument resultType must not null");
+        return query(queryWrapper);
+    }
+
+
+    /**
+     * 构建分页对象构建器
+     *
+     * @param <T> 查询实体类型
+     * @param <R> 结果类型
+     */
+    @EqualsAndHashCode
+    public static class WindQueryExecutor<T, R> {
+
+        private final QueryWrapper queryWrapper;
+
+        private Function<QueryWrapper, Long> counter;
+
+        private Function<QueryWrapper, List<T>> queryResulter;
+
+        private Function<T, R> converter;
+
+        WindQueryExecutor(QueryWrapper queryWrapper) {
+            this.queryWrapper = queryWrapper;
+        }
+
+
+        public WindQueryExecutor<T, R> counter(final Function<QueryWrapper, Long> counter) {
+            this.counter = counter;
+            return this;
+        }
+
+
+        public WindQueryExecutor<T, R> queryResulter(final Function<QueryWrapper, List<T>> queryResulter) {
+            this.queryResulter = queryResulter;
+            return this;
+        }
+
+        public WindQueryExecutor<T, R> converter(final Function<T, R> converter) {
+            this.converter = converter;
+            return this;
+        }
+
+        /**
+         * 游标分页查询
+         *
+         * @param query 游标查询请求
+         * @return 游标分页对象
+         */
+        @NotNull
+        public CursorPagination<R> cursor(@NotNull AbstractCursorQuery<?> query) {
+            checkArgs(query);
+            long total = -1;
+            if (query.shouldCountTotal()) {
+                total = counter.apply(queryWrapper);
+            }
+            List<R> list = queryResulter.apply(queryWrapper).stream().map(converter).toList();
+            return CursorPagination.of(total, list, query);
+        }
+
+        /**
+         * 分页查询
+         *
+         * @param query 分页查询请求
+         * @return 分页对象
+         */
+        @NotNull
+        public Pagination<R> pagination(@NotNull AbstractPageQuery<?> query) {
+            checkArgs(query);
+            long total = -1;
+            if (query.shouldCountTotal() && counter != null) {
+                total = counter.apply(queryWrapper);
+            }
+            return Pagination.of(queryResulter.apply(queryWrapper).stream().map(converter).toList(), query, total);
+        }
+
+        private void checkArgs(WindQuery<?> query) {
+            if (query.shouldCountTotal()) {
+                AssertUtils.notNull(counter, "query counter must not null");
+            }
+            AssertUtils.notNull(queryResulter, "query counter must not null");
+        }
+    }
 }

@@ -1,6 +1,7 @@
 package com.wind.transaction.core.enums;
 
 import com.mybatisflex.annotation.EnumValue;
+import com.wind.common.WindConstants;
 import com.wind.common.enums.DescriptiveEnum;
 import com.wind.common.exception.AssertUtils;
 import com.wind.transaction.core.Money;
@@ -25,7 +26,7 @@ import java.util.Objects;
 @Getter
 public enum CurrencyIsoCode implements DescriptiveEnum {
 
-    UNKNOWN("-1", "unknown", "未知", "??"),
+    UNKNOWN("-1", WindConstants.UNKNOWN, "未知", "??"),
 
     USD("840", "USD", "美元", "$"),
 

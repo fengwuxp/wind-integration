@@ -1,6 +1,7 @@
 package com.wind.transaction.core.enums;
 
 import com.mybatisflex.annotation.EnumValue;
+import com.wind.common.WindConstants;
 import com.wind.common.enums.DescriptiveEnum;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -26,7 +27,7 @@ import java.util.Objects;
 @AllArgsConstructor
 public enum InternationalRegionCode implements DescriptiveEnum {
 
-    UNKNOWN("UNKNOWN", "UNKNOWN", "未知", "UNKNOWN", ""),
+    UNKNOWN(WindConstants.UNKNOWN, WindConstants.UNKNOWN, "未知", WindConstants.UNKNOWN, WindConstants.UNKNOWN),
 
     CN("CHN", "+86", "中国", "China", "156"),
     HK("HKG", "+852", "中国香港", "Hong Kong, China", "344"),
@@ -322,14 +323,11 @@ public enum InternationalRegionCode implements DescriptiveEnum {
         if (!StringUtils.hasText(code)) {
             return null;
         }
-        switch (code.length()) {
-            case 2:
-                return getByAlpha2Code(code);
-            case 3:
-                return getByAlpha3Code(code);
-            default:
-                return null;
-        }
+        return switch (code.length()) {
+            case 2 -> getByAlpha2Code(code);
+            case 3 -> getByAlpha3Code(code);
+            default -> null;
+        };
     }
 
     public static InternationalRegionCode getByCallingCode(String callingCode) {

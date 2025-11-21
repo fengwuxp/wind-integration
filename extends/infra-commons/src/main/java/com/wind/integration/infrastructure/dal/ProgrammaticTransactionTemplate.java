@@ -93,10 +93,10 @@ public class ProgrammaticTransactionTemplate {
      */
     @SuppressWarnings("java:S1181")
     public <T> T execute(Supplier<T> supplier, Propagation propagation, @Nullable Supplier<T> fallback) {
-        DefaultTransactionDefinition defaultTransactionDefinition = new DefaultTransactionDefinition();
+        DefaultTransactionDefinition definition = new DefaultTransactionDefinition();
         // TODO 增加事物名称、超时配置等
-        defaultTransactionDefinition.setPropagationBehavior(propagation.value());
-        TransactionStatus transaction = this.platformTransactionManager.getTransaction(defaultTransactionDefinition);
+        definition.setPropagationBehavior(propagation.value());
+        TransactionStatus transaction = this.platformTransactionManager.getTransaction(definition);
         try {
             T result = supplier.get();
             this.platformTransactionManager.commit(transaction);

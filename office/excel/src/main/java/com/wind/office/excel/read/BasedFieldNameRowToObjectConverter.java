@@ -8,6 +8,7 @@ import com.wind.office.excel.ExcelCellQuickBuilder;
 import com.wind.office.excel.convert.ExcelRowToObjectConverter;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
 import jakarta.validation.constraints.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.format.Parser;
@@ -45,7 +46,7 @@ public record BasedFieldNameRowToObjectConverter<T>(Class<T> objectType, List<Ex
     }
 
     @Override
-    public T convert(@org.jetbrains.annotations.NotNull List<String> row) {
+    public T convert(@NonNull List<String> row) {
         return WindReflectUtils.newInstance(objectType, parseFieldValues(row));
     }
 

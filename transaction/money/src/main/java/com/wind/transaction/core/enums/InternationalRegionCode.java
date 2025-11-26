@@ -5,7 +5,7 @@ import com.wind.common.WindConstants;
 import com.wind.common.enums.DescriptiveEnum;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import java.util.Arrays;

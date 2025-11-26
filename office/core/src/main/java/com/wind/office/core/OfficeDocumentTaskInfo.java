@@ -1,6 +1,6 @@
 package com.wind.office.core;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
 import java.util.Collection;

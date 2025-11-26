@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -24,7 +24,7 @@ import java.util.Objects;
  **/
 public abstract class ExcelTestsUtils {
 
-    public static @NotNull Path getClasspathFilepath(String filename) throws URISyntaxException, IOException {
+    public static @NonNull Path getClasspathFilepath(String filename) throws URISyntaxException, IOException {
         URL baseUrl = Objects.requireNonNull(ExcelTestsUtils.class.getResource("/"));
         Path filepath = Paths.get(Paths.get(baseUrl.toURI()).toString(), filename);
         Files.deleteIfExists(filepath);

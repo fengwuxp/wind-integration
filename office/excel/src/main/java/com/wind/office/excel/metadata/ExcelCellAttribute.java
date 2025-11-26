@@ -1,6 +1,6 @@
 package com.wind.office.excel.metadata;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * excel单元格属性

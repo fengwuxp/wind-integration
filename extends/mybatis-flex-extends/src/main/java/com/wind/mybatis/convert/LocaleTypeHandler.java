@@ -4,7 +4,7 @@ package com.wind.mybatis.convert;
 import com.wind.common.WindConstants;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.sql.CallableStatement;
 import java.sql.PreparedStatement;

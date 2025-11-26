@@ -11,7 +11,7 @@ import com.wind.common.exception.BaseException;
 import com.wind.common.exception.DefaultExceptionCode;
 import com.wind.office.excel.ExportExcelDataFetcher;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.format.Printer;
 import org.springframework.util.CollectionUtils;
 
@@ -205,8 +205,7 @@ public record ExcelTemplateRender(Path filepath, List<WriteHandler> writeHandler
             return this;
         }
 
-        @NotNull
-        private SheetRender.SheetRenderBuilder latestSheet() {
+        private SheetRender.@NonNull SheetRenderBuilder latestSheet() {
             SheetRender.SheetRenderBuilder result = CollectionUtils.lastElement(sheetRenders);
             AssertUtils.notNull(result, "lasest SheetRenderBuilder must not null");
             return result;

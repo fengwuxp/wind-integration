@@ -4,7 +4,7 @@ import com.google.common.collect.ImmutableSet;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryCondition;
 import com.mybatisflex.core.query.RawQueryCondition;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import jakarta.validation.constraints.NotEmpty;
 import java.util.Collections;

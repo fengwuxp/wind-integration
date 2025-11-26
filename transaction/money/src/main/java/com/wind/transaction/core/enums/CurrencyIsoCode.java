@@ -5,11 +5,11 @@ import com.wind.common.WindConstants;
 import com.wind.common.enums.DescriptiveEnum;
 import com.wind.common.exception.AssertUtils;
 import com.wind.transaction.core.Money;
-import lombok.Getter;
-import org.springframework.lang.Nullable;
-
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -528,7 +528,7 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
      * @param currency 英文编码或数字编码
      * @return CurrencyIsoCode
      */
-    @NotNull
+    @NonNull
     public static CurrencyIsoCode requireOf(String currency) {
         CurrencyIsoCode result = of(currency);
         if (result == null) {

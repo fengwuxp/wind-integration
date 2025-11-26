@@ -5,7 +5,7 @@ import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
@@ -77,8 +77,7 @@ record SheetRender(int index, String sheetName, List<SheetDataSupplier> supplier
             this.builders.add(builder);
         }
 
-        @NotNull
-        SheetDataSupplier.SheetDataSupplierBuilder latestRender() {
+        SheetDataSupplier.@NonNull SheetDataSupplierBuilder latestRender() {
             SheetDataSupplier.SheetDataSupplierBuilder result = CollectionUtils.lastElement(builders);
             AssertUtils.notNull(result, "lasest SheetDataSupplierBuilder must not null");
             return result;

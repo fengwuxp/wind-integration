@@ -5,7 +5,7 @@ import com.wind.office.excel.export.SpringExpressionObjectToRowConverter;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -21,17 +21,17 @@ import java.util.function.Supplier;
 @Getter
 abstract class SheetDataSupplier implements Supplier<List<List<String>>> {
 
-    @NotNull
+    @NonNull
     private final List<ExcelCellDescriptor> titles;
 
-    @NotNull
+    @NonNull
     private final List<ExportExcelDataFetcher<?>> fetchers;
 
     private final int fetchSize;
 
     private final SpringExpressionObjectToRowConverter rowConverter;
 
-    protected SheetDataSupplier(@NotNull List<ExcelCellDescriptor> titles, @NotNull List<ExportExcelDataFetcher<?>> fetchers, int fetchSize) {
+    protected SheetDataSupplier(@NonNull List<ExcelCellDescriptor> titles, @NonNull List<ExportExcelDataFetcher<?>> fetchers, int fetchSize) {
         this.titles = titles;
         this.fetchers = fetchers;
         this.fetchSize = fetchSize;
@@ -109,14 +109,14 @@ abstract class SheetDataSupplier implements Supplier<List<List<String>>> {
 
     static class RowSupplier extends SheetDataSupplier {
 
-        public RowSupplier(@NotNull List<ExcelCellDescriptor> titles, @NotNull List<ExportExcelDataFetcher<?>> fetchers, int fetchSize) {
+        public RowSupplier(@NonNull List<ExcelCellDescriptor> titles, @NonNull List<ExportExcelDataFetcher<?>> fetchers, int fetchSize) {
             super(titles, fetchers, fetchSize);
         }
     }
 
     static class CellSupplier extends SheetDataSupplier {
 
-        public CellSupplier(@NotNull List<ExcelCellDescriptor> titles, @NotNull List<ExportExcelDataFetcher<?>> fetchers, int fetchSize) {
+        public CellSupplier(@NonNull List<ExcelCellDescriptor> titles, @NonNull List<ExportExcelDataFetcher<?>> fetchers, int fetchSize) {
             super(titles, fetchers, fetchSize);
         }
     }

@@ -2,8 +2,8 @@ package com.wind.office.core.formatter;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.Formatter;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Locale;
 import java.util.Map;

@@ -1,8 +1,8 @@
 package com.wind.office.excel.metadata;
 
 import com.wind.common.exception.BaseException;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.format.Printer;
 
 import java.util.Locale;
@@ -14,10 +14,10 @@ import java.util.Locale;
  * @author wuxp
  * @date 2025-05-14 14:06
  **/
-public interface ExcelCellPrinter<T> extends Printer<T> {
+public interface ExcelCellPrinter<T> extends Printer<@NonNull T> {
 
     @Override
-    default @NotNull String print(@Nullable T object, @NotNull Locale locale) {
+    default @NonNull String print(@Nullable T object, @NonNull Locale locale) {
         throw new BaseException("unsupported, please use: String print(T cellValue, String expression, Object row, Locale locale)");
     }
 
@@ -30,5 +30,5 @@ public interface ExcelCellPrinter<T> extends Printer<T> {
      * @param locale     the current user locale
      * @return the printed text string
      */
-    String print(@Nullable T cellValue, @NotNull String expression, @NotNull Object row, @NotNull Locale locale);
+    String print(@Nullable T cellValue, @NonNull String expression, @NonNull Object row, @NonNull Locale locale);
 }

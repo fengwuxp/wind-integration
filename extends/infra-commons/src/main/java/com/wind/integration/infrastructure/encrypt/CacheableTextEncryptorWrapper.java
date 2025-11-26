@@ -5,7 +5,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.wind.common.annotations.VisibleForTesting;
 import com.wind.security.crypto.symmetric.AesTextEncryptor;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.security.crypto.keygen.KeyGenerators;
 
@@ -25,7 +25,7 @@ public class CacheableTextEncryptorWrapper implements TextEncryptor {
 
     private final AesTextEncryptor localTextEncryptor;
 
-    private final Cache<@NotNull String, String> decryptedCaches;
+    private final Cache<@NonNull String, String> decryptedCaches;
 
     public CacheableTextEncryptorWrapper(TextEncryptor delegate, Duration cacheExpire, int maxSize) {
         this.delegate = delegate;

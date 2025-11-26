@@ -5,6 +5,7 @@ import com.wind.office.excel.convert.ExcelObjectToRowConverter;
 import com.wind.office.excel.metadata.ExcelCellDescriptor;
 import com.wind.office.excel.metadata.ExcelCellPrinter;
 import com.wind.script.spring.SpringExpressionEvaluator;
+import org.jspecify.annotations.NonNull;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.format.Printer;
@@ -28,7 +29,7 @@ public record SpringExpressionObjectToRowConverter(List<ExcelCellDescriptor> cel
     }
 
     @Override
-    public List<String> convert(@org.jetbrains.annotations.NotNull Object row) {
+    public List<String> convert(@NonNull Object row) {
         List<String> result = new ArrayList<>();
         if (row instanceof Collection<?>) {
             // 集合

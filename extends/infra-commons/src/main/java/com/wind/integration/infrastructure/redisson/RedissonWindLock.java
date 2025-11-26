@@ -4,7 +4,7 @@ import com.wind.common.exception.BaseException;
 import com.wind.common.exception.DefaultExceptionCode;
 import com.wind.common.locks.WindLock;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 
@@ -52,7 +52,7 @@ public class RedissonWindLock implements WindLock {
     }
 
     @Override
-    public boolean tryLock(long time, @NotNull TimeUnit unit) throws InterruptedException {
+    public boolean tryLock(long time, @NonNull TimeUnit unit) throws InterruptedException {
         return lock.tryLock(time, unit);
     }
 
@@ -68,7 +68,7 @@ public class RedissonWindLock implements WindLock {
         }
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Condition newCondition() {
         return lock.newCondition();

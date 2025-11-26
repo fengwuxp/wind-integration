@@ -10,12 +10,10 @@ import com.wind.tools.h2.H2FunctionInitializer;
 import jakarta.annotation.PostConstruct;
 import lombok.AllArgsConstructor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
-import org.springframework.boot.autoconfigure.sql.init.SqlInitializationAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,7 +40,6 @@ import javax.sql.DataSource;
         DataSourceAutoConfiguration.class,
         DataSourceTransactionManagerAutoConfiguration.class,
         AbstractServiceTest.H2InitializationAutoConfiguration.class,
-        SqlInitializationAutoConfiguration.class,
         MybatisFlexAutoConfiguration.class
 })
 @Transactional(rollbackFor = Exception.class)
@@ -75,7 +72,6 @@ public abstract class AbstractServiceTest {
      */
     @AllArgsConstructor
     @AutoConfiguration
-    @AutoConfigureBefore(SqlInitializationAutoConfiguration.class)
     @EnableConfigurationProperties(DataSourceProperties.class)
     public static class H2InitializationAutoConfiguration {
 

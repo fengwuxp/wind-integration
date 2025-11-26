@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.wind.middleware</groupId>
         <artifactId>wind-middleware</artifactId>
-        <version>1.0.2-jdk21-SNAPSHOT</version>
+        <version>1.1.0-jdk21-SNAPSHOT</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -30,7 +30,7 @@
     </modules>
 
     <properties>
-        <revision>1.0.2-jdk21-SNAPSHOT</revision>
+        <revision>1.1.0-jdk21-SNAPSHOT</revision>
 
         <java.version>21</java.version>
         <maven.compiler.source>21</maven.compiler.source>
@@ -59,10 +59,6 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.jetbrains</groupId>
-            <artifactId>annotations</artifactId>
         </dependency>
         <dependency>
             <groupId>jakarta.validation</groupId>
@@ -213,11 +209,11 @@
                 <artifactId>jakarta.mail-api</artifactId>
                 <version>${jakarta-mail.version}</version>
             </dependency>
-            <dependency>
-                <groupId>jakarta.activation</groupId>
-                <artifactId>jakarta.activation-api</artifactId>
-                <version>${jakarta-mail.version}</version>
-            </dependency>
+<!--            <dependency>-->
+<!--                <groupId>jakarta.activation</groupId>-->
+<!--                <artifactId>jakarta.activation-api</artifactId>-->
+<!--                <version>${jakarta-mail.version}</version>-->
+<!--            </dependency>-->
             <dependency>
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-core</artifactId>

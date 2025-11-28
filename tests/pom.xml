@@ -61,14 +61,6 @@
             <artifactId>wind-kms-alibabacloud</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.wind.integration</groupId>
-            <artifactId>wind-system-face</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.wind.integration</groupId>
-            <artifactId>wind-system-impl</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.wind.tools</groupId>
             <artifactId>mybatis-flex-codegen</artifactId>
         </dependency>

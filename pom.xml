@@ -25,7 +25,6 @@
         <module>dependencies</module>
         <module>wind-oss</module>
         <module>wind-kms</module>
-        <module>system-domain</module>
         <module>wind-metrics</module>
     </modules>
 
@@ -151,16 +150,6 @@
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-infra-commons</artifactId>
-                <version>${revision}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.wind.integration</groupId>
-                <artifactId>wind-system-face</artifactId>
-                <version>${revision}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.wind.integration</groupId>
-                <artifactId>wind-system-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

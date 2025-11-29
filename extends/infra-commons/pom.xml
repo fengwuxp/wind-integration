@@ -13,8 +13,8 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.wind.security</groupId>
-            <artifactId>wind-security-crypto</artifactId>
+            <groupId>com.wind.middleware</groupId>
+            <artifactId>wind-crypto</artifactId>
         </dependency>
         <dependency>
             <groupId>com.wind.middleware</groupId>

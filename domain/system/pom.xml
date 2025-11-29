@@ -5,10 +5,17 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.integration</groupId>
-        <artifactId>wind-system-domain</artifactId>
+        <artifactId>wind-domain</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <artifactId>wind-system-face</artifactId>
+
+    <artifactId>system-domain-face</artifactId>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
 
 </project>

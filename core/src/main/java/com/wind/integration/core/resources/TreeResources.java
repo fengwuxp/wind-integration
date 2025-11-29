@@ -2,6 +2,7 @@ package com.wind.integration.core.resources;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Null;
+
 import java.io.Serializable;
 import java.util.List;
 
@@ -28,6 +29,7 @@ public interface TreeResources<ID extends Serializable> extends WindResources<ID
     /**
      * @return 子节点
      */
+    @Null
     List<? extends TreeResources<ID>> getChildren();
 
     /**
@@ -35,5 +37,12 @@ public interface TreeResources<ID extends Serializable> extends WindResources<ID
      */
     default boolean isRoot() {
         return getParentId() == null;
+    }
+
+    /**
+     * @return 是否为叶子节点
+     */
+    default boolean isLeaf() {
+        return getChildren() == null || getChildren().isEmpty();
     }
 }

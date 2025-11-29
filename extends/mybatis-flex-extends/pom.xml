@@ -14,6 +14,10 @@
     <dependencies>
         <dependency>
             <groupId>com.wind.middleware</groupId>
+            <artifactId>wind-crypto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.middleware</groupId>
             <artifactId>wind-core</artifactId>
         </dependency>
         <dependency>
@@ -31,10 +35,6 @@
         <dependency>
             <groupId>org.mybatis</groupId>
             <artifactId>mybatis</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.wind.security</groupId>
-            <artifactId>wind-security-crypto</artifactId>
         </dependency>
         <dependency>
             <groupId>commons-codec</groupId>

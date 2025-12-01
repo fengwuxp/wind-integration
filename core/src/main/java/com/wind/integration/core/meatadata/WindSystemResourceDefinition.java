@@ -1,21 +1,22 @@
 package com.wind.integration.core.meatadata;
 
-import com.wind.common.enums.DescriptiveEnum;
-import com.wind.integration.core.model.TenantIsolationObject;
+import com.wind.common.WindConstants;
 import com.wind.integration.core.resources.TreeResources;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import java.io.Serializable;
 import java.util.Collections;
 import java.util.Map;
 
 /**
  * wind-system 资源定义
  *
+ * @param <ID> 资源ID
  * @author wuxp
  * @date 2025-11-26 17:27
  **/
-public interface WindSystemResourceDefinition extends TreeResources<Long>, TenantIsolationObject<Long> {
+public interface WindSystemResourceDefinition<ID extends Serializable> extends TreeResources<ID> {
 
     /**
      * 例如：应用的 appName
@@ -26,7 +27,7 @@ public interface WindSystemResourceDefinition extends TreeResources<Long>, Tenan
     String getOwner();
 
     /**
-     * @return 权限所属组
+     * @return 资源分组
      */
     @NotBlank
     String getGroup();
@@ -41,19 +42,28 @@ public interface WindSystemResourceDefinition extends TreeResources<Long>, Tenan
      * @return 资源类型
      */
     @NotNull
-    <E extends DescriptiveEnum> E getResourceType();
+    String getResourceType();
 
     /**
      * @return 资源唯一标识
      */
     @NotBlank
-    String getResourceId();
+    String getResourceKey();
 
     /**
      * @return 资源定义
      */
     @NotBlank
     String getResourceDefinition();
+
+    /**
+     * 对于 UI 资源，可以指定  UI 套系/版本
+     * 例如：admin, merchant, mobile, light, dark
+     */
+    @NotBlank
+    default String getUiVariant() {
+        return WindConstants.DEFAULT_TEXT;
+    }
 
     /**
      * @return 资源元数据

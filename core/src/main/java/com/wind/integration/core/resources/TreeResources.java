@@ -21,6 +21,12 @@ public interface TreeResources<ID extends Serializable> extends WindResources<ID
     ID getParentId();
 
     /**
+     * @return 父级名称
+     */
+    @Null
+    String getParentName();
+
+    /**
      * @return 资源在树形结构的层级
      */
     @NotNull

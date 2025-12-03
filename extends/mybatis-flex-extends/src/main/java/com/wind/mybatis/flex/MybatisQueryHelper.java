@@ -77,10 +77,6 @@ public final class MybatisQueryHelper {
                 }
                 result.orderBy(orderField, Objects.equals(Objects.requireNonNull(query.getOrderTypes())[i], QueryOrderType.ASC));
             }
-            if (query instanceof AbstractCursorQuery<? extends QueryOrderField> cursorQuery) {
-                // 如果是游标查询，自动设置游标条件、分页大小
-                result.and(MybatisQueryHelper.cursorConditionWithNumId(CURSOR_ID_COLUMN, cursorQuery)).limit(query.getQuerySize());
-            }
             return result;
         }
         return QueryWrapper.create();
@@ -302,7 +298,9 @@ public final class MybatisQueryHelper {
             if (query.shouldCountTotal()) {
                 total = counter.apply(queryWrapper);
             }
-            List<R> list = queryResulter.apply(queryWrapper).stream().map(converter).toList();
+            // 自动设置游标条件、分页大小
+            QueryWrapper limit = queryWrapper.and(MybatisQueryHelper.cursorConditionWithNumId(CURSOR_ID_COLUMN, query)).limit(query.getQuerySize());
+            List<R> list = queryResulter.apply(limit).stream().map(converter).toList();
             return CursorPagination.of(total, list, query);
         }
 
@@ -319,7 +317,9 @@ public final class MybatisQueryHelper {
             if (query.shouldCountTotal() && counter != null) {
                 total = counter.apply(queryWrapper);
             }
-            return Pagination.of(queryResulter.apply(queryWrapper).stream().map(converter).toList(), query, total);
+            // 分页查询
+            QueryWrapper limit = queryWrapper.limit((query.getQueryPage() - 1) * query.getQuerySize(), query.getQueryPage());
+            return Pagination.of(queryResulter.apply(limit).stream().map(converter).toList(), query, total);
         }
 
         private void checkArgs(WindQuery<?> query) {

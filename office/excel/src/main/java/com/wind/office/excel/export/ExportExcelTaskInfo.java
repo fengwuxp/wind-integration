@@ -102,7 +102,7 @@ public class ExportExcelTaskInfo implements OfficeDocumentTaskInfo {
     }
 
     public static ExportExcelTaskInfo of(String name, ExcelDocumentWriter writer) {
-        return of(name, writer, 3000);
+        return of(name, writer, 5000);
     }
 
     public static ExportExcelTaskInfo of(String name, ExcelDocumentWriter writer, int batchSize) {
@@ -110,7 +110,7 @@ public class ExportExcelTaskInfo implements OfficeDocumentTaskInfo {
     }
 
     public static ExportExcelTaskInfo of(Object id, String name, ExcelDocumentWriter writer) {
-        return of(id, name, writer, 3000);
+        return of(id, name, writer, 5000);
     }
 
     public static ExportExcelTaskInfo of(Object id, String name, ExcelDocumentWriter writer, int batchSize) {

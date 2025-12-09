@@ -7,6 +7,8 @@ import com.mybatisflex.core.query.QueryCondition;
 import com.mybatisflex.core.query.QueryOrderBy;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
+import com.wind.common.exception.BaseException;
+import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.cursor.AbstractCursorQuery;
 import com.wind.common.query.cursor.CursorPagination;
@@ -260,7 +262,7 @@ public final class MybatisQueryHelper {
 
         private Function<QueryWrapper, Long> counter;
 
-        private Function<QueryWrapper, List<T>> queryResulter;
+        private Function<QueryWrapper, List<T>> resultQueryFunc;
 
         private Function<T, R> converter;
 
@@ -274,9 +276,14 @@ public final class MybatisQueryHelper {
             return this;
         }
 
-
+        @Deprecated
         public WindQueryExecutor<T, R> queryResulter(final Function<QueryWrapper, List<T>> queryResulter) {
-            this.queryResulter = queryResulter;
+            this.resultQueryFunc = queryResulter;
+            return this;
+        }
+
+        public WindQueryExecutor<T, R> resultQueryFunc(final Function<QueryWrapper, List<T>> resultQueryFunc) {
+            this.resultQueryFunc = resultQueryFunc;
             return this;
         }
 
@@ -300,7 +307,7 @@ public final class MybatisQueryHelper {
             }
             // 自动设置游标条件、分页大小
             QueryWrapper limit = queryWrapper.and(MybatisQueryHelper.cursorConditionWithNumId(CURSOR_ID_COLUMN, query)).limit(query.getQuerySize());
-            List<R> list = queryResulter.apply(limit).stream().map(converter).toList();
+            List<R> list = resultQueryFunc.apply(limit).stream().map(converter).toList();
             return CursorPagination.of(total, list, query);
         }
 
@@ -319,14 +326,25 @@ public final class MybatisQueryHelper {
             }
             // 分页查询
             QueryWrapper limit = queryWrapper.limit((query.getQueryPage() - 1) * query.getQuerySize(), query.getQueryPage());
-            return Pagination.of(queryResulter.apply(limit).stream().map(converter).toList(), query, total);
+            return Pagination.of(resultQueryFunc.apply(limit).stream().map(converter).toList(), query, total);
+        }
+
+        @NotNull
+        public WindPagination<R> query(@NotNull WindQuery<? extends QueryOrderField> query) {
+            if (query instanceof AbstractPageQuery<?> q) {
+                return pagination(q);
+            }
+            if (query instanceof AbstractCursorQuery<?> q) {
+                return cursor(q);
+            }
+            throw BaseException.common("argument query must be AbstractPageQuery or AbstractCursorQuery");
         }
 
         private void checkArgs(WindQuery<?> query) {
             if (query.shouldCountTotal()) {
                 AssertUtils.notNull(counter, "query counter must not null");
             }
-            AssertUtils.notNull(queryResulter, "query counter must not null");
+            AssertUtils.notNull(resultQueryFunc, "query counter must not null");
         }
     }
 }

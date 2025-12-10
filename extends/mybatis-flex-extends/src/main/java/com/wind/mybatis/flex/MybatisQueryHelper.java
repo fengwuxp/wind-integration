@@ -325,7 +325,7 @@ public final class MybatisQueryHelper {
                 total = counter.apply(queryWrapper);
             }
             // 分页查询
-            QueryWrapper limit = queryWrapper.limit((query.getQueryPage() - 1) * query.getQuerySize(), query.getQueryPage());
+            QueryWrapper limit = queryWrapper.limit((query.getQueryPage() - 1) * query.getQuerySize(), query.getQuerySize());
             return Pagination.of(resultQueryFunc.apply(limit).stream().map(converter).toList(), query, total);
         }
 

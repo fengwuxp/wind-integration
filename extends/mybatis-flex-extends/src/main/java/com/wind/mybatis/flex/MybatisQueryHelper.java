@@ -330,7 +330,7 @@ public final class MybatisQueryHelper {
         }
 
         @NotNull
-        public WindPagination<R> query(@NotNull WindQuery<? extends QueryOrderField> query) {
+        public WindPagination<R> query(@NotNull WindQuery<?> query) {
             if (query instanceof AbstractPageQuery<?> q) {
                 return pagination(q);
             }

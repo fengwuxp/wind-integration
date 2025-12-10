@@ -498,6 +498,16 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
      * @param amount 货币数额，单位：分
      * @return 货币对象
      */
+    public Money of(long amount) {
+        return Money.immutable(amount, this);
+    }
+
+    /**
+     * 创建一个货币对象
+     *
+     * @param amount 货币数额，单位：分
+     * @return 货币对象
+     */
     public Money of(int amount) {
         return Money.immutable(amount, this);
     }

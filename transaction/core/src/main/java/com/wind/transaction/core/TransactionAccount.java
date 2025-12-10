@@ -26,7 +26,7 @@ public interface TransactionAccount {
      *
      * @return 账户总转入数额 （总转入）
      */
-    Integer getDepositAmount();
+    Long getDepositAmount();
 
     /**
      * 账户当下可用于支出的数额
@@ -34,7 +34,7 @@ public interface TransactionAccount {
      *
      * @return 账户可用数额
      */
-    default Integer getAvailableBalance() {
+    default Long getAvailableBalance() {
         return getDepositAmount() + getRefundedAmount() - getExpensesAmount() - getFreezeAmount();
     }
 
@@ -43,7 +43,7 @@ public interface TransactionAccount {
      *
      * @return 账户余额
      */
-    default Integer getTotalBalance() {
+    default Long getTotalBalance() {
         return getAvailableBalance() + getFreezeAmount();
     }
 
@@ -52,36 +52,36 @@ public interface TransactionAccount {
      *
      * @return 账户已冻结数额（已冻结）
      */
-    Integer getFreezeAmount();
+    Long getFreezeAmount();
 
     /**
      * 累计支出 = 累计支付（消费）+ 累计提现 + 累计手续费
      *
      * @return 累计账户已支出的数额（总支出）
      */
-    Integer getExpensesAmount();
+    Long getExpensesAmount();
 
     /**
      * 累计账户由于成功支付后、交易取消或部分取消退回账户的余额
      *
      * @return 已退款数额（总退款）
      */
-    Integer getRefundedAmount();
+    Long getRefundedAmount();
 
     /**
      * 累计提现
      *
      * @return 累计账户已提现的数额
      */
-    Integer getWithdrawAmount();
+    Long getWithdrawAmount();
 
     /**
      * 累计手续费
      *
      * @return 交易服务费用
      */
-    default Integer getFeeAmount() {
-        return 0;
+    default Long getFeeAmount() {
+        return 0L;
     }
 
     /**

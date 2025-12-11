@@ -21,13 +21,13 @@ public interface MessageDefinition<T> {
      * @return 消息标题
      */
     @NotNull
-    String getTitle();
+    String title();
 
     /**
      * @return 消息内容
      */
     @NotNull
-    T getMessage();
+    T message();
 
     /**
      * 消息格式
@@ -35,7 +35,7 @@ public interface MessageDefinition<T> {
      * @return 例如：html\text\markdown 等
      */
     @NotNull
-    String getFormat();
+    String format();
 
     /**
      * 根据不同的消息发送渠道可以是手机号码、邮箱地址、等
@@ -43,7 +43,7 @@ public interface MessageDefinition<T> {
      * @return 消息接收者
      */
     @NotNull
-    Set<String> getReceivers();
+    Set<String> receivers();
 
     /**
      * 获取消息元数据

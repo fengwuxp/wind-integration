@@ -26,6 +26,7 @@
         <module>wind-oss</module>
         <module>wind-kms</module>
         <module>wind-metrics</module>
+        <module>wind-message</module>
     </modules>
 
     <properties>

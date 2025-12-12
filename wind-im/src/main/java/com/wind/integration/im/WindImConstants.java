@@ -33,12 +33,12 @@ public final class WindImConstants {
     /**
      * 聊天消息路由
      */
-    public static final String ROUTE_CHAT_MESSAGE_PATH = "/api/inc/v1/im/route/message";
+    public static final String ROUTE_CHAT_MESSAGE_PATH = "/inc/api/v1/im/route/message";
 
     /**
      * 撤回消息路由
      */
-    public static final String ROUTE_REVOKE_MESSAGE_PATH = "/api/inc/v1/im/route/revoke";
+    public static final String ROUTE_REVOKE_MESSAGE_PATH = "/inc/api/v1/im/route/revoke";
 
     /**
      * 用户名

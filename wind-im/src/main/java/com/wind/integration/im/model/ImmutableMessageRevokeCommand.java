@@ -14,23 +14,23 @@ import java.time.LocalDateTime;
  * @param messageId    被撤回的消息 ID
  * @param sessionId    所属会话 ID
  * @param revokeUserId 操作撤回消息的用户
- * @param revokedTime  撤回时间
+ * @param revokeTime   撤回时间
  * @author wuxp
  * @date 2025-12-12 10:53
  */
 @FieldNameConstants
-public record ImmutableMessageRevokeCommand(@NotBlank String messageId, @NotBlank String sessionId, @NotBlank String revokeUserId, @NotNull LocalDateTime revokedTime) {
+public record ImmutableMessageRevokeCommand(@NotBlank String messageId, @NotBlank String sessionId, @NotBlank String revokeUserId, @NotNull LocalDateTime revokeTime) {
 
     @JsonCreator
     public ImmutableMessageRevokeCommand(
             @JsonProperty(Fields.messageId) String messageId,
             @JsonProperty(Fields.sessionId) String sessionId,
             @JsonProperty(Fields.revokeUserId) String revokeUserId,
-            @JsonProperty(Fields.revokedTime) LocalDateTime revokedTime
+            @JsonProperty(Fields.revokeTime) LocalDateTime revokeTime
     ) {
         this.messageId = messageId;
         this.sessionId = sessionId;
         this.revokeUserId = revokeUserId;
-        this.revokedTime = revokedTime;
+        this.revokeTime = revokeTime;
     }
 }

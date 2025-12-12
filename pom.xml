@@ -149,7 +149,7 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
-                <artifactId>wind-im-core</artifactId>
+                <artifactId>wind-im</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

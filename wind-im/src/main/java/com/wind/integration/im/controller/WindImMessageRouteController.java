@@ -20,7 +20,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-
+/**
+ * 聊天消息路由 (内部服务，不要暴露到公网)
+ *
+ * @author wuxp
+ */
 @Slf4j
 @RestController
 @AllArgsConstructor

@@ -2,6 +2,7 @@ package com.wind.integration.core.message;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -26,7 +27,7 @@ public interface TemplateMessageFactory<S> {
      */
     @SuppressWarnings({"rawtypes", "unckeced"})
     @NotNull
-    Collection<MessageDefinition> getMessages(String templateId, S source, Map<String, Object> extraVariables);
+    Collection<MessageDefinition> getMessages(@NonNull String templateId, S source, Map<String, Object> extraVariables);
 
     /**
      * 根据业务数据转换消息
@@ -37,7 +38,7 @@ public interface TemplateMessageFactory<S> {
      */
     @SuppressWarnings({"rawtypes", "unckeced"})
     @NotNull
-    default Collection<MessageDefinition> getMessages(String templateId, S source) {
+    default Collection<MessageDefinition> getMessages(@NonNull String templateId, S source) {
         return getMessages(templateId, source, Collections.emptyMap());
     }
 

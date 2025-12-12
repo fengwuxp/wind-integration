@@ -1,7 +1,5 @@
 package com.wind.integration.core.message;
 
-import lombok.AllArgsConstructor;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -13,10 +11,7 @@ import java.util.stream.Collectors;
  * @author wuxp
  * @date 2023-09-28 15:35
  **/
-@AllArgsConstructor
-public class CompositeMessageSender implements MessageSender<MessageDefinition<?>> {
-
-    private final Collection<MessageSender<? extends MessageDefinition<?>>> delegates;
+public record CompositeMessageSender(Collection<MessageSender<? extends MessageDefinition<?>>> delegates) implements MessageSender<MessageDefinition<?>> {
 
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})

@@ -10,7 +10,7 @@ import com.wind.integration.im.model.ImmutableMessageRevokeCommand;
 import com.wind.integration.im.spi.WindImSessionService;
 import com.wind.integration.im.spi.WindMessageRevokeConsumer;
 import com.wind.websocket.core.WindSocketSession;
-import com.wind.websocket.core.WindSocketSessionManager;
+import com.wind.websocket.core.WindSocketSessionRegistry;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +29,7 @@ import static com.wind.integration.im.WindImConstants.CHAT_MESSAGE_REVOKE_FAILUR
 @AllArgsConstructor
 public class DefaultRevokeMessageHandler implements DataListener<ImmutableMessageRevokeCommand> {
 
-    private final WindSocketSessionManager sessionManager;
+    private final WindSocketSessionRegistry sessionRegistry;
 
     private final WindImSessionService sessionService;
 
@@ -42,7 +42,7 @@ public class DefaultRevokeMessageHandler implements DataListener<ImmutableMessag
             // 业务处理
             revokeConsumer.accept(command);
             // 广播消息撤回事件
-            WindSocketSession session = sessionManager.getSession(command.sessionId());
+            WindSocketSession session = sessionRegistry.getSession(command.sessionId());
             session.broadcast(command, Collections.emptyList());
         } catch (Exception exception) {
             log.error("消息撤回处理异常: sessionId = {}, messageId = {}, revokeUserId = {}, message = {}", command.sessionId(), command.messageId(), command.revokeUserId(),

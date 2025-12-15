@@ -9,12 +9,12 @@ import com.wind.integration.im.handler.DefaultChatMessageHandler;
 import com.wind.integration.im.handler.DefaultRevokeMessageHandler;
 import com.wind.integration.im.lifecycle.DefaultSocketioConnectListener;
 import com.wind.integration.im.lifecycle.DefaultSocketioDisconnectListener;
-import com.wind.integration.im.session.DefaultWindSocketSessionManager;
+import com.wind.integration.im.session.DefaultWindSocketSessionRegistry;
 import com.wind.integration.im.spi.WindImChatMessageRepository;
 import com.wind.integration.im.spi.WindImSessionService;
 import com.wind.integration.im.spi.WindMessageRevokeConsumer;
 import com.wind.websocket.core.WindSocketConnectionListener;
-import com.wind.websocket.core.WindSocketSessionManager;
+import com.wind.websocket.core.WindSocketSessionRegistry;
 import org.redisson.api.RedissonClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -22,36 +22,36 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
+ * WebSocket 配置类
+ *
  * @author wuxp
  * @date 2025-12-12 14:49
  **/
 @Configuration
 public class WindWebSocketConfiguration {
+
     /**
-     * 创建 WebSocket 会话管理器的默认实现 Bean。
-     * 负责创建、更新、获取、销毁 WebSocket 会话。
+     *
+     * 创建 WindSocketSessionRegistry Bean
      *
      * @return WindSocketSessionManager 实例
      */
     @Bean
     @ConditionalOnBean(value = {RedissonClient.class, WindImSessionService.class})
-    public WindSocketSessionManager windSocketSessionManager(RedissonClient redissonClient, WindImSessionService windImSessionService) {
-        return new DefaultWindSocketSessionManager(redissonClient, windImSessionService);
+    public WindSocketSessionRegistry windSocketSessionRegistry(RedissonClient redissonClient, WindImSessionService windImSessionService) {
+        return new DefaultWindSocketSessionRegistry(redissonClient, windImSessionService);
     }
 
     /**
      * 创建连接事件监听器 Bean。
-     * 用于处理连接建立、断开、异常等事件，并将连接注册到会话中。
-     * <p>
-     * 该 Bean 依赖 WindSocketSessionManager，因此在存在 WindSocketSessionManager Bean 时才会注入。
      *
-     * @param sessionManager 会话管理器
+     * @param socketSessionRegistry 会话管理器
      * @return WindSocketConnectionListener 实例
      */
     @Bean
-    @ConditionalOnBean(value = {WindSocketSessionManager.class})
-    public WindSocketConnectionListener windSocketConnectionListener(WindSocketSessionManager sessionManager) {
-        return new DefaultWindSocketConnectionListener(sessionManager);
+    @ConditionalOnBean(value = {WindSocketSessionRegistry.class})
+    public WindSocketConnectionListener windSocketConnectionListener(WindSocketSessionRegistry socketSessionRegistry) {
+        return new DefaultWindSocketConnectionListener(socketSessionRegistry);
     }
 
     @Bean
@@ -69,16 +69,16 @@ public class WindWebSocketConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean(value = {WindSocketSessionManager.class, WindImChatMessageRepository.class})
-    public DefaultChatMessageHandler defaultChatMessageHandler(WindSocketSessionManager sessionManager, WindImChatMessageRepository chatMessageRepository) {
-        return new DefaultChatMessageHandler(sessionManager, chatMessageRepository);
+    @ConditionalOnBean(value = {WindSocketSessionRegistry.class, WindImChatMessageRepository.class})
+    public DefaultChatMessageHandler defaultChatMessageHandler(WindSocketSessionRegistry sessionRegistry, WindImChatMessageRepository chatMessageRepository) {
+        return new DefaultChatMessageHandler(sessionRegistry, chatMessageRepository);
     }
 
     @Bean
-    @ConditionalOnBean(value = {WindSocketSessionManager.class, WindImSessionService.class, WindMessageRevokeConsumer.class})
-    public DefaultRevokeMessageHandler defaultRevokeMessageHandler(WindSocketSessionManager sessionManager, WindImSessionService sessionService,
+    @ConditionalOnBean(value = {WindSocketSessionRegistry.class, WindImSessionService.class, WindMessageRevokeConsumer.class})
+    public DefaultRevokeMessageHandler defaultRevokeMessageHandler(WindSocketSessionRegistry sessionRegistry, WindImSessionService sessionService,
                                                                    WindMessageRevokeConsumer revokeConsumer) {
-        return new DefaultRevokeMessageHandler(sessionManager, sessionService, revokeConsumer);
+        return new DefaultRevokeMessageHandler(sessionRegistry, sessionService, revokeConsumer);
     }
 
     @Bean

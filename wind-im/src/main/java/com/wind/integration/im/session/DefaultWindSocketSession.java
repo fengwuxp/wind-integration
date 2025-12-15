@@ -2,9 +2,9 @@ package com.wind.integration.im.session;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.im.WindImConstants;
-import com.wind.integration.im.connection.RemoteSocketRouteClientConnection;
-import com.wind.integration.im.connection.ImmutableSocketClientConnectionMetadata;
 import com.wind.integration.im.connection.DefaultWindSocketConnectionListener;
+import com.wind.integration.im.connection.ImmutableSocketClientConnectionMetadata;
+import com.wind.integration.im.connection.RemoteSocketRouteClientConnection;
 import com.wind.integration.im.spi.WindImSessionService;
 import com.wind.websocket.core.SocketClientConnectionDescriptor;
 import com.wind.websocket.core.WindSessionConnectionPolicy;
@@ -60,24 +60,22 @@ public class DefaultWindSocketSession implements WindSocketSession {
     private static final String SOCKET_USER_CONNECTION_CACHE_KEY = "SOCKET_USER_CONNECTIONS";
 
     /**
-     * 用户ID 到连接描述符列表的映射缓存（Redis Map结构）
-     * <p>
-     * Key：用户ID（String）
-     * Value：该用户下所有连接的连接描述符列表（List<SocketClientConnectionDescriptor>）
-     * <p>
-     * 用于维护每个用户当前活跃的连接信息，支持多端设备连接场景，
-     * 可用于消息路由、连接状态检查等。
-     * <p>
+     * 用户ID 到连接描述符列表的映射缓存（Redis Map结构）。
+     * 用于维护每个用户当前活跃的连接信息，支持多端设备连接场景，可用于消息路由、连接状态检查等。
+     *
+     * @key 用户 ID
+     * @value 该用户下所有连接列表
      * Redis Key 示例：SOCKET_USER_CONNECTIONS
      */
-    private final RMap<String, List<SocketClientConnectionDescriptor>> userConnectionDescriptorCache;
+    private final RMap<String, List<SocketClientConnectionDescriptor>> userConnectionCache;
 
     /**
-     * 本地内存缓存连接描述符，提升访问性能
-     * 该缓存存储连接ID对应的 WindSocketClientClientConnection 实例。
-     * 注意：该缓存为本地进程内存，不适合多实例共享。
+     * 本地 Socket 连接缓存
+     *
+     * @key 连接 ID
+     * @value {@link WindSocketClientClientConnection} 实例
      */
-    private final Map<String, WindSocketClientClientConnection> localConnectionDescriptorCache;
+    private final Map<String, WindSocketClientClientConnection> localConnectionCache;
 
     /**
      * 会话服务
@@ -126,7 +124,7 @@ public class DefaultWindSocketSession implements WindSocketSession {
                                     Map<String, Object> metadata,
                                     RedissonClient redissonClient,
                                     WindImSessionService sessionService,
-                                    Map<String, WindSocketClientClientConnection> localConnectionDescriptorCache
+                                    Map<String, WindSocketClientClientConnection> localConnectionCache
     ) {
         this.id = id;
         this.gmtCreate = gmtCreate;
@@ -135,8 +133,8 @@ public class DefaultWindSocketSession implements WindSocketSession {
         this.sessionType = sessionType;
         this.metadata = (metadata != null) ? metadata : new HashMap<>();
         this.sessionService = sessionService;
-        this.userConnectionDescriptorCache = redissonClient.getMap(SOCKET_USER_CONNECTION_CACHE_KEY);
-        this.localConnectionDescriptorCache = localConnectionDescriptorCache;
+        this.userConnectionCache = redissonClient.getMap(SOCKET_USER_CONNECTION_CACHE_KEY);
+        this.localConnectionCache = localConnectionCache;
     }
 
     /**
@@ -166,10 +164,10 @@ public class DefaultWindSocketSession implements WindSocketSession {
                         .filter(conn -> Objects.equals(conn.getSessionId(), id) &&
                                 Objects.equals(conn.getClientDeviceType(), connection.getClientDeviceType()))
                         .forEach(item -> {
-                            WindSocketClientClientConnection oldConn = localConnectionDescriptorCache.get(item.getId());
+                            WindSocketClientClientConnection oldConn = localConnectionCache.get(item.getId());
                             if (oldConn != null) {
                                 oldConn.close();
-                                localConnectionDescriptorCache.remove(item.getId());
+                                localConnectionCache.remove(item.getId());
                             } else {
                                 log.warn("SINGLE_DEVICE_KICK_NEW：未找到旧连接 connectionId = {}", item.getId());
                             }
@@ -204,7 +202,7 @@ public class DefaultWindSocketSession implements WindSocketSession {
         }
 
         // 设置 连接ID -> 连接描述符
-        localConnectionDescriptorCache.put(connection.getId(), connection);
+        localConnectionCache.put(connection.getId(), connection);
 
         // 设置 Redis 用户ID -> 连接描述符集合 保存更新后的连接描述符
         putConnectionDescriptors(userId, clientConnections.stream().map(this::from).collect(Collectors.toList()));
@@ -212,7 +210,7 @@ public class DefaultWindSocketSession implements WindSocketSession {
 
     @NotNull
     private List<SocketClientConnectionDescriptor> getConnectionDescriptors(@NotBlank String userId) {
-        return Optional.ofNullable(userConnectionDescriptorCache.get(userId)).orElseGet(CopyOnWriteArrayList::new);
+        return Optional.ofNullable(userConnectionCache.get(userId)).orElseGet(CopyOnWriteArrayList::new);
     }
 
     /**
@@ -223,9 +221,9 @@ public class DefaultWindSocketSession implements WindSocketSession {
      */
     private void putConnectionDescriptors(@NotBlank String userId, List<SocketClientConnectionDescriptor> connections) {
         if (CollectionUtils.isEmpty(connections)) {
-            userConnectionDescriptorCache.remove(userId);
+            userConnectionCache.remove(userId);
         } else {
-            userConnectionDescriptorCache.put(userId, connections);
+            userConnectionCache.put(userId, connections);
         }
     }
 
@@ -265,7 +263,7 @@ public class DefaultWindSocketSession implements WindSocketSession {
             SocketClientConnectionDescriptor descriptor = iterator.next();
             if (descriptor.getSessionId().equals(id)) {
                 // 从本地连接缓存中移除连接
-                WindSocketClientClientConnection remove = localConnectionDescriptorCache.remove(descriptor.getId());
+                WindSocketClientClientConnection remove = localConnectionCache.remove(descriptor.getId());
                 if (remove != null) {
                     remove.close();
                 } else {
@@ -297,7 +295,7 @@ public class DefaultWindSocketSession implements WindSocketSession {
         AssertUtils.hasText(connectionId, "argument connectionId must not empty");
 
         // 获取连接描述符（包括 userId、sessionId 等元信息）
-        WindSocketClientClientConnection remove = localConnectionDescriptorCache.remove(connectionId);
+        WindSocketClientClientConnection remove = localConnectionCache.remove(connectionId);
         if (remove == null) {
             log.warn("leaveConnection：未找到连接 connectionId = {}", connectionId);
             return;
@@ -363,11 +361,12 @@ public class DefaultWindSocketSession implements WindSocketSession {
             // 获取连接描述符对应的会话 ID
             if (connectionDescriptor.getSessionId().equals(id)) {
                 // 获取本地连接对象
-                WindSocketClientClientConnection connection = localConnectionDescriptorCache.get(connectionDescriptor.getId());
+                WindSocketClientClientConnection connection = localConnectionCache.get(connectionDescriptor.getId());
                 // 存在则加入结果集
                 // 构造远程连接代理对象并加入结果集
                 result.add(Objects.requireNonNullElseGet(connection,
-                        () -> new RemoteSocketRouteClientConnection(getNodeAddress(connectionDescriptor), connectionDescriptor.getSessionId(), connectionDescriptor.getMetadata())));
+                        () -> new RemoteSocketRouteClientConnection(getNodeAddress(connectionDescriptor), connectionDescriptor.getSessionId(),
+                                connectionDescriptor.getMetadata())));
             }
         }
         return Collections.unmodifiableList(result);

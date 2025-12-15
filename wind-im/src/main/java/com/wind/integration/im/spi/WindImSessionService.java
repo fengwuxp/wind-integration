@@ -3,9 +3,7 @@ package com.wind.integration.im.spi;
 import com.wind.websocket.core.WindSocketSessionDescriptor;
 import com.wind.websocket.core.WindSocketSessionStatus;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -17,31 +15,12 @@ import java.util.Set;
 public interface WindImSessionService {
 
     /**
-     * 创建会话
-     *
-     * @param sessionId 会话 id，可能为空
-     * @param name      会话名称
-     * @param metadata  会话元数据
-     * @return 创建的会话描述符
-     */
-    String createIfAbsent(@Nullable String sessionId, @NonNull String name, @NonNull Map<String, Object> metadata);
-
-    /**
      * 更新会话状态
      *
      * @param sessionId 会话 id
      * @param status    会话状态
      */
     void updateSessionStatus(@NonNull String sessionId, @NonNull WindSocketSessionStatus status);
-
-    /**
-     * 更新会话状态
-     *
-     * @param sessionId   会话 id
-     * @param sessionName 会话名称
-     * @param metadata    会话元数据
-     */
-    void updateSessionMetadata(@NonNull String sessionId, @NonNull String sessionName, @NonNull Map<String, Object> metadata);
 
     /**
      * 判断会话是否存在

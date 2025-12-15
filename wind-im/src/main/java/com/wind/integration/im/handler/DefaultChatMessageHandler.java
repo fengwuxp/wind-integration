@@ -6,7 +6,7 @@ import com.corundumstudio.socketio.listener.DataListener;
 import com.wind.integration.im.spi.WindImChatMessageRepository;
 import com.wind.websocket.chat.ImmutableChatMessage;
 import com.wind.websocket.core.WindSocketSession;
-import com.wind.websocket.core.WindSocketSessionManager;
+import com.wind.websocket.core.WindSocketSessionRegistry;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -22,7 +22,7 @@ import java.util.Collections;
 @AllArgsConstructor
 public class DefaultChatMessageHandler implements DataListener<ImmutableChatMessage> {
 
-    private final WindSocketSessionManager sessionManager;
+    private final WindSocketSessionRegistry sessionRegistry;
 
     private final WindImChatMessageRepository chatMessageRepository;
 
@@ -36,7 +36,7 @@ public class DefaultChatMessageHandler implements DataListener<ImmutableChatMess
             chatMessageRepository.save(namespace, message);
             // 发送消息投递成功 ACK
             ackSender.sendAckData(message.getId());
-            WindSocketSession session = sessionManager.getSession(message.getSessionId());
+            WindSocketSession session = sessionRegistry.getSession(message.getSessionId());
             // 广播消息
             session.broadcast(message, Collections.singleton(message.getFromUserId()));
         } catch (Exception exception) {

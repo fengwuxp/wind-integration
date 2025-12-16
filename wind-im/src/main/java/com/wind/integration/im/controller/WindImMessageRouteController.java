@@ -4,13 +4,13 @@ package com.wind.integration.im.controller;
 import com.wind.common.exception.BaseException;
 import com.wind.integration.im.WindImConstants;
 import com.wind.integration.im.connection.LocalSocketClientConnection;
-import com.wind.integration.im.model.ImmutableMessageRevokeCommand;
-import com.wind.integration.im.model.RouteMessageRequest;
+import com.wind.integration.im.model.request.RouteMessageRequest;
 import com.wind.server.web.restful.RestfulApiRespFactory;
 import com.wind.server.web.supports.ApiResp;
 import com.wind.websocket.chat.ImmutableChatMessage;
+import com.wind.websocket.command.ImmutableMessageRevokeCommand;
 import com.wind.websocket.core.WindSocketClientClientConnection;
-import com.wind.websocket.core.WindSocketSessionManager;
+import com.wind.websocket.core.WindSocketSessionRegistry;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Im Message Route", description = "远程会话消息服务")
 public class WindImMessageRouteController {
 
-    private final WindSocketSessionManager socketSessionManager;
+    private final WindSocketSessionRegistry socketSessionRegistry;
 
     @PostMapping(WindImConstants.ROUTE_CHAT_MESSAGE_PATH)
     @Operation(summary = "路由聊天消息")
@@ -41,7 +41,7 @@ public class WindImMessageRouteController {
 
         String userId = request.receiveUserId();
         String clientDeviceType = request.receiveClientDeviceType();
-        WindSocketClientClientConnection userConnection = socketSessionManager.getSession(request.sessionId()).getUserConnectionWithDeviceType(userId, clientDeviceType);
+        WindSocketClientClientConnection userConnection = socketSessionRegistry.getSession(request.sessionId()).getUserConnectionWithDeviceType(userId, clientDeviceType);
         if (userConnection instanceof LocalSocketClientConnection) {
             userConnection.send(request.payload());
         } else {
@@ -59,7 +59,7 @@ public class WindImMessageRouteController {
         String userId = request.receiveUserId();
         String clientDeviceType = request.receiveClientDeviceType();
 
-        WindSocketClientClientConnection userConnection = socketSessionManager.getSession(request.sessionId()).getUserConnectionWithDeviceType(userId, clientDeviceType);
+        WindSocketClientClientConnection userConnection = socketSessionRegistry.getSession(request.sessionId()).getUserConnectionWithDeviceType(userId, clientDeviceType);
         if (userConnection instanceof LocalSocketClientConnection) {
             userConnection.send(chatMessage);
         } else {

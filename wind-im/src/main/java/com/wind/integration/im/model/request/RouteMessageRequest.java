@@ -1,4 +1,4 @@
-package com.wind.integration.im.model;
+package com.wind.integration.im.model.request;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;

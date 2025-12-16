@@ -1,6 +1,7 @@
 package com.wind.integration.im.spi;
 
-import com.wind.integration.im.model.ImmutableMessageRevokeCommand;
+
+import com.wind.websocket.command.ImmutableMessageRevokeCommand;
 
 import java.util.function.Consumer;
 

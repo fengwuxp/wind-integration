@@ -16,6 +16,7 @@ import com.wind.common.query.supports.AbstractPageQuery;
 import com.wind.common.query.supports.Pagination;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.common.query.supports.QueryOrderType;
+import com.wind.common.util.WindReflectUtils;
 import jakarta.validation.constraints.NotNull;
 import lombok.EqualsAndHashCode;
 
@@ -276,7 +277,7 @@ public final class MybatisQueryHelper {
             return this;
         }
 
-        @Deprecated
+        @Deprecated(forRemoval = true)
         public WindQueryExecutor<T, R> queryResulter(final Function<QueryWrapper, List<T>> queryResulter) {
             this.resultQueryFunc = queryResulter;
             return this;
@@ -303,7 +304,7 @@ public final class MybatisQueryHelper {
             checkArgs(query);
             long total = -1;
             if (query.shouldCountTotal()) {
-                total = counter.apply(queryWrapper);
+                total = counter.apply(clerOrderBy());
             }
             // 自动设置游标条件、分页大小
             QueryWrapper limit = queryWrapper.and(MybatisQueryHelper.cursorConditionWithNumId(CURSOR_ID_COLUMN, query)).limit(query.getQuerySize());
@@ -322,7 +323,7 @@ public final class MybatisQueryHelper {
             checkArgs(query);
             long total = -1;
             if (query.shouldCountTotal() && counter != null) {
-                total = counter.apply(queryWrapper);
+                total = counter.apply(clerOrderBy());
             }
             // 分页查询
             QueryWrapper limit = queryWrapper.limit((query.getQueryPage() - 1) * query.getQuerySize(), query.getQuerySize());
@@ -345,6 +346,14 @@ public final class MybatisQueryHelper {
                 AssertUtils.notNull(counter, "query counter must not null");
             }
             AssertUtils.notNull(resultQueryFunc, "query counter must not null");
+        }
+
+        // TODO 待优化
+        private QueryWrapper clerOrderBy() {
+            QueryWrapper result = queryWrapper.clone();
+            // 统计总数不做 orderBy
+            WindReflectUtils.setFieldValue("orderBys", result, null);
+            return result;
         }
     }
 }

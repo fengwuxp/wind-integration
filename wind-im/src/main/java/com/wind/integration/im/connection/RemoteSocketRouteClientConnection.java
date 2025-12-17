@@ -8,6 +8,7 @@ import com.wind.integration.im.model.request.RouteMessageRequest;
 import com.wind.websocket.WindWebSocketMetadataNames;
 import com.wind.websocket.chat.ImmutableChatMessage;
 import com.wind.websocket.command.ImmutableMessageRevokeCommand;
+import com.wind.websocket.command.ImmutableSessionStatusChangedCommand;
 import com.wind.websocket.core.WindSocketRouteClientConnection;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -84,6 +85,12 @@ public class RemoteSocketRouteClientConnection implements WindSocketRouteClientC
                         url = REMOTE_NODE_URL_PATTERN.formatted(remoteNodeAddress, WindImConstants.ROUTE_REVOKE_MESSAGE_PATH);
                         log.debug("发送撤回消息到远程节点 url = {} messageId = {}, sessionId = {}", url, revoke.messageId(), revoke.sessionId());
                         request = new RouteMessageRequest<>(this.sessionId, revoke, receiveUserId, receiveClientDeviceType, this.metadata);
+                    }
+
+                    case ImmutableSessionStatusChangedCommand command -> {
+                        url = REMOTE_NODE_URL_PATTERN.formatted(remoteNodeAddress, WindImConstants.ROUTE_SESSION_STATUS_MESSAGE_PATH);
+                        log.debug("发送会话状态变更消息到远程节点 url = {} messageId = {}, sessionId = {}", url, command.getId(), command.getId());
+                        request = new RouteMessageRequest<>(this.sessionId, command, receiveUserId, receiveClientDeviceType, this.metadata);
                     }
                     default -> {
                         log.warn("不支持的消息类型: {}", payload.getClass());

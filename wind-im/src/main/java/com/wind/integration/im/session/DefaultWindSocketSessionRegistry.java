@@ -2,6 +2,7 @@ package com.wind.integration.im.session;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.im.spi.WindChatSessionService;
+import com.wind.websocket.command.ImmutableSessionStatusChangedCommand;
 import com.wind.websocket.core.WindSessionConnectionPolicy;
 import com.wind.websocket.core.WindSocketClientClientConnection;
 import com.wind.websocket.core.WindSocketSession;
@@ -92,11 +93,13 @@ public class DefaultWindSocketSessionRegistry implements WindSocketSessionRegist
     @Override
     public void activeSession(@NotBlank String sessionId) {
         sessionService.updateSessionStatus(sessionId, WindSocketSessionStatus.ACTIVE);
+        getSession(sessionId).broadcast(ImmutableSessionStatusChangedCommand.active(sessionId));
     }
 
     @Override
     public void suspendSession(@NotBlank String sessionId) {
         sessionService.updateSessionStatus(sessionId, WindSocketSessionStatus.SUSPENDED);
+        getSession(sessionId).broadcast(ImmutableSessionStatusChangedCommand.suspended(sessionId));
     }
 
     private DefaultWindSocketSession buildDefaultWindSocketSession(@NotBlank String sessionId) {

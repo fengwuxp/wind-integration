@@ -6,6 +6,7 @@ import com.wind.common.util.ExecutorServiceUtils;
 import com.wind.integration.im.WindImConstants;
 import com.wind.websocket.chat.ImmutableChatMessage;
 import com.wind.websocket.command.ImmutableMessageRevokeCommand;
+import com.wind.websocket.command.ImmutableSessionStatusChangedCommand;
 import com.wind.websocket.core.WindSocketClientClientConnection;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -76,12 +77,15 @@ public class LocalSocketClientConnection implements WindSocketClientClientConnec
                     // 聊天消息发送事件
                     client.sendEvent(WindImConstants.CHAT_MESSAGE_SENT_EVENT, message);
                     // 这里的发送是异步的，没有回调监听发送结果，需自己实现确认机制（如果需要）
-                    log.debug("聊天消息发送成功，messageId = {}", message.getId());
+                    log.debug("聊天消息发送，messageId = {}", message.getId());
                 } else if (payload instanceof ImmutableMessageRevokeCommand message) {
                     // 聊天消息发送撤回
                     client.sendEvent(WindImConstants.CHAT_MESSAGE_REVOKE_EVENT, message);
                     // 这里的发送是异步的，没有回调监听发送结果，需自己实现确认机制（如果需要）
-                    log.debug("消息撤回请求发送成功, messageId = {}", message.messageId());
+                    log.debug("消息撤回请求发送, messageId = {}", message.messageId());
+                } else if (payload instanceof ImmutableSessionStatusChangedCommand message) {
+                    client.sendEvent(WindImConstants.CHAT_SESSION_STATUS_CHANGED_EVENT, message);
+                    log.debug("会话状态变更消息发送, sessionId = {}, status = {}", message.getSessionId(), message.getStatus());
                 }
             } catch (BaseException e) {
                 log.error("发送消息失败，message = {}", e.getMessage(), e);

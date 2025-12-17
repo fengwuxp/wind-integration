@@ -9,6 +9,7 @@ import com.wind.server.web.restful.RestfulApiRespFactory;
 import com.wind.server.web.supports.ApiResp;
 import com.wind.websocket.chat.ImmutableChatMessage;
 import com.wind.websocket.command.ImmutableMessageRevokeCommand;
+import com.wind.websocket.command.ImmutableSessionStatusChangedCommand;
 import com.wind.websocket.core.WindSocketClientClientConnection;
 import com.wind.websocket.core.WindSocketSessionRegistry;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -36,36 +37,37 @@ public class WindImMessageRouteController {
 
     @PostMapping(WindImConstants.ROUTE_CHAT_MESSAGE_PATH)
     @Operation(summary = "路由聊天消息")
-    public ApiResp<Void> chat(@RequestBody RouteMessageRequest<ImmutableChatMessage> request) {
+    public ApiResp<Void> routeChatMessage(@RequestBody RouteMessageRequest<ImmutableChatMessage> request) {
         log.debug("route chat message = {}", request);
-
-        String userId = request.receiveUserId();
-        String clientDeviceType = request.receiveClientDeviceType();
-        WindSocketClientClientConnection userConnection = socketSessionRegistry.getSession(request.sessionId()).getUserConnectionWithDeviceType(userId, clientDeviceType);
-        if (userConnection instanceof LocalSocketClientConnection) {
-            userConnection.send(request.payload());
-        } else {
-            throw BaseException.common(String.format("route chat message, user connection is not local, userId = %s, clientDeviceType = %s, sessionId = %s",
-                    userId, clientDeviceType, request.sessionId()));
-        }
+        route(request);
         return RestfulApiRespFactory.ok();
     }
 
     @PostMapping(WindImConstants.ROUTE_REVOKE_MESSAGE_PATH)
     @Operation(summary = "路由消息撤回指令")
-    public ApiResp<Void> revoked(@RequestBody RouteMessageRequest<ImmutableMessageRevokeCommand> request) {
-        log.debug("route revoke message = {}", request);
-        ImmutableMessageRevokeCommand chatMessage = request.payload();
+    public ApiResp<Void> routeRevoked(@RequestBody RouteMessageRequest<ImmutableMessageRevokeCommand> request) {
+        log.debug("route revoke message command = {}", request);
+        route(request);
+        return RestfulApiRespFactory.ok();
+    }
+
+    @PostMapping(WindImConstants.ROUTE_SESSION_STATUS_MESSAGE_PATH)
+    @Operation(summary = "路由会话状态变更指令")
+    public ApiResp<Void> routeSessionStatusChanged(@RequestBody RouteMessageRequest<ImmutableSessionStatusChangedCommand> request) {
+        log.debug("route session status changed command = {}", request);
+        route(request);
+        return RestfulApiRespFactory.ok();
+    }
+
+    private void route(RouteMessageRequest<?> request) {
         String userId = request.receiveUserId();
         String clientDeviceType = request.receiveClientDeviceType();
-
-        WindSocketClientClientConnection userConnection = socketSessionRegistry.getSession(request.sessionId()).getUserConnectionWithDeviceType(userId, clientDeviceType);
-        if (userConnection instanceof LocalSocketClientConnection) {
-            userConnection.send(chatMessage);
+        WindSocketClientClientConnection connection = socketSessionRegistry.getSession(request.sessionId()).getUserConnectionWithDeviceType(userId, clientDeviceType);
+        if (connection instanceof LocalSocketClientConnection) {
+            connection.send(request.payload());
         } else {
-            throw BaseException.common(String.format("route revoke message, user connection is not local, userId = %s, clientDeviceType = %s, sessionId = %s",
-                    userId, clientDeviceType, request.sessionId()));
+            throw BaseException.common(String.format("route message failure, user connection is not local, userId = %s, clientDeviceType = %s, sessionId = %s",
+                    request.receiveUserId(), request.receiveClientDeviceType(), request.sessionId()));
         }
-        return RestfulApiRespFactory.ok();
     }
 }

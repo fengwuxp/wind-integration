@@ -11,9 +11,14 @@ public final class WindImConstants {
     }
 
     /**
-     * SocketIO 连接成功
+     * 用户加入会话事件
      */
-    public static final String SOCKETIO_CONNECTION_SUCCESS_EVENT = "socketio.connection.success";
+    public static final String CHAT_SESSION_JOIN_EVENT = "chat.session.join";
+
+    /**
+     * 会话状态变更事件
+     */
+    public static final String CHAT_SESSION_STATUS_CHANGED_EVENT = "chat.session.status-changed";
 
     /**
      * 聊天消息发送
@@ -39,6 +44,11 @@ public final class WindImConstants {
      * 撤回消息路由
      */
     public static final String ROUTE_REVOKE_MESSAGE_PATH = "/inc/api/v1/im/route/revoke";
+
+    /**
+     * 会话状态路由
+     */
+    public static final String ROUTE_SESSION_STATUS_MESSAGE_PATH = "/inc/api/v1/im/route/session-status";
 
     /**
      * 用户名

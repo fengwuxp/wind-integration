@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import static com.wind.integration.im.WindImConstants.SOCKETIO_CONNECTION_SUCCESS_EVENT;
+import static com.wind.integration.im.WindImConstants.CHAT_SESSION_JOIN_EVENT;
 
 /**
  * 默认的 SocketIO 连接监听器实现
@@ -65,7 +65,7 @@ public record DefaultSocketioConnectListener(String nodeIpAddress, WindSocketCon
             // 5. 注册连接对象
             WindSocketClientClientConnection connection = new LocalSocketClientConnection(client, connectionId, sessionId, metadata);
             socketConnectionListener.onConnect(connection);
-            client.sendEvent(SOCKETIO_CONNECTION_SUCCESS_EVENT, "success");
+            client.sendEvent(CHAT_SESSION_JOIN_EVENT, "join success");
         } catch (Exception e) {
             log.error("连接异常 message = {} ", e.getMessage(), e);
             client.disconnect();

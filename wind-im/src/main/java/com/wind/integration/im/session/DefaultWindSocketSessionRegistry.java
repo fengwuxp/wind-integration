@@ -1,7 +1,7 @@
 package com.wind.integration.im.session;
 
 import com.wind.common.exception.AssertUtils;
-import com.wind.integration.im.spi.WindImSessionService;
+import com.wind.integration.im.spi.WindChatSessionService;
 import com.wind.websocket.core.WindSessionConnectionPolicy;
 import com.wind.websocket.core.WindSocketClientClientConnection;
 import com.wind.websocket.core.WindSocketSession;
@@ -45,7 +45,7 @@ public class DefaultWindSocketSessionRegistry implements WindSocketSessionRegist
 
     private final RedissonClient redissonClient;
 
-    private final WindImSessionService sessionService;
+    private final WindChatSessionService sessionService;
 
     /**
      * 获取指定 ID 的会话，如果不存在会抛出异常。

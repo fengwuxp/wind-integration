@@ -7,12 +7,12 @@ import org.jspecify.annotations.NonNull;
 import java.util.Set;
 
 /**
- * IM 会话服务
+ * 聊天会话服务
  *
  * @author wuxp
  * @date 2025-12-12 13:19
  **/
-public interface WindImSessionService {
+public interface WindChatSessionService {
 
     /**
      * 更新会话状态

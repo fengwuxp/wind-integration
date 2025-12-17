@@ -5,7 +5,7 @@ import com.wind.integration.im.WindImConstants;
 import com.wind.integration.im.connection.DefaultWindSocketConnectionListener;
 import com.wind.integration.im.connection.ImmutableSocketClientConnectionMetadata;
 import com.wind.integration.im.connection.RemoteSocketRouteClientConnection;
-import com.wind.integration.im.spi.WindImSessionService;
+import com.wind.integration.im.spi.WindChatSessionService;
 import com.wind.websocket.core.SocketClientConnectionDescriptor;
 import com.wind.websocket.core.WindSessionConnectionPolicy;
 import com.wind.websocket.core.WindSocketClientClientConnection;
@@ -80,7 +80,7 @@ public class DefaultWindSocketSession implements WindSocketSession {
     /**
      * 会话服务
      */
-    private final WindImSessionService sessionService;
+    private final WindChatSessionService sessionService;
 
     /**
      * 会话 ID
@@ -123,7 +123,7 @@ public class DefaultWindSocketSession implements WindSocketSession {
                                     WindSocketSessionType sessionType,
                                     Map<String, Object> metadata,
                                     RedissonClient redissonClient,
-                                    WindImSessionService sessionService,
+                                    WindChatSessionService sessionService,
                                     Map<String, WindSocketClientClientConnection> localConnectionCache
     ) {
         this.id = id;

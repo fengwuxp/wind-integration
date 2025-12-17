@@ -6,16 +6,12 @@ import com.corundumstudio.socketio.listener.DataListener;
 import com.wind.common.exception.BaseException;
 import com.wind.common.exception.DefaultExceptionCode;
 import com.wind.common.exception.ExceptionCode;
-import com.wind.integration.im.spi.WindImSessionService;
-import com.wind.integration.im.spi.WindMessageRevokeConsumer;
+import com.wind.integration.im.spi.WindChatMessageRevokeHandler;
 import com.wind.websocket.command.ImmutableMessageRevokeCommand;
-import com.wind.websocket.core.WindSocketSession;
-import com.wind.websocket.core.WindSocketSessionRegistry;
+import com.wind.websocket.core.WindSessionMessageSender;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.Collections;
 
 import static com.wind.integration.im.WindImConstants.CHAT_MESSAGE_REVOKE_FAILURE_EVENT;
 
@@ -29,21 +25,18 @@ import static com.wind.integration.im.WindImConstants.CHAT_MESSAGE_REVOKE_FAILUR
 @AllArgsConstructor
 public class DefaultRevokeMessageHandler implements DataListener<ImmutableMessageRevokeCommand> {
 
-    private final WindSocketSessionRegistry sessionRegistry;
+    private final WindSessionMessageSender sessionMessageSender;
 
-    private final WindImSessionService sessionService;
-
-    private final WindMessageRevokeConsumer revokeConsumer;
+    private final WindChatMessageRevokeHandler messageRevokeHandler;
 
     @Override
     public void onData(SocketIOClient client, ImmutableMessageRevokeCommand command, AckRequest ackSender) {
-        log.info("Received revoke command from sessionId = {}, messageId = {}, revokeUserId = {} ", command.sessionId(), command.messageId(), command.revokeUserId());
+        log.debug("Received revoke command from sessionId = {}, messageId = {}, revokeUserId = {} ", command.sessionId(), command.messageId(), command.revokeUserId());
         try {
             // 业务处理
-            revokeConsumer.accept(command);
-            // 广播消息撤回事件
-            WindSocketSession session = sessionRegistry.getSession(command.sessionId());
-            session.broadcast(command, Collections.emptyList());
+            messageRevokeHandler.accept(command);
+            // 发送撤回事件
+            sessionMessageSender.sendMessage(command);
         } catch (Exception exception) {
             log.error("消息撤回处理异常: sessionId = {}, messageId = {}, revokeUserId = {}, message = {}", command.sessionId(), command.messageId(), command.revokeUserId(),
                     exception.getMessage(), exception);

@@ -3,14 +3,10 @@ package com.wind.integration.im.handler;
 import com.corundumstudio.socketio.AckRequest;
 import com.corundumstudio.socketio.SocketIOClient;
 import com.corundumstudio.socketio.listener.DataListener;
-import com.wind.integration.im.spi.WindImChatMessageRepository;
 import com.wind.websocket.chat.ImmutableChatMessage;
-import com.wind.websocket.core.WindSocketSession;
-import com.wind.websocket.core.WindSocketSessionRegistry;
+import com.wind.websocket.core.WindSessionMessageSender;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.Collections;
 
 /**
  * 聊天消息监听器
@@ -22,26 +18,18 @@ import java.util.Collections;
 @AllArgsConstructor
 public class DefaultChatMessageHandler implements DataListener<ImmutableChatMessage> {
 
-    private final WindSocketSessionRegistry sessionRegistry;
-
-    private final WindImChatMessageRepository chatMessageRepository;
+    private final WindSessionMessageSender sessionMessageSender;
 
     @Override
     public void onData(SocketIOClient client, ImmutableChatMessage message, AckRequest ackSender) {
-        String namespace = client.getNamespace().getName();
-        log.debug("Received chat message from namespace = {}, sessionId = {}, formUserId = {}, messageId = {}", namespace, message.getSessionId(), message.getFromUserId(),
-                message.getId());
         try {
             // 保存会话消息
-            chatMessageRepository.save(namespace, message);
+            sessionMessageSender.sendMessage(message);
             // 发送消息投递成功 ACK
             ackSender.sendAckData(message.getId());
-            WindSocketSession session = sessionRegistry.getSession(message.getSessionId());
-            // 广播消息
-            session.broadcast(message, Collections.singleton(message.getFromUserId()));
         } catch (Exception exception) {
-            log.error("聊天消息发送一次: namespace = {}, sessionId = {}, sender = {}, error = {}", namespace, message.getSessionId(), message.getFromUserId(),
-                    exception.getMessage(), exception);
+            log.error("聊天消息发送异常: namespace = {}, sessionId = {}, sender = {}, error = {}", client.getNamespace().getName(),
+                    message.getSessionId(), message.getSenderId(), exception.getMessage(), exception);
             client.disconnect();
         }
     }

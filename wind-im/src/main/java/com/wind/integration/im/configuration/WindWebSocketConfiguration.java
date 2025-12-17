@@ -3,6 +3,7 @@ package com.wind.integration.im.configuration;
 import com.corundumstudio.socketio.SocketIOServer;
 import com.corundumstudio.socketio.listener.ConnectListener;
 import com.corundumstudio.socketio.listener.DisconnectListener;
+import com.wind.integration.im.DefaultSessionMessageSender;
 import com.wind.integration.im.WindSocketIOServerRunner;
 import com.wind.integration.im.connection.DefaultWindSocketConnectionListener;
 import com.wind.integration.im.handler.DefaultChatMessageHandler;
@@ -10,9 +11,11 @@ import com.wind.integration.im.handler.DefaultRevokeMessageHandler;
 import com.wind.integration.im.lifecycle.DefaultSocketioConnectListener;
 import com.wind.integration.im.lifecycle.DefaultSocketioDisconnectListener;
 import com.wind.integration.im.session.DefaultWindSocketSessionRegistry;
-import com.wind.integration.im.spi.WindImChatMessageRepository;
-import com.wind.integration.im.spi.WindImSessionService;
-import com.wind.integration.im.spi.WindMessageRevokeConsumer;
+import com.wind.integration.im.spi.WindChatMessageRepository;
+import com.wind.integration.im.spi.WindChatSessionService;
+import com.wind.integration.im.spi.WindChatMessageRevokeHandler;
+import com.wind.websocket.core.CompositeSessionMessageSender;
+import com.wind.websocket.core.WindSessionMessageSender;
 import com.wind.websocket.core.WindSocketConnectionListener;
 import com.wind.websocket.core.WindSocketSessionRegistry;
 import org.redisson.api.RedissonClient;
@@ -20,6 +23,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+
+import java.util.List;
 
 /**
  * WebSocket 配置类
@@ -37,9 +43,9 @@ public class WindWebSocketConfiguration {
      * @return WindSocketSessionManager 实例
      */
     @Bean
-    @ConditionalOnBean(value = {RedissonClient.class, WindImSessionService.class})
-    public WindSocketSessionRegistry windSocketSessionRegistry(RedissonClient redissonClient, WindImSessionService windImSessionService) {
-        return new DefaultWindSocketSessionRegistry(redissonClient, windImSessionService);
+    @ConditionalOnBean(value = {RedissonClient.class, WindChatSessionService.class})
+    public WindSocketSessionRegistry windSocketSessionRegistry(RedissonClient redissonClient, WindChatSessionService windChatSessionService) {
+        return new DefaultWindSocketSessionRegistry(redissonClient, windChatSessionService);
     }
 
     /**
@@ -69,16 +75,28 @@ public class WindWebSocketConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean(value = {WindSocketSessionRegistry.class, WindImChatMessageRepository.class})
-    public DefaultChatMessageHandler defaultChatMessageHandler(WindSocketSessionRegistry sessionRegistry, WindImChatMessageRepository chatMessageRepository) {
-        return new DefaultChatMessageHandler(sessionRegistry, chatMessageRepository);
+    @ConditionalOnBean(value = {WindSocketSessionRegistry.class, WindChatMessageRepository.class})
+    public DefaultSessionMessageSender defaultSessionMessageSender(WindSocketSessionRegistry sessionRegistry, WindChatMessageRepository chatMessageRepository) {
+        return new DefaultSessionMessageSender(sessionRegistry, chatMessageRepository);
     }
 
     @Bean
-    @ConditionalOnBean(value = {WindSocketSessionRegistry.class, WindImSessionService.class, WindMessageRevokeConsumer.class})
-    public DefaultRevokeMessageHandler defaultRevokeMessageHandler(WindSocketSessionRegistry sessionRegistry, WindImSessionService sessionService,
-                                                                   WindMessageRevokeConsumer revokeConsumer) {
-        return new DefaultRevokeMessageHandler(sessionRegistry, sessionService, revokeConsumer);
+    @Primary
+    @ConditionalOnBean(WindSessionMessageSender.class)
+    public CompositeSessionMessageSender compositeSessionMessageSender(List<WindSessionMessageSender> senders) {
+        return new CompositeSessionMessageSender(senders);
+    }
+
+    @Bean
+    @ConditionalOnBean(WindSessionMessageSender.class)
+    public DefaultChatMessageHandler defaultChatMessageHandler(WindSessionMessageSender chatMessageRepository) {
+        return new DefaultChatMessageHandler(chatMessageRepository);
+    }
+
+    @Bean
+    @ConditionalOnBean({WindSessionMessageSender.class, WindChatMessageRevokeHandler.class})
+    public DefaultRevokeMessageHandler defaultRevokeMessageHandler(WindSessionMessageSender sessionMessageSender, WindChatMessageRevokeHandler revokeHandler) {
+        return new DefaultRevokeMessageHandler(sessionMessageSender, revokeHandler);
     }
 
     @Bean

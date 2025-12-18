@@ -17,7 +17,7 @@ public final class WindInternalApiConstants {
     /**
      * 内网接口前缀
      */
-    public static final String INC_API_PREFIX = "/internal/v1";
+    public static final String INC_API_PREFIX = "/inc";
 
     /**
      * 内网开放 API 前缀 （不需要验签）

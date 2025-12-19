@@ -99,7 +99,7 @@ class ApprovalExecutionPathResolverTests {
 
         flowDSL.setNodes(List.of(start, finance, ceo, hr));
 
-        // transitions
+        //  条件 amount > 100000
         WorkflowDefinition.Transition t1 = new WorkflowDefinition.Transition();
         t1.setSource("start");
         t1.setTarget("finance");
@@ -109,6 +109,7 @@ class ApprovalExecutionPathResolverTests {
         cond1.setRight(new Operand(100000, OperandType.CONSTANT));
         t1.setCondition(cond1);
 
+        // 条件分支 amount <= 100000
         WorkflowDefinition.Transition t2 = new WorkflowDefinition.Transition();
         t2.setSource("start");
         t2.setTarget("hr");

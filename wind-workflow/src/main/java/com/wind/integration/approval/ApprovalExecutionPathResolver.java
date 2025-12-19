@@ -2,6 +2,7 @@ package com.wind.integration.approval;
 
 import com.wind.integration.workflow.WorkflowDefinition;
 import com.wind.integration.workflow.WorkflowExecutionPathResolver;
+import org.jspecify.annotations.NonNull;
 import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
@@ -28,6 +29,7 @@ public final class ApprovalExecutionPathResolver {
      * @param context 执行上下文
      * @return 符合条件的节点执行路径（列表嵌套表示分支）
      */
+    @NonNull
     public static List<ApprovalFlowDefinition.ApprovalNode> eval(ApprovalFlowDefinition flowDSL, Map<String, Object> context) {
         if (CollectionUtils.isEmpty(flowDSL.getTransitions())) {
             return flowDSL.getNodes();
@@ -38,7 +40,7 @@ public final class ApprovalExecutionPathResolver {
 
         // 使用现有的节点路径计算器获取 ID 路径
         List<List<String>> nodeIdPaths = WorkflowExecutionPathResolver.eval(workflow, context);
-        if (nodeIdPaths.isEmpty()){
+        if (nodeIdPaths.isEmpty()) {
             return Collections.emptyList();
         }
 

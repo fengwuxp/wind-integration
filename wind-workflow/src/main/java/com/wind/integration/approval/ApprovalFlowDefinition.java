@@ -1,6 +1,7 @@
 package com.wind.integration.approval;
 
 import com.wind.integration.workflow.WorkflowDefinition;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -27,8 +28,9 @@ public class ApprovalFlowDefinition implements Serializable {
     private GlobalConfig global;
 
     /**
-     * 审批节点列表
+     * 审批候选节点
      */
+    @NotNull
     private List<ApprovalNode> nodes;
 
     /**
@@ -108,7 +110,7 @@ public class ApprovalFlowDefinition implements Serializable {
     }
 
     /**
-     * 审批人策略
+     * 流程参与人策略
      */
     public enum ActorStrategy {
         /**
@@ -140,10 +142,6 @@ public class ApprovalFlowDefinition implements Serializable {
 
         /**
          * 策略
-         * USER      - 指定用户
-         * ROLE      - 指定角色
-         * GROUP     - 用户组
-         * EXPRESSION - 表达式，例如申请人上级
          */
         private ActorStrategy strategy;
 
@@ -193,7 +191,7 @@ public class ApprovalFlowDefinition implements Serializable {
         /**
          * approveRequired：mode 为 COUNT/RATIO 时需要的数量
          */
-        private Integer approveRequired;
+        private Double approveRequired;
 
     }
 

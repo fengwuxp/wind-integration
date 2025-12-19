@@ -28,6 +28,7 @@
         <module>wind-metrics</module>
         <module>wind-message</module>
         <module>wind-im</module>
+        <module>wind-workflow</module>
     </modules>
 
     <properties>
@@ -150,6 +151,11 @@
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-im</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-workflow</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

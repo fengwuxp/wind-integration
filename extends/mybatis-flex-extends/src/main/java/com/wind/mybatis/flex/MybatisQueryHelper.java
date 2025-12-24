@@ -22,6 +22,7 @@ import lombok.EqualsAndHashCode;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -267,6 +268,11 @@ public final class MybatisQueryHelper {
 
         private Function<T, R> converter;
 
+        /**
+         * 结果数据增强处理
+         */
+        private Consumer<List<R>> resultEnricher;
+
         WindQueryExecutor(QueryWrapper queryWrapper) {
             this.queryWrapper = queryWrapper;
         }
@@ -293,6 +299,11 @@ public final class MybatisQueryHelper {
             return this;
         }
 
+        public WindQueryExecutor<T, R> resultEnricher(final Consumer<List<R>> resultEnricher) {
+            this.resultEnricher = resultEnricher;
+            return this;
+        }
+
         /**
          * 游标分页查询
          *
@@ -308,8 +319,11 @@ public final class MybatisQueryHelper {
             }
             // 自动设置游标条件、分页大小
             QueryWrapper limit = queryWrapper.and(MybatisQueryHelper.cursorConditionWithNumId(CURSOR_ID_COLUMN, query)).limit(query.getQuerySize());
-            List<R> list = resultQueryFunc.apply(limit).stream().map(converter).toList();
-            return CursorPagination.of(total, list, query);
+            List<R> records = resultQueryFunc.apply(limit).stream().map(converter).toList();
+            if (resultEnricher != null) {
+                resultEnricher.accept(records);
+            }
+            return CursorPagination.of(total, records, query);
         }
 
         /**
@@ -327,7 +341,11 @@ public final class MybatisQueryHelper {
             }
             // 分页查询
             QueryWrapper limit = queryWrapper.limit((query.getQueryPage() - 1) * query.getQuerySize(), query.getQuerySize());
-            return Pagination.of(resultQueryFunc.apply(limit).stream().map(converter).toList(), query, total);
+            List<R> records = resultQueryFunc.apply(limit).stream().map(converter).toList();
+            if (resultEnricher != null) {
+                resultEnricher.accept(records);
+            }
+            return Pagination.of(records, query, total);
         }
 
         @NotNull

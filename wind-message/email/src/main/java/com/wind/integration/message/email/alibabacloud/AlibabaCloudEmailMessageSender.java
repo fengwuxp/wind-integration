@@ -17,6 +17,8 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 
+import java.util.function.Supplier;
+
 
 /**
  * 阿里云邮件发送
@@ -29,16 +31,26 @@ import org.jspecify.annotations.NonNull;
 @AllArgsConstructor
 public class AlibabaCloudEmailMessageSender implements MessageSender<SimpleEmailMessage> {
 
+    @NonNull
     private final Client client;
 
     /**
-     * 发件人邮箱
+     * 发件人账号提供者
      */
-    private final String sendAccount;
+    @NonNull
+    private final Supplier<String> accountSupplier;
+
+    /**
+     * @param accountSupplier 发件人账号提供者
+     * @param properties      配置
+     */
+    public AlibabaCloudEmailMessageSender(@NonNull Supplier<String> accountSupplier, @NonNull AlibabaCloudEmailProperties properties) {
+        this.accountSupplier = accountSupplier;
+        this.client = buildClient(properties);
+    }
 
     public AlibabaCloudEmailMessageSender(@NonNull String sendAccount, @NonNull AlibabaCloudEmailProperties properties) {
-        this.client = buildClient(properties);
-        this.sendAccount = sendAccount;
+        this(() -> sendAccount, properties);
     }
 
     @SneakyThrows
@@ -46,7 +58,7 @@ public class AlibabaCloudEmailMessageSender implements MessageSender<SimpleEmail
     public void sendMessage(SimpleEmailMessage message) {
         try {
             SingleSendMailRequest request = new SingleSendMailRequest();
-            request.setAccountName(sendAccount);
+            request.setAccountName(accountSupplier.get());
             // 地址类型。取值：0：随机账号 1：发信地址
             request.setAddressType(1);
             request.setReplyToAddress(Boolean.TRUE);

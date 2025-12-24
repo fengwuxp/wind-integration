@@ -169,6 +169,16 @@
                 <version>${revision}</version>
             </dependency>
             <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-message-emial</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-message-dingtalk</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
                 <groupId>com.github.xiaoymin</groupId>
                 <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
                 <version>${knife4j.version}</version>

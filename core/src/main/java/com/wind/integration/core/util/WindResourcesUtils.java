@@ -1,10 +1,12 @@
 package com.wind.integration.core.util;
 
 import com.wind.common.exception.AssertUtils;
+import com.wind.common.util.WindReflectUtils;
 import com.wind.integration.core.resources.TreeResources;
+import jakarta.validation.constraints.NotNull;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
-import jakarta.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -18,6 +20,7 @@ import java.util.stream.Collectors;
  * @author wuxp
  * @date 2024-12-12 23:27
  **/
+@Slf4j
 public final class WindResourcesUtils {
 
     private WindResourcesUtils() {
@@ -56,6 +59,15 @@ public final class WindResourcesUtils {
                         .stream()
                         .sorted(Comparator.comparing(T::getOrderIndex))
                         .toList();
+                children.forEach(item -> {
+                    if (item.getParentName() == null) {
+                        try {
+                            WindReflectUtils.setFieldValue("parentName", item, node.getName());
+                        } catch (Exception exception) {
+                            log.debug("Set class type = {} parentName exception, message  = {}", item.getClass().getName(), exception.getMessage(), exception);
+                        }
+                    }
+                });
                 childrenSetter.accept(node, children);
             }
         }

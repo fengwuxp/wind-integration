@@ -18,13 +18,14 @@ class WindResourcesUtilsTests {
 
     @Test
     void testConvertForTree() {
-        ExampleResources root1 = new ExampleResources(1L, "r", null, null, 0, null, null);
-        ExampleResources root2 = new ExampleResources(2L, "r", null, null, 0, null, null);
+        ExampleResources root1 = new ExampleResources(1L, "root1", null, null, 0, null, null);
+        ExampleResources root2 = new ExampleResources(2L, "root2", null, null, 0, null, null);
         List<ExampleResources> result = WindResourcesUtils.convertForTree(Arrays.asList(root1, root2, new ExampleResources(22L, "c2", 2L, null, 1, null,
                         null)),
                 ExampleResources::setChildren);
         Assertions.assertEquals(2, result.size());
         Assertions.assertEquals(1, result.get(1).getChildren().size());
+        Assertions.assertEquals("root2", result.get(1).getChildren().getFirst().getParentName());
     }
 
 

@@ -1,8 +1,13 @@
 package com.wind.integration.approval;
 
+import com.wind.common.enums.DescriptiveEnum;
 import com.wind.integration.workflow.WorkflowDefinition;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.ToString;
 
 import java.io.Serializable;
 import java.util.List;
@@ -15,16 +20,20 @@ import java.util.List;
  * @date 2025-12-19 14:06
  **/
 @Data
-public class ApprovalFlowDefinition implements Serializable {
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
+public class ApprovalFlowDefinition extends WorkflowDefinition {
 
     /**
      * DSL 版本号
      */
+    @NotNull
     private String version = "1.0.0";
 
     /**
      * 全局配置
      */
+    @NotNull
     private GlobalConfig global;
 
     /**
@@ -33,10 +42,82 @@ public class ApprovalFlowDefinition implements Serializable {
     @NotNull
     private List<ApprovalNode> nodes;
 
+
     /**
-     * 流转规则列表
+     * 超时处理动作（最终结果）
      */
-    private List<WorkflowDefinition.Transition> transitions;
+    @Getter
+    @AllArgsConstructor
+    public enum ApprovalTimeoutAction implements DescriptiveEnum {
+
+        /**
+         * 自动拒绝
+         */
+        AUTO_REFUSE("自动拒绝"),
+
+        /**
+         * 自动通过
+         */
+        AUTO_APPROVE("自动通过"),
+
+        /**
+         * 升级处理
+         */
+        ESCALATE("升级处理");
+
+        private final String desc;
+    }
+
+    /**
+     * 超时提醒配置
+     */
+    @Data
+    public static class TimeoutReminder implements Serializable {
+
+        /**
+         * 第一次提醒（小时）
+         */
+        private Integer firstReminderHours;
+
+        /**
+         * 重复提醒间隔（小时）
+         */
+        private Integer repeatIntervalHours;
+
+        /**
+         * 通知对象
+         */
+        @NotNull
+        private Actor notifyActor;
+
+        /**
+         * 通知策略
+         */
+        @NotNull
+        private Notification notification;
+    }
+
+    @Data
+    public static class TimeoutPolicy implements Serializable {
+
+        /**
+         * 超时时间（小时）
+         */
+        @NotNull
+        private Integer timeoutHours;
+
+        /**
+         * 提醒策略
+         */
+        private TimeoutReminder reminder;
+
+        /**
+         * 最终处理动作
+         */
+        @NotNull
+        private ApprovalTimeoutAction finalAction;
+
+    }
 
     /**
      * 全局配置
@@ -45,19 +126,26 @@ public class ApprovalFlowDefinition implements Serializable {
     public static class GlobalConfig implements Serializable {
 
         /**
-         * 节点超时是否自动拒绝
+         * 审批单超时处理策略
          */
-        private Boolean autoRejectOnTimeout;
+        @NotNull
+        private TimeoutPolicy timeoutPolicy;
 
         /**
-         * 默认超时时间（小时）
+         * 默认节点超时策略（节点未配置时生效）
          */
-        private Integer defaultTimeoutHours;
+        @NotNull
+        private TimeoutPolicy defaultNodeTimeoutPolicy;
+
+        /**
+         * 默认抄送人
+         */
+        private List<Actor> defaultCc;
 
         /**
          * 默认通知策略
          */
-        private Notification notification;
+        private Notification defaultNotification;
 
     }
 
@@ -65,9 +153,48 @@ public class ApprovalFlowDefinition implements Serializable {
     public static class Notification implements Serializable {
 
         /**
-         * 通知渠道，例如 IN_APP, EMAIL
+         * 通知渠道，例如 IN_APP, EMAIL, DINGTALK
          */
+        @NotNull
         private List<String> channels;
+
+    }
+
+    /**
+     * 节点加签策略
+     */
+    @AllArgsConstructor
+    @Getter
+    public enum NodeAddSignPolicy implements DescriptiveEnum {
+
+        NONE("不允许加签"),
+
+        PRE("允许前加签"),
+
+        POST("允许后加签"),
+
+        PRE_OR_POST("前/后加签均允许");
+
+        private final String desc;
+    }
+
+
+    /**
+     * 节点类型
+     */
+    @AllArgsConstructor
+    @Getter
+    public enum ApprovalNodeType implements DescriptiveEnum {
+
+        START("开始"),
+
+        APPROVAL("审批"),
+
+        CC("抄送"),
+
+        END("结束");
+
+        private final String desc;
 
     }
 
@@ -80,16 +207,20 @@ public class ApprovalFlowDefinition implements Serializable {
         /**
          * 节点唯一 ID
          */
+        @NotNull
         private String id;
 
         /**
-         * 节点类型，例如 APPROVAL
+         * 节点类型
+         * 例如 APPROVAL、CC
          */
-        private String type;
+        @NotNull
+        private ApprovalNodeType type;
 
         /**
          * 节点名称
          */
+        @NotNull
         private String name;
 
         /**
@@ -100,38 +231,56 @@ public class ApprovalFlowDefinition implements Serializable {
         /**
          * 决策策略
          */
+        @NotNull
         private DecisionPolicy decisionPolicy;
 
         /**
-         * 节点行为，包括抄送、超时、钩子等
+         * 加签策略
          */
-        private NodeBehaviors behaviors;
+        @NotNull
+        private NodeAddSignPolicy signPolicy;
+
+        /**
+         * 抄送列表
+         */
+        private CC cc;
+
+        /**
+         * 节点超时处理策略
+         */
+        private TimeoutPolicy timeoutPolicy;
+
 
     }
 
     /**
      * 流程参与人策略
      */
-    public enum ActorStrategy {
+    @Getter
+    @AllArgsConstructor
+    public enum ActorStrategy implements DescriptiveEnum {
         /**
          * 用户
          */
-        USER,
+        USER("用户"),
 
         /**
          * 角色
          */
-        ROLE,
+        ROLE("角色"),
 
         /**
-         * 用户组
+         * 用户组 （例如：部门）
          */
-        GROUP,
+        GROUP("用户组"),
 
         /**
          * 表达式
          */
-        EXPRESSION
+        EXPRESSION("表达式");
+
+        private final String desc;
+
     }
 
     /**
@@ -186,6 +335,7 @@ public class ApprovalFlowDefinition implements Serializable {
         /**
          * 模式
          */
+        @NotNull
         private DecisionPolicyMode mode;
 
         /**
@@ -195,29 +345,6 @@ public class ApprovalFlowDefinition implements Serializable {
 
     }
 
-
-    /**
-     * 节点行为定义
-     */
-    @Data
-    public static class NodeBehaviors implements Serializable {
-
-        /**
-         * 抄送列表
-         */
-        private List<CC> cc;
-
-        /**
-         * 超时设置
-         */
-        private Timeout timeout;
-
-        /**
-         * 钩子函数
-         */
-        private Hooks hooks;
-
-    }
 
     /**
      * 抄送模式
@@ -254,38 +381,14 @@ public class ApprovalFlowDefinition implements Serializable {
         /**
          * 抄送模式
          */
+        @NotNull
         private CCMode on;
 
         /**
          * 抄送人定义
          */
+        @NotNull
         private List<Actor> actors;
     }
-
-    /**
-     * 超时定义
-     */
-    @Data
-    public static class Timeout implements Serializable {
-
-        /**
-         * 超时时间（小时）
-         */
-        private Integer hours;
-
-        /**
-         * 超时处理动作
-         */
-        private String action;
-    }
-
-    /**
-     * 钩子定义
-     */
-    @Data
-    public static class Hooks {
-
-    }
-
 
 }

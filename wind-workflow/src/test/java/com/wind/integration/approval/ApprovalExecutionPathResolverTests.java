@@ -28,7 +28,7 @@ class ApprovalExecutionPathResolverTests {
         ApprovalFlowDefinition.ApprovalNode node = new ApprovalFlowDefinition.ApprovalNode();
         node.setId("start");
         node.setName("开始审批");
-        node.setType("APPROVAL");
+        node.setType(ApprovalFlowDefinition.ApprovalNodeType.APPROVAL);
 
         flowDSL.setNodes(List.of(node));
 
@@ -50,14 +50,17 @@ class ApprovalExecutionPathResolverTests {
         // 节点
         ApprovalFlowDefinition.ApprovalNode node1 = new ApprovalFlowDefinition.ApprovalNode();
         node1.setId("start");
+        node1.setType(ApprovalFlowDefinition.ApprovalNodeType.START);
         node1.setName("开始审批");
 
         ApprovalFlowDefinition.ApprovalNode node2 = new ApprovalFlowDefinition.ApprovalNode();
         node2.setId("finance");
+        node2.setType(ApprovalFlowDefinition.ApprovalNodeType.APPROVAL);
         node2.setName("财务审批");
 
         ApprovalFlowDefinition.ApprovalNode node3 = new ApprovalFlowDefinition.ApprovalNode();
         node3.setId("ceo");
+        node3.setType(ApprovalFlowDefinition.ApprovalNodeType.APPROVAL);
         node3.setName("CEO 审批");
 
         flowDSL.setNodes(List.of(node1, node2, node3));
@@ -77,10 +80,9 @@ class ApprovalExecutionPathResolverTests {
 
         List<ApprovalFlowDefinition.ApprovalNode> paths = ApprovalExecutionPathResolver.eval(flowDSL, context);
 
-        assertEquals(3, paths.size());
-        assertEquals("start", paths.get(0).getId());
-        assertEquals("finance", paths.get(1).getId());
-        assertEquals("ceo", paths.get(2).getId());
+        assertEquals(2, paths.size());
+        assertEquals("finance", paths.get(0).getId());
+        assertEquals("ceo", paths.get(1).getId());
     }
 
     @Test
@@ -90,12 +92,16 @@ class ApprovalExecutionPathResolverTests {
         // 节点
         ApprovalFlowDefinition.ApprovalNode start = new ApprovalFlowDefinition.ApprovalNode();
         start.setId("start");
+        start.setType(ApprovalFlowDefinition.ApprovalNodeType.START);
         ApprovalFlowDefinition.ApprovalNode finance = new ApprovalFlowDefinition.ApprovalNode();
         finance.setId("finance");
+        finance.setType(ApprovalFlowDefinition.ApprovalNodeType.APPROVAL);
         ApprovalFlowDefinition.ApprovalNode ceo = new ApprovalFlowDefinition.ApprovalNode();
         ceo.setId("ceo");
+        ceo.setType(ApprovalFlowDefinition.ApprovalNodeType.APPROVAL);
         ApprovalFlowDefinition.ApprovalNode hr = new ApprovalFlowDefinition.ApprovalNode();
         hr.setId("hr");
+        hr.setType(ApprovalFlowDefinition.ApprovalNodeType.APPROVAL);
 
         flowDSL.setNodes(List.of(start, finance, ceo, hr));
 
@@ -134,12 +140,12 @@ class ApprovalExecutionPathResolverTests {
 
         List<ApprovalFlowDefinition.ApprovalNode> paths = ApprovalExecutionPathResolver.eval(flowDSL, context);
 
-        assertEquals(List.of("start", "finance", "ceo"),
+        assertEquals(List.of("finance", "ceo"),
                 paths.stream().map(ApprovalFlowDefinition.ApprovalNode::getId).toList());
 
         // 测试 amount <= 100000
         context.put("amount", 80000);
         paths = ApprovalExecutionPathResolver.eval(flowDSL, context);
-        assertEquals(List.of("start", "hr", "ceo"), paths.stream().map(ApprovalFlowDefinition.ApprovalNode::getId).toList());
+        assertEquals(List.of( "hr", "ceo"), paths.stream().map(ApprovalFlowDefinition.ApprovalNode::getId).toList());
     }
 }

@@ -16,7 +16,10 @@ import java.time.format.DateTimeFormatter;
  *
  * @author wuxp
  * @date 2023-11-29 14:35
+ * @see com.wind.sequence.time.TemporalSequenceFactory
+ * @see RedissonTemporalSequenceSupport
  **/
+@Deprecated(forRemoval = true)
 public record RedissonNumericSequenceGenerator(RedissonClient redissonClient) {
 
     /**
@@ -26,7 +29,7 @@ public record RedissonNumericSequenceGenerator(RedissonClient redissonClient) {
      * @return seq，例如：202311290012311
      */
     public String hourNext(WindSequenceType type) {
-        return hourNext(type, type.defaultLength());
+        return hourNext(type, type.length());
     }
 
     public String hourNext(WindSequenceType type, int length) {
@@ -62,7 +65,7 @@ public record RedissonNumericSequenceGenerator(RedissonClient redissonClient) {
      * @return seq，例如：202311290012311
      */
     public String next(SequenceTimeScopeType scope, WindSequenceType type) {
-        return next(scope, type, type.defaultLength());
+        return next(scope, type, type.length());
     }
 
     public String next(SequenceTimeScopeType scope, WindSequenceType type, int length) {

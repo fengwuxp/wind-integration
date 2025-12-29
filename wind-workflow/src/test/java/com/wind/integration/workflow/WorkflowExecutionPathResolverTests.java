@@ -84,7 +84,7 @@ class WorkflowExecutionPathResolverTests {
         t1.setSource("start");
         t1.setTarget("node1");
         ExpressionDescriptor cond1 = new ExpressionDescriptor();
-        cond1.setOp(Op.GE);
+        cond1.setOp(Op.GT);
         cond1.setLeft(new Operand("amount", OperandType.VARIABLE));
         cond1.setRight(new Operand(100, OperandType.CONSTANT));
         t1.setCondition(cond1);
@@ -94,7 +94,7 @@ class WorkflowExecutionPathResolverTests {
         t2.setSource("start");
         t2.setTarget("node2");
         ExpressionDescriptor cond2 = new ExpressionDescriptor();
-        cond2.setOp(Op.LET);
+        cond2.setOp(Op.LE);
         cond2.setLeft(new Operand("amount", OperandType.VARIABLE));
         cond2.setRight(new Operand(100, OperandType.CONSTANT));
         t2.setCondition(cond2);

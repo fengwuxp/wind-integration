@@ -11,6 +11,8 @@ import lombok.ToString;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 审批流 DSL
@@ -41,6 +43,45 @@ public class ApprovalFlowDefinition extends WorkflowDefinition {
      */
     @NotNull
     private List<ApprovalNode> nodes;
+
+    /**
+     * 流程任务
+     */
+    private List<FlowAction> actions;
+
+
+    /**
+     * 节点任务触发时机
+     */
+    @AllArgsConstructor
+    @Getter
+    public enum FlowActionTrigger implements DescriptiveEnum {
+
+        ON_FLOW_START("流程开始"),
+
+        ON_FLOW_APPROVED("审批通过"),
+
+        ON_FLOW_REJECTED("审批拒绝"),
+
+        ON_FLOW_TERMINATED("审批终止"),
+
+        ON_FLOW_TIMEOUT("审批超时");
+
+        private final String desc;
+    }
+
+    /**
+     * 流程任务
+     */
+    @Data
+    public static class FlowAction implements Serializable{
+
+        private FlowActionTrigger trigger;
+
+        private String action;
+
+        private Map<String, Object> params;
+    }
 
 
     /**
@@ -250,6 +291,10 @@ public class ApprovalFlowDefinition extends WorkflowDefinition {
          */
         private TimeoutPolicy timeoutPolicy;
 
+        /**
+         * 节点通过执行的任务
+         */
+        private Set<String> actions;
 
     }
 

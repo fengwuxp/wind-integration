@@ -1,6 +1,7 @@
 package com.wind.integration.approval;
 
 import com.wind.common.enums.DescriptiveEnum;
+import com.wind.integration.core.workflow.WorkflowActor;
 import com.wind.integration.workflow.WorkflowDefinition;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -45,7 +46,7 @@ public class ApprovalFlowDefinition extends WorkflowDefinition {
     private List<ApprovalNode> nodes;
 
     /**
-     * 流程任务
+     * 流程执行动作列表
      */
     private List<FlowAction> actions;
 
@@ -74,7 +75,7 @@ public class ApprovalFlowDefinition extends WorkflowDefinition {
      * 流程任务
      */
     @Data
-    public static class FlowAction implements Serializable{
+    public static class FlowAction implements Serializable {
 
         private FlowActionTrigger trigger;
 
@@ -129,7 +130,7 @@ public class ApprovalFlowDefinition extends WorkflowDefinition {
          * 通知对象
          */
         @NotNull
-        private Actor notifyActor;
+        private WorkflowActor notifyActor;
 
         /**
          * 通知策略
@@ -181,7 +182,7 @@ public class ApprovalFlowDefinition extends WorkflowDefinition {
         /**
          * 默认抄送人
          */
-        private List<Actor> defaultCc;
+        private List<WorkflowActor> defaultCc;
 
         /**
          * 默认通知策略
@@ -267,7 +268,7 @@ public class ApprovalFlowDefinition extends WorkflowDefinition {
         /**
          * 审批人定义
          */
-        private List<Actor> actors;
+        private List<WorkflowActor> actors;
 
         /**
          * 决策策略
@@ -298,53 +299,6 @@ public class ApprovalFlowDefinition extends WorkflowDefinition {
 
     }
 
-    /**
-     * 流程参与人策略
-     */
-    @Getter
-    @AllArgsConstructor
-    public enum ActorStrategy implements DescriptiveEnum {
-        /**
-         * 用户
-         */
-        USER("用户"),
-
-        /**
-         * 角色
-         */
-        ROLE("角色"),
-
-        /**
-         * 用户组 （例如：部门）
-         */
-        GROUP("用户组"),
-
-        /**
-         * 表达式
-         */
-        EXPRESSION("表达式");
-
-        private final String desc;
-
-    }
-
-    /**
-     * 审批人定义
-     */
-    @Data
-    public static class Actor implements Serializable {
-
-        /**
-         * 策略
-         */
-        private ActorStrategy strategy;
-
-        /**
-         * 值，例如用户名、角色名或表达式
-         */
-        private String value;
-
-    }
 
     /**
      * 决策策略模式
@@ -433,7 +387,7 @@ public class ApprovalFlowDefinition extends WorkflowDefinition {
          * 抄送人定义
          */
         @NotNull
-        private List<Actor> actors;
+        private List<WorkflowActor> actors;
     }
 
 }

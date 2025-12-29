@@ -16,6 +16,10 @@
             <groupId>com.wind.middleware</groupId>
             <artifactId>wind-script</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-integration-core</artifactId>
+        </dependency>
     </dependencies>
 
 </project>

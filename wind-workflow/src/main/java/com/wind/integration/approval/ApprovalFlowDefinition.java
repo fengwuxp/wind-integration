@@ -62,11 +62,11 @@ public class ApprovalFlowDefinition extends WorkflowDefinition {
 
         ON_FLOW_APPROVED("审批通过"),
 
-        ON_FLOW_REJECTED("审批拒绝"),
+        ON_FLOW_REFUSED("审批拒绝"),
 
         ON_FLOW_TERMINATED("审批终止"),
 
-        ON_FLOW_TIMEOUT("审批超时");
+        ON_FLOW_EXPIRED("审批超时");
 
         private final String desc;
     }
@@ -363,12 +363,7 @@ public class ApprovalFlowDefinition extends WorkflowDefinition {
         /**
          * 审批拒绝时抄送
          */
-        AFTER_REJECT,
-
-        /**
-         * 节点完成时抄送
-         */
-        AFTER_COMPLETE
+        AFTER_REFUSED,
     }
 
     /**

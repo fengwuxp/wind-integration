@@ -54,7 +54,7 @@ public class RemoteSocketRouteClientConnection implements WindSocketRouteClientC
     private RestClient createRestClient() {
         // 创建请求工厂并设置超时时间
         HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(1000);
+        requestFactory.setConnectionRequestTimeout(1000);
         requestFactory.setReadTimeout(3000);
         return RestClient.builder()
                 .requestFactory(requestFactory)

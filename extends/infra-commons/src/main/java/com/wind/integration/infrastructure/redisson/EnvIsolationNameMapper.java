@@ -1,7 +1,7 @@
 package com.wind.integration.infrastructure.redisson;
 
 import com.wind.common.util.ServiceInfoUtils;
-import org.redisson.api.NameMapper;
+import org.redisson.config.NameMapper;
 
 /**
  * redis key 按照环境隔离

@@ -23,8 +23,7 @@
         <dependency>
             <groupId>com.wind.integration</groupId>
             <artifactId>wind-system-face</artifactId>
-            <version>1.0.29-SNAPSHOT</version>
-            <scope>compile</scope>
+            <version>${revision}</version>
         </dependency>
         <dependency>
             <groupId>com.mybatis-flex</groupId>

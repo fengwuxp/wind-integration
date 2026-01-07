@@ -189,6 +189,11 @@
                 <version>${easyexcel.version}</version>
             </dependency>
             <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>easyexcel-support</artifactId>
+                <version>${easyexcel.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>
                 <version>${apache-hc4.version}</version>

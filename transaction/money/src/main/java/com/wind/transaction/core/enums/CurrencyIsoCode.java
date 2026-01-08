@@ -83,7 +83,6 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
     PKR("586", "PKR", "巴基斯坦卢比", "P.Re"),
 
     BRL("986", "BRL", "巴西雷亚尔", "R$"),
-
     @Deprecated
     BRN("076", "BRN", "巴西雷亚尔", "R$"),
     @Deprecated
@@ -460,7 +459,6 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
     /**
      * 通用货币三字码
      */
-    @EnumValue
     private final String enDesc;
 
     /**

@@ -1,10 +1,6 @@
 package com.wind.integration.approval;
 
 import com.wind.integration.workflow.WorkflowDefinition;
-import com.wind.script.expression.ExpressionDescriptor;
-import com.wind.script.expression.Op;
-import com.wind.script.expression.Operand;
-import com.wind.script.expression.OperandType;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -109,21 +105,13 @@ class ApprovalExecutionPathResolverTests {
         WorkflowDefinition.Transition t1 = new WorkflowDefinition.Transition();
         t1.setSource("start");
         t1.setTarget("finance");
-        ExpressionDescriptor cond1 = new ExpressionDescriptor();
-        cond1.setOp(Op.GT);
-        cond1.setLeft(new Operand("amount", OperandType.VARIABLE));
-        cond1.setRight(new Operand(100000, OperandType.CONSTANT));
-        t1.setCondition(cond1);
+        t1.setExpression("#amount > 100000");
 
         // 条件分支 amount <= 100000
         WorkflowDefinition.Transition t2 = new WorkflowDefinition.Transition();
         t2.setSource("start");
         t2.setTarget("hr");
-        ExpressionDescriptor cond2 = new ExpressionDescriptor();
-        cond2.setOp(Op.LE);
-        cond2.setLeft(new Operand("amount", OperandType.VARIABLE));
-        cond2.setRight(new Operand(100000, OperandType.CONSTANT));
-        t2.setCondition(cond2);
+        t2.setExpression("#amount <= 100000");
 
         WorkflowDefinition.Transition t3 = new WorkflowDefinition.Transition();
         t3.setSource("finance");
@@ -146,6 +134,6 @@ class ApprovalExecutionPathResolverTests {
         // 测试 amount <= 100000
         context.put("amount", 80000);
         paths = ApprovalExecutionPathResolver.eval(flowDSL, context);
-        assertEquals(List.of( "hr", "ceo"), paths.stream().map(ApprovalFlowDefinition.ApprovalNode::getId).toList());
+        assertEquals(List.of("hr", "ceo"), paths.stream().map(ApprovalFlowDefinition.ApprovalNode::getId).toList());
     }
 }

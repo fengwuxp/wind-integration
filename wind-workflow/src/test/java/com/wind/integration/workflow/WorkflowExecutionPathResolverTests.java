@@ -1,10 +1,6 @@
 package com.wind.integration.workflow;
 
 
-import com.wind.script.expression.ExpressionDescriptor;
-import com.wind.script.expression.Op;
-import com.wind.script.expression.Operand;
-import com.wind.script.expression.OperandType;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -28,7 +24,6 @@ class WorkflowExecutionPathResolverTests {
         WorkflowDefinition.Transition t1 = new WorkflowDefinition.Transition();
         t1.setSource("start");
         t1.setTarget("end");
-        t1.setCondition(null);
 
         dsl.setTransitions(List.of(t1));
 
@@ -83,21 +78,13 @@ class WorkflowExecutionPathResolverTests {
         WorkflowDefinition.Transition t1 = new WorkflowDefinition.Transition();
         t1.setSource("start");
         t1.setTarget("node1");
-        ExpressionDescriptor cond1 = new ExpressionDescriptor();
-        cond1.setOp(Op.GT);
-        cond1.setLeft(new Operand("amount", OperandType.VARIABLE));
-        cond1.setRight(new Operand(100, OperandType.CONSTANT));
-        t1.setCondition(cond1);
+        t1.setExpression("#amount >100");
 
         // start -> node2 [condition: amount <= 100]
         WorkflowDefinition.Transition t2 = new WorkflowDefinition.Transition();
         t2.setSource("start");
         t2.setTarget("node2");
-        ExpressionDescriptor cond2 = new ExpressionDescriptor();
-        cond2.setOp(Op.LE);
-        cond2.setLeft(new Operand("amount", OperandType.VARIABLE));
-        cond2.setRight(new Operand(100, OperandType.CONSTANT));
-        t2.setCondition(cond2);
+        t2.setExpression("#amount <=100");
 
         // node1 -> end
         WorkflowDefinition.Transition t3 = new WorkflowDefinition.Transition();

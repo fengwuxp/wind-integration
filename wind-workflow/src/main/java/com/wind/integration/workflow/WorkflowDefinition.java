@@ -49,7 +49,13 @@ public class WorkflowDefinition implements Serializable {
         /**
          * 流程条件配置
          */
+        @Deprecated(forRemoval = true)
         private ExpressionDescriptor condition;
+
+        /**
+         * 流程条件表达式
+         */
+        private String expression;
 
         /**
          * 触发动作，可选，例如 NOTIFY_NEXT

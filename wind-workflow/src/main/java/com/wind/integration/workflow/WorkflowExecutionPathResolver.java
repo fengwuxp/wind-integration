@@ -1,11 +1,10 @@
 package com.wind.integration.workflow;
 
 
-import com.wind.script.expression.ExpressionDescriptor;
 import com.wind.script.spring.SpringExpressionEvaluator;
-import com.wind.script.spring.SpringExpressionGenerator;
 import org.jspecify.annotations.NonNull;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -66,8 +65,7 @@ public final class WorkflowExecutionPathResolver {
             paths.add(new ArrayList<>(currentPath));
         } else {
             for (WorkflowDefinition.Transition item : outgoing) {
-                ExpressionDescriptor condition = item.getCondition();
-                boolean canMove = condition == null || Objects.equals(true, SpringExpressionEvaluator.DEFAULT.eval(SpringExpressionGenerator.generate(condition), context));
+                boolean canMove = !StringUtils.hasText(item.getExpression()) || Objects.equals(true, SpringExpressionEvaluator.DEFAULT.eval(item.getExpression(), context));
                 if (canMove) {
                     dfs(item.getTarget(), dsl, context, currentPath, paths);
                 }

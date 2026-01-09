@@ -1,5 +1,6 @@
 package com.wind.transaction.core.enums;
 
+import com.mybatisflex.annotation.EnumValue;
 import com.wind.common.WindConstants;
 import com.wind.common.enums.DescriptiveEnum;
 import com.wind.common.exception.AssertUtils;
@@ -458,6 +459,7 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
     /**
      * 通用货币三字码
      */
+    @EnumValue
     private final String enDesc;
 
     /**

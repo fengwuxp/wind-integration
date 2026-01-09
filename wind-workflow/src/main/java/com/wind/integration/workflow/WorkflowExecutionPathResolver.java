@@ -47,29 +47,29 @@ public final class WorkflowExecutionPathResolver {
     @NonNull
     public static List<List<String>> eval(@NonNull WorkflowDefinition dsl, @NonNull String startNodeId, @NonNull Map<String, Object> context) {
         List<List<String>> paths = new ArrayList<>();
-        dfs(startNodeId, dsl, context, new ArrayList<>(), paths);
+        dfs(startNodeId, dsl.getTransitions(), context, new ArrayList<>(), paths);
         return paths;
     }
 
-    private static void dfs(String nodeId, WorkflowDefinition dsl, Map<String, Object> context, List<String> currentPath, List<List<String>> paths) {
-        if (CollectionUtils.isEmpty(dsl.getTransitions())) {
+    private static void dfs(String nodeId, List<WorkflowDefinition.Transition> transitions, Map<String, Object> context, List<String> currentPath, List<List<String>> paths) {
+        if (CollectionUtils.isEmpty(transitions)) {
             return;
         }
         currentPath.add(nodeId);
-        List<WorkflowDefinition.Transition> outgoing = dsl.getTransitions().stream()
+        List<WorkflowDefinition.Transition> outgoing = transitions.stream()
                 .filter(t -> t.getSource().equals(nodeId))
                 .toList();
-
-        if (outgoing.isEmpty()) {
-            // 到达终点，保存路径
-            paths.add(new ArrayList<>(currentPath));
-        } else {
-            for (WorkflowDefinition.Transition item : outgoing) {
-                boolean canMove = !StringUtils.hasText(item.getExpression()) || Objects.equals(true, SpringExpressionEvaluator.DEFAULT.eval(item.getExpression(), context));
-                if (canMove) {
-                    dfs(item.getTarget(), dsl, context, currentPath, paths);
-                }
+        boolean hasNext = false;
+        for (WorkflowDefinition.Transition item : outgoing) {
+            boolean canMoveNext = !StringUtils.hasText(item.getExpression()) || Objects.equals(true, SpringExpressionEvaluator.DEFAULT.eval(item.getExpression(), context));
+            if (canMoveNext) {
+                dfs(item.getTarget(), transitions, context, currentPath, paths);
+                hasNext = true;
             }
+        }
+        if (!hasNext) {
+            // 当前路径抵达终点，添加到路径集合中
+            paths.add(new ArrayList<>(currentPath));
         }
         currentPath.removeLast();
     }

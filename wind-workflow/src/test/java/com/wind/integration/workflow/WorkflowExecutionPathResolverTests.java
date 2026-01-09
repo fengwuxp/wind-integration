@@ -36,6 +36,43 @@ class WorkflowExecutionPathResolverTests {
     }
 
     @Test
+    void testSimplePathWithCondition() {
+        WorkflowDefinition dsl = new WorkflowDefinition();
+        dsl.setVersion("1.0");
+
+        // start -> node1, start -> node2
+        WorkflowDefinition.Transition t1 = new WorkflowDefinition.Transition();
+        t1.setSource("start");
+        t1.setTarget("node1");
+
+        WorkflowDefinition.Transition t2 = new WorkflowDefinition.Transition();
+        t2.setExpression("#amount > 100");
+        t2.setSource("node1");
+        t2.setTarget("node2");
+
+        WorkflowDefinition.Transition t3 = new WorkflowDefinition.Transition();
+        t3.setSource("node1");
+        t3.setTarget("end");
+
+        WorkflowDefinition.Transition t4 = new WorkflowDefinition.Transition();
+        t4.setSource("node2");
+        t4.setTarget("end");
+
+        dsl.setTransitions(List.of(t1, t2));
+
+        Map<String, Object> context = new HashMap<>();
+        context.put("amount", 20);
+        List<List<String>> paths = WorkflowExecutionPathResolver.eval(dsl, "start", context);
+        assertEquals(1, paths.size());
+        assertEquals(List.of("start", "node1"), paths.getFirst());
+
+        context.put("amount", 120);
+        paths = WorkflowExecutionPathResolver.eval(dsl, "start", context);
+        assertEquals(1, paths.size());
+        assertEquals(List.of("start", "node1", "node2"), paths.getFirst());
+    }
+
+    @Test
     void testMultipleBranches() {
         WorkflowDefinition dsl = new WorkflowDefinition();
         dsl.setVersion("1.0");

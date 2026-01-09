@@ -1,7 +1,7 @@
 package com.wind.integration.core.task;
 
-import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
 
 /**
  * 通用任务 Runnable，支持幂等和重试处理，支持串行处理 {@link #isSerial()}
@@ -9,6 +9,7 @@ import org.jspecify.annotations.NonNull;
  * @author wuxp
  * @date 2024-10-08 14:31
  **/
+@NullMarked
 public interface WindTaskRunnable {
 
     /**
@@ -17,13 +18,13 @@ public interface WindTaskRunnable {
      * @param businessId 业务 Id
      * @param context    任务上下文
      */
-    void run(@NonNull String businessId, @NonNull WindTaskContext context);
+    void run(String businessId, WindTaskContext context);
 
     /**
      * 任务路由场景标识，用于任务分发与执行器路由，决定最终由哪个 {@link WindTaskRunnable} 执行
      * {@link WindTaskDefinition#scene()}
      */
-    @NotNull
+    @NonNull
     String getScene();
 
     /**

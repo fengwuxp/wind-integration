@@ -32,11 +32,11 @@ public record WindTaskDefinition(@Nullable Long id, @Nullable String name, @NotN
                                  @NotNull String source, @NotNull String sourceId) {
 
     /**
-     * 任务是否可以执行
+     * 是否可以重试
      *
-     * @return if true 允许执行
+     * @return 是否可以重试
      */
-    public boolean isRetryable() {
+    public boolean canRetry() {
         if (retriesCount == null || maxRetries == null) {
             return false;
         }

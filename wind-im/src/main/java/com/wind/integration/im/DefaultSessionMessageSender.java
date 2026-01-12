@@ -1,7 +1,9 @@
 package com.wind.integration.im;
 
 import com.wind.integration.im.spi.WindChatMessageRepository;
+import com.wind.integration.im.spi.WindChatMessageRevokeCommandHandler;
 import com.wind.websocket.chat.WindChatMessage;
+import com.wind.websocket.command.ImmutableMessageRevokeCommand;
 import com.wind.websocket.core.WindSessionMessage;
 import com.wind.websocket.core.WindSessionMessageActor;
 import com.wind.websocket.core.WindSessionMessageSender;
@@ -27,11 +29,17 @@ public class DefaultSessionMessageSender implements WindSessionMessageSender {
 
     private final WindChatMessageRepository chatMessageRepository;
 
+    private final WindChatMessageRevokeCommandHandler messageRevokeHandler;
+
     @Override
     public void sendMessage(@NonNull WindSessionMessage message) {
         if (message instanceof WindChatMessage chatMessage) {
             chatMessageRepository.save(chatMessage);
         }
+        if (message instanceof ImmutableMessageRevokeCommand command){
+            messageRevokeHandler.accept(command);
+        }
+
         log.debug("Send chat message from  sessionId = {}, formUserId = {}, messageId = {}", message.getSessionId(), message.getSenderId(), message.getId());
         WindSocketSession session = socketSessionRegistry.getSession(message.getSessionId());
         // 广播消息

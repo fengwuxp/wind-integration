@@ -20,8 +20,7 @@ import org.springframework.util.StringUtils;
  * - 负责解析并验证 token，并将认证后的用户信息绑定到连接的上下文中（client）。
  * <p>
  * 客户端示例（推荐使用 socket.io v4）：
- * <code>
- * ```
+ * <pre>{@code
  * const socket = io('http://{serverAddress}/{namespace}', {
  * auth: {
  * token: "Bearer xxxxx.yyyyy.zzzzz" // 注意：此字段会被传递到 AuthTokenListener
@@ -33,8 +32,8 @@ import org.springframework.util.StringUtils;
  * clientId: 'client123'
  * },
  * transports: ['websocket']
- * });
- * ```
+ * })
+ * }</pre;
  *
  * @param authenticationTokenCodecService 认证 Token 解析服务
  * @author wuxp

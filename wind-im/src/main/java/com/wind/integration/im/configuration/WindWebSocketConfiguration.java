@@ -7,13 +7,13 @@ import com.wind.integration.im.DefaultSessionMessageSender;
 import com.wind.integration.im.WindSocketIOServerRunner;
 import com.wind.integration.im.connection.DefaultWindSocketConnectionListener;
 import com.wind.integration.im.handler.DefaultChatMessageHandler;
-import com.wind.integration.im.handler.DefaultRevokeMessageHandler;
+import com.wind.integration.im.handler.DefaultRevokeMessageCommandHandler;
 import com.wind.integration.im.lifecycle.DefaultSocketioConnectListener;
 import com.wind.integration.im.lifecycle.DefaultSocketioDisconnectListener;
 import com.wind.integration.im.session.DefaultWindSocketSessionRegistry;
 import com.wind.integration.im.spi.WindChatMessageRepository;
+import com.wind.integration.im.spi.WindChatMessageRevokeCommandHandler;
 import com.wind.integration.im.spi.WindChatSessionService;
-import com.wind.integration.im.spi.WindChatMessageRevokeHandler;
 import com.wind.websocket.core.CompositeSessionMessageSender;
 import com.wind.websocket.core.WindSessionMessageSender;
 import com.wind.websocket.core.WindSocketConnectionListener;
@@ -75,9 +75,10 @@ public class WindWebSocketConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean(value = {WindSocketSessionRegistry.class, WindChatMessageRepository.class})
-    public DefaultSessionMessageSender defaultSessionMessageSender(WindSocketSessionRegistry sessionRegistry, WindChatMessageRepository chatMessageRepository) {
-        return new DefaultSessionMessageSender(sessionRegistry, chatMessageRepository);
+    @ConditionalOnBean(value = {WindSocketSessionRegistry.class, WindChatMessageRepository.class, WindChatMessageRevokeCommandHandler.class})
+    public DefaultSessionMessageSender defaultSessionMessageSender(WindSocketSessionRegistry sessionRegistry, WindChatMessageRepository chatMessageRepository,
+                                                                   WindChatMessageRevokeCommandHandler handler) {
+        return new DefaultSessionMessageSender(sessionRegistry, chatMessageRepository, handler);
     }
 
     @Bean
@@ -94,9 +95,9 @@ public class WindWebSocketConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean({WindSessionMessageSender.class, WindChatMessageRevokeHandler.class})
-    public DefaultRevokeMessageHandler defaultRevokeMessageHandler(WindSessionMessageSender sessionMessageSender, WindChatMessageRevokeHandler revokeHandler) {
-        return new DefaultRevokeMessageHandler(sessionMessageSender, revokeHandler);
+    @ConditionalOnBean({WindSessionMessageSender.class})
+    public DefaultRevokeMessageCommandHandler defaultRevokeMessageHandler(WindSessionMessageSender sessionMessageSender) {
+        return new DefaultRevokeMessageCommandHandler(sessionMessageSender);
     }
 
     @Bean

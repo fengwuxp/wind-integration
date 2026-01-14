@@ -32,7 +32,7 @@ public record RedissonTemporalSequenceSupport(RedissonClient redissonClient) {
 
     private long next(SequenceTimeScopeType scope, WindSequenceType sequenceType) {
         // TODO 兼容旧逻辑, 待删除
-        String name = LocalDateTime.now().getNano() >= SWITCH_DATE.getNano() ? genKey(scope, sequenceType) : genKeyByOld(sequenceType.name());
+        String name = !LocalDateTime.now().isBefore(SWITCH_DATE) ? genKey(scope, sequenceType) : genKeyByOld(sequenceType.name());
         RAtomicLong counter = redissonClient.getAtomicLong(name);
         long seq = counter.incrementAndGet();
         if (seq <= 1) {

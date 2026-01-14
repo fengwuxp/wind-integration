@@ -28,12 +28,6 @@ import java.util.Set;
 public class ApprovalFlowDefinition extends WorkflowDefinition {
 
     /**
-     * DSL 版本号
-     */
-    @NotNull
-    private String version = "1.0.0";
-
-    /**
      * 全局配置
      */
     @NotNull

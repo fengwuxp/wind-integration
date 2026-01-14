@@ -1,6 +1,5 @@
 package com.wind.integration.workflow;
 
-import com.wind.script.expression.ExpressionDescriptor;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -45,12 +44,6 @@ public class WorkflowDefinition implements Serializable {
          */
         @NotNull
         private String target;
-
-        /**
-         * 流程条件配置
-         */
-        @Deprecated(forRemoval = true)
-        private ExpressionDescriptor condition;
 
         /**
          * 流程条件表达式

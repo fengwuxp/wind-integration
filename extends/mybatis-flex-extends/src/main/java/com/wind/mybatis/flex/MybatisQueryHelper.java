@@ -283,12 +283,6 @@ public final class MybatisQueryHelper {
             return this;
         }
 
-        @Deprecated(forRemoval = true)
-        public WindQueryExecutor<T, R> queryResulter(final Function<QueryWrapper, List<T>> queryResulter) {
-            this.resultQueryFunc = queryResulter;
-            return this;
-        }
-
         public WindQueryExecutor<T, R> resultQueryFunc(final Function<QueryWrapper, List<T>> resultQueryFunc) {
             this.resultQueryFunc = resultQueryFunc;
             return this;

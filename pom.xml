@@ -225,16 +225,6 @@
                 <version>${aliyun.tea-openapi.version}</version>
             </dependency>
             <dependency>
-                <groupId>jakarta.mail</groupId>
-                <artifactId>jakarta.mail-api</artifactId>
-                <version>${jakarta-mail.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>jakarta.activation</groupId>
-                <artifactId>jakarta.activation-api</artifactId>
-                <version>${jakarta-mail.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-core</artifactId>
                 <version>${hutool.version}</version>

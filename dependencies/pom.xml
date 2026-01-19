@@ -16,87 +16,87 @@
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-integration-core</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-oss-api</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-oss-alibabacloud</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-oss-spring-boot-starter</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-kms-api</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-kms-alibabacloud</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-office-core</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-transaction-core</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-transaction-money</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-office-excel</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-metrics</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-im</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-workflow</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>mybatis-flex-extends</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-infra-commons</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-message-emial</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-message-dingtalk</artifactId>
-                <version>${revision}</version>
+                <version>${project.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

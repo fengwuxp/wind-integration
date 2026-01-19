@@ -10,6 +10,7 @@ import java.util.Collection;
  * @author wuxp
  * @date 2024-12-12 23:45
  **/
+@Deprecated
 public interface WindResourcesLoader<R extends WindResources<? extends Serializable>> {
 
     /**

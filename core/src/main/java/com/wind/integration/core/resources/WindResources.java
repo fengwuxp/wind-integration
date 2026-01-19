@@ -12,6 +12,7 @@ import java.io.Serializable;
  * @author wuxp
  * @date 2024-12-12 23:19
  **/
+@Deprecated
 public interface WindResources<ID extends Serializable> {
 
     /**

@@ -12,6 +12,7 @@ import java.util.List;
  * @author wuxp
  * @date 2024-12-12 23:22
  **/
+@Deprecated
 public interface TreeResources<ID extends Serializable> extends WindResources<ID> {
 
     /**

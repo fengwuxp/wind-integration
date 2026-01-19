@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
  * @date 2024-12-12 23:27
  **/
 @Slf4j
+@Deprecated
 public final class WindResourcesUtils {
 
     private WindResourcesUtils() {

@@ -20,6 +20,7 @@ import com.wind.common.util.WindReflectUtils;
 import jakarta.validation.constraints.NotNull;
 import lombok.EqualsAndHashCode;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -311,11 +312,14 @@ public final class MybatisQueryHelper {
             if (query.shouldCountTotal()) {
                 total = counter.apply(clerOrderBy());
             }
-            // 自动设置游标条件、分页大小
-            QueryWrapper limit = queryWrapper.and(MybatisQueryHelper.cursorConditionWithNumId(CURSOR_ID_COLUMN, query)).limit(query.getQuerySize());
-            List<R> records = resultQueryFunc.apply(limit).stream().map(converter).toList();
-            if (resultEnricher != null) {
-                resultEnricher.accept(records);
+            List<R> records = Collections.emptyList();
+            if (query.shouldQueryResult()) {
+                // 自动设置游标条件、分页大小
+                QueryWrapper limit = queryWrapper.and(MybatisQueryHelper.cursorConditionWithNumId(CURSOR_ID_COLUMN, query)).limit(query.getQuerySize());
+                records = resultQueryFunc.apply(limit).stream().map(converter).toList();
+                if (resultEnricher != null) {
+                    resultEnricher.accept(records);
+                }
             }
             return CursorPagination.of(total, records, query);
         }
@@ -333,11 +337,14 @@ public final class MybatisQueryHelper {
             if (query.shouldCountTotal() && counter != null) {
                 total = counter.apply(clerOrderBy());
             }
-            // 分页查询
-            QueryWrapper limit = queryWrapper.limit((query.getQueryPage() - 1) * query.getQuerySize(), query.getQuerySize());
-            List<R> records = resultQueryFunc.apply(limit).stream().map(converter).toList();
-            if (resultEnricher != null) {
-                resultEnricher.accept(records);
+            List<R> records = Collections.emptyList();
+            if (query.shouldQueryResult()) {
+                // 分页查询
+                QueryWrapper limit = queryWrapper.limit((query.getQueryPage() - 1) * query.getQuerySize(), query.getQuerySize());
+                records = resultQueryFunc.apply(limit).stream().map(converter).toList();
+                if (resultEnricher != null) {
+                    resultEnricher.accept(records);
+                }
             }
             return Pagination.of(records, query, total);
         }

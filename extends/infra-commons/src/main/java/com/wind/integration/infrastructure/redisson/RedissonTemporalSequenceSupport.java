@@ -23,20 +23,15 @@ import java.time.format.DateTimeFormatter;
 @Slf4j
 public record RedissonTemporalSequenceSupport(RedissonClient redissonClient) {
 
-    private static final LocalDateTime SWITCH_DATE = LocalDateTime.parse("2026-01-19 00:00:00", WindDateFormater.YYYY_MM_DD_HH_MM_SS.getFormatter());
-
     public RedissonTemporalSequenceSupport {
         TemporalSequenceFactory.setCounter(this::next);
         log.info("TemporalSequenceFactory Redisson counter config successful");
     }
 
     private long next(SequenceTimeScopeType scope, WindSequenceType sequenceType) {
-        // TODO 兼容旧逻辑, 待删除
-        String name = !LocalDateTime.now().isBefore(SWITCH_DATE) ? genKey(scope, sequenceType) : genKeyByOld(sequenceType.name());
-        RAtomicLong counter = redissonClient.getAtomicLong(name);
+        RAtomicLong counter = redissonClient.getAtomicLong(genKey(scope, sequenceType));
         long seq = counter.incrementAndGet();
         if (seq <= 1) {
-            // TODO 待优化
             counter.expire(getExpireTime(scope));
         }
         return seq;
@@ -45,11 +40,6 @@ public record RedissonTemporalSequenceSupport(RedissonClient redissonClient) {
     private @NonNull String genKey(SequenceTimeScopeType scope, WindSequenceType sequenceType) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(scope.getPattern());
         return scope.name() + WindConstants.AT + LocalDateTime.now().format(formatter) + WindConstants.UNDERLINE + sequenceType.name();
-    }
-
-    private String genKeyByOld(String key) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(SequenceTimeScopeType.DAY.getPattern());
-        return LocalDateTime.now().format(formatter) + "_" + key;
     }
 
     private Duration getExpireTime(SequenceTimeScopeType scope) {

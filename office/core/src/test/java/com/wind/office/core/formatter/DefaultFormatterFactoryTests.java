@@ -25,7 +25,7 @@ class DefaultFormatterFactoryTests {
     @Test
     void testOfEnum() {
         Formatter<DefaultExceptionCode> formatter = DefaultFormatterFactory.ofEnum(DefaultExceptionCode.class);
-        Assertions.assertEquals("请求不合法", formatter.print(DefaultExceptionCode.BAD_REQUEST, Locale.CHINA));
+        Assertions.assertEquals("请求无效", formatter.print(DefaultExceptionCode.BAD_REQUEST, Locale.CHINA));
     }
 
     @Test

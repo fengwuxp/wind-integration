@@ -1,7 +1,7 @@
 package com.wind.integration.core.meatadata;
 
 import com.wind.common.WindConstants;
-import com.wind.integration.core.resources.TreeResources;
+import com.wind.core.resources.TreeResources;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 

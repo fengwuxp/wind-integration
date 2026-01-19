@@ -4,8 +4,8 @@ import com.mybatisflex.core.BaseMapper;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.util.WindReflectUtils;
-import com.wind.integration.core.resources.TreeResources;
-import com.wind.integration.core.resources.WindResources;
+import com.wind.core.resources.TreeResources;
+import com.wind.core.resources.WindResources;
 import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 

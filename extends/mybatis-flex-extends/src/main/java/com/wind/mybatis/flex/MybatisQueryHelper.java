@@ -311,6 +311,9 @@ public final class MybatisQueryHelper {
             long total = -1;
             if (query.shouldCountTotal()) {
                 total = counter.apply(clerOrderBy());
+                if (total <= 0) {
+                    return CursorPagination.empty();
+                }
             }
             List<R> records = Collections.emptyList();
             if (query.shouldQueryResult()) {
@@ -336,6 +339,9 @@ public final class MybatisQueryHelper {
             long total = -1;
             if (query.shouldCountTotal() && counter != null) {
                 total = counter.apply(clerOrderBy());
+                if (total <= 0) {
+                    return Pagination.empty();
+                }
             }
             List<R> records = Collections.emptyList();
             if (query.shouldQueryResult()) {

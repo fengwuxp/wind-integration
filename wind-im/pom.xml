@@ -13,6 +13,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-integration-core</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.wind.middleware</groupId>
             <artifactId>wind-websocket</artifactId>
         </dependency>

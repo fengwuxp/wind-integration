@@ -48,7 +48,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     /**
      * 用于解密 kms ak/sk 的秘钥文件路径
      */
-    private static final String KMS_KEY_ASE_KEY_FILEPATH = "classpath*:kms_key_ase_key.key";
+    private static final String KMS_KEY_AES_KEY_FILEPATH = "classpath*:kms_key_aes.key";
 
     /**
      * VPC 域名后缀
@@ -207,7 +207,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     private static String loadFileAsText() {
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         try {
-            Resource[] resources = resolver.getResources(AlibabaCloudKmsCryptoClient.KMS_KEY_ASE_KEY_FILEPATH);
+            Resource[] resources = resolver.getResources(AlibabaCloudKmsCryptoClient.KMS_KEY_AES_KEY_FILEPATH);
             if (ObjectUtils.isEmpty(resources)) {
                 return WindConstants.EMPTY;
             }

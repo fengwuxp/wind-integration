@@ -13,6 +13,7 @@ import com.wind.common.query.WindQuery;
 import com.wind.common.query.cursor.AbstractCursorQuery;
 import com.wind.common.query.cursor.CursorPagination;
 import com.wind.common.query.supports.AbstractPageQuery;
+import com.wind.common.query.supports.PageBasedQuery;
 import com.wind.common.query.supports.Pagination;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.common.query.supports.QueryOrderType;
@@ -46,14 +47,13 @@ public final class MybatisQueryHelper {
     }
 
     /**
-     * TODO 统一使用 WindQuery ？
      * 通过查询请求创建一个 mybatis flex 分页对象
      *
      * @param query 查询请求
      * @return mybatis flex 分页对象
      */
     @NotNull
-    public static <T> Page<T> of(AbstractPageQuery<?> query) {
+    public static <T> Page<T> of(PageBasedQuery<?> query) {
         Integer querySize = Math.min(query.getQuerySize(), query.getMaxQuerySize());
         return new Page<>(query.getQueryPage(), querySize);
     }
@@ -310,7 +310,7 @@ public final class MybatisQueryHelper {
             checkArgs(query);
             long total = -1;
             if (query.shouldCountTotal()) {
-                total = counter.apply(clerOrderBy());
+                total = counter.apply(cloneAndClearOrderBy());
                 if (total <= 0) {
                     return CursorPagination.empty();
                 }
@@ -338,7 +338,7 @@ public final class MybatisQueryHelper {
             checkArgs(query);
             long total = -1;
             if (query.shouldCountTotal() && counter != null) {
-                total = counter.apply(clerOrderBy());
+                total = counter.apply(cloneAndClearOrderBy());
                 if (total <= 0) {
                     return Pagination.empty();
                 }
@@ -346,7 +346,7 @@ public final class MybatisQueryHelper {
             List<R> records = Collections.emptyList();
             if (query.shouldQueryResult()) {
                 // 分页查询
-                QueryWrapper limit = queryWrapper.limit((query.getQueryPage() - 1) * query.getQuerySize(), query.getQuerySize());
+                QueryWrapper limit = queryWrapper.limit(query.getOffset(), query.getQuerySize());
                 records = resultQueryFunc.apply(limit).stream().map(converter).toList();
                 if (resultEnricher != null) {
                     resultEnricher.accept(records);
@@ -370,13 +370,13 @@ public final class MybatisQueryHelper {
             if (query.shouldCountTotal()) {
                 AssertUtils.notNull(counter, "query counter must not null");
             }
+            AssertUtils.isTrue(query.getQuerySize() <= query.getMaxQuerySize(), "query size must less than {}", query.getMaxQuerySize());
             AssertUtils.notNull(resultQueryFunc, "query counter must not null");
         }
 
-        // TODO 待优化
-        private QueryWrapper clerOrderBy() {
+        private QueryWrapper cloneAndClearOrderBy() {
             QueryWrapper result = queryWrapper.clone();
-            // 统计总数不做 orderBy
+            // 统计总数不做 orderBy TODO 待优化
             WindReflectUtils.setFieldValue("orderBys", result, null);
             return result;
         }

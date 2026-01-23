@@ -164,7 +164,7 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
-                <artifactId>wind-message-emial</artifactId>
+                <artifactId>wind-message-emial-albabacloud</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

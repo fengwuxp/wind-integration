@@ -2,9 +2,8 @@ package com.wind.integration.im.model.request;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.experimental.FieldNameConstants;
+import org.jspecify.annotations.NonNull;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -23,11 +22,11 @@ import java.util.Map;
  * @date 2025-12-12 11:03
  */
 @FieldNameConstants
-public record RouteMessageRequest<T>(@NotBlank String sessionId,
-                                     @NotNull T payload,
-                                     @NotBlank String receiveUserId,
-                                     @NotBlank String receiveClientDeviceType,
-                                     @NotNull Map<String, Object> metadata) implements Serializable {
+public record RouteMessageRequest<T>(@NonNull String sessionId,
+                                     @NonNull T payload,
+                                     @NonNull String receiveUserId,
+                                     @NonNull String receiveClientDeviceType,
+                                     @NonNull Map<String, Object> metadata) implements Serializable {
     @Serial
     private static final long serialVersionUID = -8864951965985845124L;
 

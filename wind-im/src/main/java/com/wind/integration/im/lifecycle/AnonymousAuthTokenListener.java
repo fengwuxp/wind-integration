@@ -28,7 +28,7 @@ public class AnonymousAuthTokenListener implements AuthTokenListener {
         }
         client.set(WindWebSocketMetadataNames.USER_ID_NAME, clientId);
         client.set(WindImConstants.USERNAME_VARIABLE_NAME, clientId);
-        log.info("客户端连接成功，使用匿名模式 clientId = {}", clientId);
+        log.info("匿名模式客户端连接成功， clientId = {}", clientId);
         return AuthTokenResult.AUTH_TOKEN_RESULT_SUCCESS;
     }
 }

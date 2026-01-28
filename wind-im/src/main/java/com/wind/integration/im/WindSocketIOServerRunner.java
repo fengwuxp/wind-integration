@@ -16,17 +16,17 @@ import org.springframework.boot.CommandLineRunner;
 @AllArgsConstructor
 public class WindSocketIOServerRunner implements CommandLineRunner, DisposableBean {
 
-    private final SocketIOServer socketIOServer;
+    private final SocketIOServer ioServer;
 
     @Override
     public void run(String... args) throws Exception {
-        log.info("Start Netty SocketIO 服务, Port = {}", socketIOServer.getConfiguration().getPort());
-        socketIOServer.start();
+        log.info("Start Netty SocketIO 服务, Port = {}", ioServer.getConfiguration().getPort());
+        ioServer.start();
     }
 
     @Override
     public void destroy() {
         log.info("Stop Netty SocketIO 服务器");
-        socketIOServer.stop();
+        ioServer.stop();
     }
 }

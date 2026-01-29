@@ -1,6 +1,6 @@
 package com.wind.transaction.core.enums;
 
-import com.wind.transaction.core.AccountTransactionType;
+import com.wind.common.enums.DescriptiveEnum;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -12,7 +12,7 @@ import lombok.Getter;
  **/
 @AllArgsConstructor
 @Getter
-public enum DefaultAccountTransactionType implements AccountTransactionType {
+public enum DefaultAccountTransactionType implements DescriptiveEnum {
 
     /**
      * 充值

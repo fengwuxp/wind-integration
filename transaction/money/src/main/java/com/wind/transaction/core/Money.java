@@ -153,6 +153,15 @@ public final class Money implements Serializable, Comparable<Money> {
     }
 
     /**
+     * 是否为0
+     *
+     * @return if true 为 0
+     */
+    public boolean isZero() {
+        return amount == 0;
+    }
+
+    /**
      * 创建一个具有{@param amount} 数额的货币对象
      *
      * @param amount   数额(分)
@@ -218,5 +227,4 @@ public final class Money implements Serializable, Comparable<Money> {
         }
         return String.format("%s%s", currency.getSign(), this.fen2Yuan());
     }
-
 }

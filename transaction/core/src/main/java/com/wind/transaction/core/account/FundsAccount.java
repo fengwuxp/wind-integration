@@ -1,25 +1,26 @@
-package com.wind.transaction.core;
+package com.wind.transaction.core.account;
 
 import com.wind.common.WindConstants;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import org.jspecify.annotations.NonNull;
+
+import java.io.Serializable;
 
 /**
- * 这是一个可用于支出、收入的支付交易账户定义
+ * 这是一个可用于支出、收入的资金账户定义
  *
  * @author wuxp
  * @date 2023-12-01 10:37
  **/
-public interface TransactionAccount {
+public interface FundsAccount extends Serializable {
 
     /**
-     * @return 账户 id
+     * 账户标识
+     *
+     * @return 账户标识
      */
-    TransactionAccountId getAccountId();
-
-    /**
-     * @return 账户所有者
-     */
-    String getOwner();
+    @NonNull
+    FundsAccountId getAccountId();
 
     /**
      * 账户转入（充值）累计数额

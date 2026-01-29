@@ -1,7 +1,6 @@
-package com.wind.transaction.core.request;
+package com.wind.transaction.core.account.request;
 
 
-import com.wind.transaction.core.AccountTransactionType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.TransactionContextVariables;
 import jakarta.validation.constraints.NotBlank;
@@ -13,7 +12,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
- * 预存款账户转入\转出请求
+ * 资金账户交易请求
  *
  * @author wuxp
  * @date 2023-11-28 19:31
@@ -22,10 +21,10 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 @AllArgsConstructor
 @NoArgsConstructor
-public class TransferRequest {
+public class FundsAccountTransactionRequest {
 
     /**
-     * 转入\转出金额
+     * 交易金额
      */
     @NotNull
     private Money amount;
@@ -33,15 +32,15 @@ public class TransferRequest {
     /**
      * 关联的交易流水号 sn
      */
-    @NotBlank
-    @Size(max = 50)
-    private String transactionSn;
+    @Size(min = 8, max = 80)
+    private String referenceTransactionSn;
 
     /**
      * 交易类型
      */
-    @NotNull
-    private AccountTransactionType transactionType;
+    @NotBlank
+    @Size(max = 20)
+    private String category;
 
     /**
      * 业务场景

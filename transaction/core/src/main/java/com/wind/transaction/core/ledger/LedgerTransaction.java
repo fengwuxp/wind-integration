@@ -68,6 +68,24 @@ public class LedgerTransaction {
     private String transactionSn;
 
     /**
+     * 交易发生时间
+     */
+    @NotNull
+    private LocalDateTime transactionTime;
+
+    /**
+     * 交易所属账期（用于查询、对账聚合）
+     */
+    @NotNull
+    private String accountingPeriod;
+
+    /**
+     * 对账批次
+     */
+    @NotNull
+    private String reconciliationBatch;
+
+    /**
      * 账本交易对账状态
      */
     @NotNull
@@ -79,16 +97,26 @@ public class LedgerTransaction {
     private String reconcileRemark;
 
     /**
-     * 账本条目
+     * 最近一次对账时间
      */
-    @NotNull
-    private List<LedgerEntry> entries;
+    private LocalDateTime reconciliationTime;
+
+    /**
+     * 对账完成时间
+     */
+    private LocalDateTime reconciliationCompletedTime;
 
     /**
      * sha256
      */
     @NotNull
     private String sha256;
+
+    /**
+     * 账本条目
+     */
+    @NotNull
+    private List<LedgerEntry> entries;
 
     /**
      * 借方金额

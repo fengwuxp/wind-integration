@@ -60,9 +60,21 @@ public class FundsAccountId implements WritableContextVariables {
         this.ownerType = ownerType;
     }
 
+    @NonNull
     public static FundsAccountId of(@NonNull String id, @NonNull Serializable ownerId, @NonNull FundsAccountOwnerType type) {
         return new FundsAccountId(id, ownerId, type);
     }
+
+    @NonNull
+    public static FundsAccountId user(@NonNull String id, @NonNull String uid) {
+        return of(id, uid, FundsAccountOwnerType.USER);
+    }
+
+    @NonNull
+    public static FundsAccountId merchant(@NonNull String id, @NonNull String merchantId) {
+        return of(id, merchantId, FundsAccountOwnerType.MERCHANT);
+    }
+
 
     @Override
     public FundsAccountId putVariable(String name, @Nullable Object val) {

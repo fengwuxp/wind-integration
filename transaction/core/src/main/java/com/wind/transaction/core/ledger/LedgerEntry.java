@@ -29,10 +29,16 @@ public class LedgerEntry implements Serializable {
     private Long id;
 
     /**
-     * 创建时间
+     * 创建时间 （记账时间（posting time））
      */
     @NotNull
     private LocalDateTime gmtCreate;
+
+    /**
+     * 最后更新时间
+     */
+    @NotNull
+    private LocalDateTime gmtModified;
 
     /**
      * 资金账户 id
@@ -125,6 +131,18 @@ public class LedgerEntry implements Serializable {
     private Map<String, String> context;
 
     /**
+     * 交易所属账期（用于查询、对账聚合）
+     */
+    @NotNull
+    private String accountingPeriod;
+
+    /**
+     * 对账批次
+     */
+    @NotNull
+    private String reconciliationBatch;
+
+    /**
      * 账本交易对账状态
      */
     @NotNull
@@ -134,6 +152,16 @@ public class LedgerEntry implements Serializable {
      * 对账备注
      */
     private String reconcileRemark;
+
+    /**
+     * 最近一次对账时间
+     */
+    private LocalDateTime reconciliationTime;
+
+    /**
+     * 对账完成时间
+     */
+    private LocalDateTime reconciliationCompletedTime;
 
     /**
      * sha256

@@ -3,7 +3,7 @@ package com.wind.transaction.core.payment;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.PaymentOrderStatus;
-import org.jspecify.annotations.NonNull;
+import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
 
@@ -18,55 +18,74 @@ public interface PaymentOrder extends TenantIsolationObject<Long> {
     /**
      * 创建时间
      */
-    @NonNull
+    @NotNull
     LocalDateTime getGmtCreate();
 
     /**
      * 订单编号
      */
-    @NonNull
+    @NotNull
     String getSn();
 
     /**
      * 业务场景
      */
-    @NonNull
+    @NotNull
     String getBusinessScene();
 
     /**
-     * 付款用户
+     * 订单归属用户（业务视角）
+     * 不等同于实际出资方
      */
-    @NonNull
-    Long getPayerId();
+    @NotNull
+    Long getOwnerUserId();
+
+    /**
+     * 付款方标识
+     */
+    @NotNull
+    String getPayerId();
+
+    /**
+     * 付款方类型
+     */
+    @NotNull
+    String getPayerType();
 
     /**
      * 收款方标识
      */
-    @NonNull
+    @NotNull
     String getPayeeId();
+
+    /**
+     * 收款方类型
+     */
+    @NotNull
+    String getPayeeType();
 
     /**
      * 订单总金额
      */
-    @NonNull
+    @NotNull
     Money getTotalAmount();
 
     /**
      * 订单实付金额
      */
-    @NonNull
+    @NotNull
     Money getActualAmount();
 
     /**
      * 已退款金额
      */
-    @NonNull
+    @NotNull
     Money getRefundAmount();
 
     /**
      * 状态
      */
-    @NonNull
+    @NotNull
     PaymentOrderStatus getStatus();
 
     /**
@@ -96,11 +115,10 @@ public interface PaymentOrder extends TenantIsolationObject<Long> {
      */
     String getRemark();
 
-
     /**
      * @return 未支付金额
      */
-    @NonNull
+    @NotNull
     default Money getUnpaidAmount() {
         return getTotalAmount().subtract(getActualAmount());
     }
@@ -108,7 +126,7 @@ public interface PaymentOrder extends TenantIsolationObject<Long> {
     /**
      * @return 可退款金额
      */
-    @NonNull
+    @NotNull
     default Money getRefundableAmount() {
         return getActualAmount().subtract(getRefundAmount());
     }
@@ -121,7 +139,6 @@ public interface PaymentOrder extends TenantIsolationObject<Long> {
     default boolean isPartiallyPaid() {
         return !getActualAmount().isZero() && getActualAmount().lt(getTotalAmount());
     }
-
 
     /**
      * 部分退款

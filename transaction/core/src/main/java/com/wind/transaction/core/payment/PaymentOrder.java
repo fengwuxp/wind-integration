@@ -28,6 +28,12 @@ public interface PaymentOrder extends TenantIsolationObject<Long> {
     String getSn();
 
     /**
+     * 订单分类
+     */
+    @NotNull
+    String getCategory();
+
+    /**
      * 业务场景
      */
     @NotNull

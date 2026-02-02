@@ -16,6 +16,8 @@ public enum FundsAccountOwnerType implements DescriptiveEnum {
 
     USER("用户"),
 
+    TENANT("租户"),
+
     MERCHANT("商户"),
 
     PLATFORM("平台"),

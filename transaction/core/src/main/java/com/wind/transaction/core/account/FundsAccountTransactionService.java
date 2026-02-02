@@ -53,5 +53,5 @@ public interface FundsAccountTransactionService {
      * @param id 账户标识
      * @return 是否支持该类型账户
      */
-    boolean supports(FundsAccountId id);
+    boolean supports(@NonNull FundsAccountId id);
 }

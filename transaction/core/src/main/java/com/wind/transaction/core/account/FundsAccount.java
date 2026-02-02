@@ -1,10 +1,9 @@
 package com.wind.transaction.core.account;
 
 import com.wind.common.WindConstants;
+import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
-
-import java.io.Serializable;
 
 /**
  * 这是一个可用于支出、收入的资金账户定义
@@ -12,7 +11,7 @@ import java.io.Serializable;
  * @author wuxp
  * @date 2023-12-01 10:37
  **/
-public interface FundsAccount extends Serializable {
+public interface FundsAccount extends TenantIsolationObject<Long> {
 
     /**
      * 账户标识
@@ -21,6 +20,14 @@ public interface FundsAccount extends Serializable {
      */
     @NonNull
     FundsAccountId getAccountId();
+
+    /**
+     * 账户所属主体
+     *
+     * @return 账户所属主体
+     */
+    @NonNull
+    FundsAccountOwner getOwner();
 
     /**
      * 账户转入（充值）累计数额
@@ -115,4 +122,12 @@ public interface FundsAccount extends Serializable {
         return WindConstants.EMPTY;
     }
 
+
+    /**
+     * 账户数据版本
+     *
+     * @return 账户数据版本
+     */
+    @NonNull
+    Integer getVersion();
 }

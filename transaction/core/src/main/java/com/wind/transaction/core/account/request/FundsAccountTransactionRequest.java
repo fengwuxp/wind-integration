@@ -3,13 +3,13 @@ package com.wind.transaction.core.account.request;
 
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.TransactionContextVariables;
+import com.wind.transaction.core.account.FundsAccountId;
+import com.wind.transaction.core.account.FundsAccountOwner;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.experimental.Accessors;
+import lombok.Builder;
+import lombok.Getter;
 
 /**
  * 资金账户交易请求
@@ -17,47 +17,63 @@ import lombok.experimental.Accessors;
  * @author wuxp
  * @date 2023-11-28 19:31
  **/
-@Data
-@Accessors(chain = true)
-@AllArgsConstructor
-@NoArgsConstructor
+@Builder
+@Getter
 public class FundsAccountTransactionRequest {
+
+    /**
+     * 账户 owner
+     */
+    @NotNull
+    private final FundsAccountOwner owner;
+
+    /**
+     * 交易对方账户
+     */
+    @NotNull
+    private final FundsAccountId counterpartyAccountId;
 
     /**
      * 交易金额
      */
     @NotNull
-    private Money amount;
+    private final Money amount;
+
+    /**
+     * 原始金额
+     */
+    @NotNull
+    private final Money originalAmount;
 
     /**
      * 关联的交易流水号 sn
      */
     @Size(min = 8, max = 80)
-    private String referenceTransactionSn;
+    private final String referenceTransactionSn;
 
     /**
      * 交易类型
      */
     @NotBlank
     @Size(max = 20)
-    private String category;
+    private final String category;
 
     /**
      * 业务场景
      */
     @NotBlank
     @Size(max = 30)
-    private String businessScene;
+    private final String businessScene;
 
     /**
      * 描述（备注）
      */
     @Size(max = 300)
-    private String description;
+    private final String description;
 
     /**
      * 上下文透传变量
      */
     @NotNull
-    private TransactionContextVariables contextVariables = TransactionContextVariables.of();
+    private final TransactionContextVariables contextVariables = TransactionContextVariables.of();
 }

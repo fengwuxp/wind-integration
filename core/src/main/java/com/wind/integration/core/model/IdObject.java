@@ -1,5 +1,7 @@
 package com.wind.integration.core.model;
 
+import org.jspecify.annotations.NonNull;
+
 import java.io.Serializable;
 
 /**
@@ -9,7 +11,11 @@ import java.io.Serializable;
  * @author wuxp
  * @date 2024-12-15 19:03
  **/
-public interface IdObject<I extends Serializable> {
+public interface IdObject<I extends Serializable> extends Serializable {
 
+    /**
+     * @return id
+     */
+    @NonNull
     I getId();
 }

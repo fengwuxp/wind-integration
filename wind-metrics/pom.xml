@@ -19,6 +19,10 @@
             <groupId>com.alibaba.fastjson2</groupId>
             <artifactId>fastjson2</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-integration-core</artifactId>
+        </dependency>
     </dependencies>
 
 

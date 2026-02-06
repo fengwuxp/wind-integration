@@ -18,6 +18,8 @@ public enum FundsAccountTransactionType implements DescriptiveEnum {
 
     TRANSFER_OUT("支出"),
 
+    PAY_FROM_FREEZE("通过冻结金额支出"),
+
     FEE("手续费"),
 
     REFUND("退款"),

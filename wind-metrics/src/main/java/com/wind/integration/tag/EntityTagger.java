@@ -37,11 +37,25 @@ public interface EntityTagger {
     /**
      * 模拟打标（仅计算）
      *
-     * @param data 业务对象
+     * @param data   业务对象
+     * @param source 标签来源
      * @return 标签集合
      */
     @NonNull
-    Collection<EntityTag> simulate(@NonNull IdObject<?> data, @NonNull TagSource source);
+    default Collection<EntityTag> simulate(@NonNull IdObject<?> data, @NonNull TagSource source) {
+        return simulate(data, source, ReadonlyContextVariables.empty());
+    }
+
+    /**
+     * 模拟打标（仅计算）
+     *
+     * @param data      数据
+     * @param source    标签来源
+     * @param variables 上下文变量
+     * @return 标签集合
+     */
+    @NonNull
+    Collection<EntityTag> simulate(@NonNull IdObject<?> data, @NonNull TagSource source, @NonNull ReadonlyContextVariables variables);
 
     /**
      * 指定标签打标 （人工、风控打标）

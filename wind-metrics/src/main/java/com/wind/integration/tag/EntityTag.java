@@ -1,11 +1,12 @@
 package com.wind.integration.tag;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.util.StringJoinSplitUtils;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
@@ -27,17 +28,18 @@ import java.util.stream.Collectors;
  * @author wuxp
  * @date 2024-09-11 09:52
  */
-public record EntityTag(@NotBlank String name, @NotBlank String value, @NotBlank TagSource source, @NotNull Serializable sourceId) implements WindTag {
+public record EntityTag(@JsonProperty("name") @NonNull String name,
+                        @JsonProperty("value") @NonNull String value,
+                        @JsonProperty("source") @NonNull TagSource source,
+                        @JsonProperty("sourceId") @NonNull Serializable sourceId) implements WindTag {
 
-    public EntityTag(String name, String value, TagSource source, Serializable sourceId) {
+
+    @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
+    public EntityTag {
         AssertUtils.hasText(name, "argument name must not emtpy");
         AssertUtils.hasText(value, "argument value must not emtpy");
         AssertUtils.notNull(source, "argument source must not null");
         AssertUtils.notNull(sourceId, "argument sourceId must not null");
-        this.name = name;
-        this.value = value;
-        this.source = source;
-        this.sourceId = sourceId;
     }
 
     @Override
@@ -59,7 +61,7 @@ public record EntityTag(@NotBlank String name, @NotBlank String value, @NotBlank
      * @param sourceId 标签来源标识
      * @return 标签
      */
-    public static EntityTag of(String name, String value, TagSource source, Serializable sourceId) {
+    public static EntityTag of(@NonNull String name, @NonNull String value, @NonNull TagSource source, @NonNull Serializable sourceId) {
         return new EntityTag(name, value, source, sourceId);
     }
 
@@ -71,7 +73,10 @@ public record EntityTag(@NotBlank String name, @NotBlank String value, @NotBlank
      * @param keyValues 标签键值对，偶数位表示 key, 奇数位表示 value，例如：{"信用评级","A"}
      * @return 标签列表
      */
-    public static List<EntityTag> tags(TagSource source, Serializable sourceId, String... keyValues) {
+    public static List<EntityTag> tags(@NonNull TagSource source, @NonNull Serializable sourceId, @Nullable String... keyValues) {
+        if (keyValues == null) {
+            return Collections.emptyList();
+        }
         EntityTag[] result = new EntityTag[keyValues.length / 2];
         for (int i = 0; i < keyValues.length; i += 2) {
             result[i / 2] = EntityTag.of(keyValues[i], keyValues[i + 1], source, sourceId);
@@ -87,7 +92,10 @@ public record EntityTag(@NotBlank String name, @NotBlank String value, @NotBlank
      * @param tags     标签列表
      * @return 业务标签对象列表
      */
-    public static List<EntityTag> tags(TagSource source, Serializable sourceId, List<WindTag> tags) {
+    public static List<EntityTag> tags(@NonNull TagSource source, @NonNull Serializable sourceId, @Nullable List<WindTag> tags) {
+        if (tags == null) {
+            return Collections.emptyList();
+        }
         List<EntityTag> result = new ArrayList<>(tags.size());
         tags.forEach(tag -> result.add(EntityTag.of(tag.name(), tag.value(), source, sourceId)));
         return Collections.unmodifiableList(result);

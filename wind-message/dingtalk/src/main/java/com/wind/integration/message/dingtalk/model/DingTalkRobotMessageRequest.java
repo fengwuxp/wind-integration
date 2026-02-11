@@ -1,7 +1,7 @@
 package com.wind.integration.message.dingtalk.model;
 
 import com.alibaba.fastjson2.JSON;
-import com.wind.signature.algorithm.HmacSHA256Signer;
+import com.wind.signature.SignatureAlgorithm;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -62,8 +62,8 @@ public class DingTalkRobotMessageRequest {
     @SneakyThrows
     public String getSign() {
         String stringToSign = timestamp + "\n" + secretKey;
-        Mac mac = Mac.getInstance(HmacSHA256Signer.ALGORITHM_NAME);
-        mac.init(new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), HmacSHA256Signer.ALGORITHM_NAME));
+        Mac mac = Mac.getInstance(SignatureAlgorithm.HMAC_SHA256.getAlgorithm());
+        mac.init(new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), SignatureAlgorithm.HMAC_SHA256.getAlgorithm()));
         byte[] signData = mac.doFinal(stringToSign.getBytes(StandardCharsets.UTF_8));
         return URLEncoder.encode(new String(Base64.getEncoder().encode(signData)), StandardCharsets.UTF_8);
     }

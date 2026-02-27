@@ -1,7 +1,7 @@
 package com.wind.integration;
 
 
-import com.mybatisflex.spring.boot.MybatisFlexAutoConfiguration;
+import com.mybatisflex.spring.boot.v4.MybatisFlexAutoConfiguration;
 import com.wind.common.locks.JdkLockFactory;
 import com.wind.common.locks.LockFactory;
 import com.wind.common.spring.SpringApplicationContextUtils;

@@ -5,9 +5,9 @@ import com.wind.common.i18n.SpringI18nMessageUtils;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.springframework.format.Parser;
 import org.springframework.format.Printer;
-import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -122,15 +122,19 @@ public final class ExcelCellDescriptor {
             return this;
         }
 
-        public <T> ExcelCellDescriptorBuilder printer(Printer<T> printer) {
-            AssertUtils.isTrue(attributes.stream().noneMatch(CellPrinter.class::isInstance), "Printer already exists");
-            this.attributes.add(new CellPrinter(printer));
+        public <T> ExcelCellDescriptorBuilder printer(@Nullable Printer<T> printer) {
+            if (printer != null) {
+                AssertUtils.isTrue(attributes.stream().noneMatch(CellPrinter.class::isInstance), "Printer already exists");
+                this.attributes.add(new CellPrinter(printer));
+            }
             return this;
         }
 
-        public <T> ExcelCellDescriptorBuilder parser(Parser<T> parser) {
-            AssertUtils.isTrue(attributes.stream().noneMatch(CellPrinter.class::isInstance), "Parser already exists");
-            this.attributes.add(new CellParser(parser));
+        public <T> ExcelCellDescriptorBuilder parser(@Nullable Parser<T> parser) {
+            if (parser != null) {
+                AssertUtils.isTrue(attributes.stream().noneMatch(CellPrinter.class::isInstance), "Parser already exists");
+                this.attributes.add(new CellParser(parser));
+            }
             return this;
         }
 

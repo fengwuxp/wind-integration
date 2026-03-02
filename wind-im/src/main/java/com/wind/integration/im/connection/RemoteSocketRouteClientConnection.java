@@ -1,6 +1,5 @@
 package com.wind.integration.im.connection;
 
-import com.wind.client.rest.HttpTraceRequestInterceptor;
 import com.wind.common.exception.BaseException;
 import com.wind.common.util.ExecutorServiceUtils;
 import com.wind.integration.im.WindImConstants;
@@ -14,7 +13,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import java.util.Map;
@@ -44,22 +42,11 @@ public class RemoteSocketRouteClientConnection implements WindSocketRouteClientC
 
     private final RestClient restClient;
 
-    public RemoteSocketRouteClientConnection(@NotBlank String remoteNodeAddress, @NotBlank String sessionId, Map<String, Object> metadata) {
+     RemoteSocketRouteClientConnection(String remoteNodeAddress, String sessionId, Map<String, Object> metadata, RestClient restClient) {
         this.remoteNodeAddress = remoteNodeAddress;
         this.sessionId = sessionId;
         this.metadata = metadata;
-        this.restClient = createRestClient();
-    }
-
-    private RestClient createRestClient() {
-        // 创建请求工厂并设置超时时间
-        HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
-        requestFactory.setConnectionRequestTimeout(1000);
-        requestFactory.setReadTimeout(3000);
-        return RestClient.builder()
-                .requestFactory(requestFactory)
-                .requestInterceptor(new HttpTraceRequestInterceptor())
-                .build();
+        this.restClient = restClient;
     }
 
     @Override
@@ -136,4 +123,6 @@ public class RemoteSocketRouteClientConnection implements WindSocketRouteClientC
     public Map<String, Object> getMetadata() {
         return metadata;
     }
+
+
 }

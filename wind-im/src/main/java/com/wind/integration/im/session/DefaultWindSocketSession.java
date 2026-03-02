@@ -4,18 +4,19 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.integration.im.WindImConstants;
 import com.wind.integration.im.connection.DefaultWindSocketConnectionListener;
 import com.wind.integration.im.connection.ImmutableSocketClientConnectionMetadata;
-import com.wind.integration.im.connection.RemoteSocketRouteClientConnection;
 import com.wind.integration.im.spi.WindChatSessionService;
 import com.wind.websocket.core.SocketClientConnectionDescriptor;
-import com.wind.websocket.core.WindSessionConnectionPolicy;
 import com.wind.websocket.core.WindSocketClientClientConnection;
+import com.wind.websocket.core.WindSocketClientClientConnectionFactory;
 import com.wind.websocket.core.WindSocketSession;
+import com.wind.websocket.core.WindSocketSessionDescriptor;
 import com.wind.websocket.core.WindSocketSessionStatus;
 import com.wind.websocket.core.WindSocketSessionType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Null;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
 import org.springframework.util.CollectionUtils;
@@ -24,7 +25,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -83,58 +83,26 @@ public class DefaultWindSocketSession implements WindSocketSession {
     private final WindChatSessionService sessionService;
 
     /**
-     * 会话 ID
+     * 会话描述符
      */
-    private final String id;
-    /**
-     * 会话创建时间
-     */
-    private final LocalDateTime gmtCreate;
-    /**
-     * 会话状态
-     */
-    private final WindSocketSessionStatus status;
-    /**
-     * 连接策略（如单设备互踢、多设备共存等）
-     */
-    private final WindSessionConnectionPolicy connectionPolicy;
-    /**
-     * 会话类型（点对点、群组等）
-     */
-    private final WindSocketSessionType sessionType;
-    /**
-     * 元数据
-     */
-    private final Map<String, Object> metadata;
+    private final WindSocketSessionDescriptor sessionDescriptor;
 
     /**
-     * 构造函数。
-     *
-     * @param id               会话 ID
-     * @param gmtCreate        创建时间
-     * @param status           会话状态
-     * @param connectionPolicy 连接策略
-     * @param sessionType      会话类型
-     * @param metadata         元数据
+     * 创建 Socket 连接工厂
      */
-    public DefaultWindSocketSession(@NotBlank String id, LocalDateTime gmtCreate,
-                                    WindSocketSessionStatus status,
-                                    WindSessionConnectionPolicy connectionPolicy,
-                                    WindSocketSessionType sessionType,
-                                    Map<String, Object> metadata,
-                                    RedissonClient redissonClient,
-                                    WindChatSessionService sessionService,
-                                    Map<String, WindSocketClientClientConnection> localConnectionCache
+    private final WindSocketClientClientConnectionFactory connectionFactory;
+
+    public DefaultWindSocketSession(@NonNull WindSocketSessionDescriptor sessionDescriptor,
+                                    @NonNull RedissonClient redissonClient,
+                                    @NonNull WindChatSessionService sessionService,
+                                    @NonNull Map<String, WindSocketClientClientConnection> localConnectionCache,
+                                    @NonNull WindSocketClientClientConnectionFactory connectionFactory
     ) {
-        this.id = id;
-        this.gmtCreate = gmtCreate;
-        this.status = status;
-        this.connectionPolicy = connectionPolicy;
-        this.sessionType = sessionType;
-        this.metadata = (metadata != null) ? metadata : new HashMap<>();
+        this.sessionDescriptor = sessionDescriptor;
         this.sessionService = sessionService;
         this.userConnectionCache = redissonClient.getMap(SOCKET_USER_CONNECTION_CACHE_KEY);
         this.localConnectionCache = localConnectionCache;
+        this.connectionFactory = connectionFactory;
     }
 
     /**
@@ -152,16 +120,16 @@ public class DefaultWindSocketSession implements WindSocketSession {
         // 设置 Redis 用户ID -> 连接描述符集合
         List<SocketClientConnectionDescriptor> clientConnections = getConnectionDescriptors(userId);
 
-        switch (connectionPolicy) {
+        switch (sessionDescriptor.getSessionConnectionPolicy()) {
             case MULTI_DEVICE:
-                clientConnections.removeIf(conn -> Objects.equals(conn.getSessionId(), id) &&
+                clientConnections.removeIf(conn -> Objects.equals(conn.getSessionId(), getId()) &&
                         Objects.equals(conn.getClientDeviceType(), connection.getClientDeviceType()));
                 clientConnections.add(connection);
                 break;
             case SINGLE_DEVICE_KICK_NEW:
                 // 踢掉旧连接，接入新连接（相同设备类型 + 当前会话）
                 clientConnections.stream()
-                        .filter(conn -> Objects.equals(conn.getSessionId(), id) &&
+                        .filter(conn -> Objects.equals(conn.getSessionId(), getId()) &&
                                 Objects.equals(conn.getClientDeviceType(), connection.getClientDeviceType()))
                         .forEach(item -> {
                             WindSocketClientClientConnection oldConn = localConnectionCache.get(item.getId());
@@ -174,7 +142,7 @@ public class DefaultWindSocketSession implements WindSocketSession {
                         });
 
                 // 移除连接描述符列表中对应的旧连接
-                clientConnections.removeIf(conn -> Objects.equals(conn.getSessionId(), id) &&
+                clientConnections.removeIf(conn -> Objects.equals(conn.getSessionId(), getId()) &&
                         Objects.equals(conn.getClientDeviceType(), connection.getClientDeviceType()));
 
                 // 加入新连接
@@ -185,8 +153,7 @@ public class DefaultWindSocketSession implements WindSocketSession {
                 // 同设备类型互斥，不同设备并存，优先保留旧连接，拒绝新连接
                 boolean hasSameDeviceConnection = clientConnections.stream()
                         .anyMatch(conn ->
-                                Objects.equals(conn.getSessionId(), id) &&
-                                        Objects.equals(conn.getClientDeviceType(), connection.getClientDeviceType()));
+                                Objects.equals(conn.getSessionId(), getId()) && Objects.equals(conn.getClientDeviceType(), connection.getClientDeviceType()));
 
                 if (hasSameDeviceConnection) {
                     // 有旧连接，不允许新连接加入，直接关闭新连接
@@ -261,7 +228,7 @@ public class DefaultWindSocketSession implements WindSocketSession {
         Iterator<SocketClientConnectionDescriptor> iterator = connectionDescriptors.iterator();
         while (iterator.hasNext()) {
             SocketClientConnectionDescriptor descriptor = iterator.next();
-            if (descriptor.getSessionId().equals(id)) {
+            if (descriptor.getSessionId().equals(getId())) {
                 // 从本地连接缓存中移除连接
                 WindSocketClientClientConnection remove = localConnectionCache.remove(descriptor.getId());
                 if (remove != null) {
@@ -280,7 +247,7 @@ public class DefaultWindSocketSession implements WindSocketSession {
     @Override
     public boolean containsUser(@NotBlank String userId) {
         AssertUtils.hasText(userId, "argument userId must not empty");
-        return sessionService.sessionExistUser(id, userId);
+        return sessionService.sessionExistUser(getId(), userId);
     }
 
     /**
@@ -323,7 +290,7 @@ public class DefaultWindSocketSession implements WindSocketSession {
     @Override
     public @NotNull Collection<WindSocketClientClientConnection> getConnections() {
         // 获取会话里面的所有成员
-        return sessionService.getSessionMembers(id).stream()
+        return sessionService.getSessionMembers(getId()).stream()
                 .map(this::getUserConnections)
                 .flatMap(Collection::stream)
                 .toList();
@@ -359,14 +326,14 @@ public class DefaultWindSocketSession implements WindSocketSession {
         List<SocketClientConnectionDescriptor> connectionDescriptors = getConnectionDescriptors(userId);
         for (SocketClientConnectionDescriptor connectionDescriptor : connectionDescriptors) {
             // 获取连接描述符对应的会话 ID
-            if (connectionDescriptor.getSessionId().equals(id)) {
+            if (connectionDescriptor.getSessionId().equals(getId())) {
                 // 获取本地连接对象
                 WindSocketClientClientConnection connection = localConnectionCache.get(connectionDescriptor.getId());
                 // 存在则加入结果集
                 // 构造远程连接代理对象并加入结果集
                 result.add(Objects.requireNonNullElseGet(connection,
-                        () -> new RemoteSocketRouteClientConnection(getNodeAddress(connectionDescriptor), connectionDescriptor.getSessionId(),
-                                connectionDescriptor.getMetadata())));
+                        () -> connectionFactory.create(getNodeAddress(connectionDescriptor), connectionDescriptor.getSessionId(),
+                                Objects.requireNonNull(connectionDescriptor.getMetadata()))));
             }
         }
         return Collections.unmodifiableList(result);
@@ -422,27 +389,27 @@ public class DefaultWindSocketSession implements WindSocketSession {
 
     @Override
     public @NotBlank String getId() {
-        return this.id;
+        return sessionDescriptor.getId();
     }
 
     @Override
     public @NotNull LocalDateTime getGmtCreate() {
-        return this.gmtCreate;
+        return sessionDescriptor.getGmtCreate();
     }
 
     @Override
     public WindSocketSessionStatus getStatus() {
-        return this.status;
+        return sessionDescriptor.getStatus();
     }
 
     @Override
     public WindSocketSessionType getSessionType() {
-        return this.sessionType;
+        return sessionDescriptor.getSessionType();
     }
 
     @Override
     @NotNull
     public Map<String, Object> getMetadata() {
-        return this.metadata;
+        return sessionDescriptor.getMetadata();
     }
 }

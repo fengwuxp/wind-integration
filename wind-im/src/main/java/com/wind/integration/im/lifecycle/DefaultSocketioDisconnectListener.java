@@ -3,8 +3,8 @@ package com.wind.integration.im.lifecycle;
 import com.corundumstudio.socketio.SocketIOClient;
 import com.corundumstudio.socketio.listener.DisconnectListener;
 import com.wind.integration.im.WindImConstants;
-import com.wind.integration.im.connection.LocalSocketClientConnection;
 import com.wind.websocket.WindWebSocketMetadataNames;
+import com.wind.websocket.core.WindSocketClientClientConnectionFactory;
 import com.wind.websocket.core.WindSocketConnectionListener;
 import lombok.extern.slf4j.Slf4j;
 
@@ -21,7 +21,8 @@ import java.util.Map;
  * @date 2025-12-12 13:49
  **/
 @Slf4j
-public record DefaultSocketioDisconnectListener(WindSocketConnectionListener socketConnectionListener) implements DisconnectListener {
+public record DefaultSocketioDisconnectListener(WindSocketConnectionListener socketConnectionListener,
+                                                WindSocketClientClientConnectionFactory factory) implements DisconnectListener {
 
     @Override
     public void onDisconnect(SocketIOClient client) {
@@ -40,7 +41,7 @@ public record DefaultSocketioDisconnectListener(WindSocketConnectionListener soc
             metadata.put(WindWebSocketMetadataNames.CLIENT_DEVICE_TYPE_NAME, deviceType);
 
             // 构建断开连接上下文并回调监听器
-            socketConnectionListener.onDisconnect(new LocalSocketClientConnection(client, connectionId, sessionId, metadata));
+            socketConnectionListener.onDisconnect(factory.create(client, sessionId, metadata));
         } catch (Exception exception) {
             log.error("Socket 连接断开异常, message = {}", exception.getMessage(), exception);
         }

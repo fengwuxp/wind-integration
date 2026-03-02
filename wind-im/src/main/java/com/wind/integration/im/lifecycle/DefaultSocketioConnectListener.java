@@ -5,9 +5,9 @@ import com.corundumstudio.socketio.SocketIOClient;
 import com.corundumstudio.socketio.listener.ConnectListener;
 import com.wind.common.util.IpAddressUtils;
 import com.wind.integration.im.WindImConstants;
-import com.wind.integration.im.connection.LocalSocketClientConnection;
 import com.wind.websocket.WindWebSocketMetadataNames;
 import com.wind.websocket.core.WindSocketClientClientConnection;
+import com.wind.websocket.core.WindSocketClientClientConnectionFactory;
 import com.wind.websocket.core.WindSocketConnectionListener;
 import lombok.extern.slf4j.Slf4j;
 
@@ -25,11 +25,12 @@ import static com.wind.integration.im.WindImConstants.CHAT_SESSION_JOIN_EVENT;
  * @date 2025-12-12 14:10
  **/
 @Slf4j
-public record DefaultSocketioConnectListener(String nodeIpAddress, WindSocketConnectionListener socketConnectionListener) implements ConnectListener {
+public record DefaultSocketioConnectListener(String nodeIpAddress, WindSocketConnectionListener socketConnectionListener
+        , WindSocketClientClientConnectionFactory factory) implements ConnectListener {
 
-    public DefaultSocketioConnectListener(WindSocketConnectionListener socketConnectionListener) {
+    public DefaultSocketioConnectListener(WindSocketConnectionListener socketConnectionListener, WindSocketClientClientConnectionFactory factory) {
         // 当前节点地址的 ip 通过 IpAddressUtils.getLocalIpv4WithCache() 获取
-        this(IpAddressUtils.getLocalIpv4WithCache(), socketConnectionListener);
+        this(IpAddressUtils.getLocalIpv4WithCache(), socketConnectionListener, factory);
     }
 
     @Override
@@ -63,7 +64,7 @@ public record DefaultSocketioConnectListener(String nodeIpAddress, WindSocketCon
             // 4. 填充节点地址
             metadata.put(WindImConstants.NODE_IP_ADDRESS_VARIABLE_NAME, nodeIpAddress);
             // 5. 注册连接对象
-            WindSocketClientClientConnection connection = new LocalSocketClientConnection(client, connectionId, sessionId, metadata);
+            WindSocketClientClientConnection connection = factory.create(client, sessionId, metadata);
             socketConnectionListener.onConnect(connection);
             client.sendEvent(CHAT_SESSION_JOIN_EVENT, "join success");
         } catch (Exception e) {

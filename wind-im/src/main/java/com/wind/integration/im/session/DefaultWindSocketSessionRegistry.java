@@ -3,8 +3,10 @@ package com.wind.integration.im.session;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.im.spi.WindChatSessionService;
 import com.wind.websocket.command.ImmutableSessionStatusChangedCommand;
+import com.wind.websocket.core.ImmutableSocketSessionDescriptor;
 import com.wind.websocket.core.WindSessionConnectionPolicy;
 import com.wind.websocket.core.WindSocketClientClientConnection;
+import com.wind.websocket.core.WindSocketClientClientConnectionFactory;
 import com.wind.websocket.core.WindSocketSession;
 import com.wind.websocket.core.WindSocketSessionDescriptor;
 import com.wind.websocket.core.WindSocketSessionRegistry;
@@ -47,6 +49,8 @@ public class DefaultWindSocketSessionRegistry implements WindSocketSessionRegist
     private final RedissonClient redissonClient;
 
     private final WindChatSessionService sessionService;
+
+    private final WindSocketClientClientConnectionFactory connectionFactory;
 
     /**
      * 获取指定 ID 的会话，如果不存在会抛出异常。
@@ -109,7 +113,15 @@ public class DefaultWindSocketSessionRegistry implements WindSocketSessionRegist
         WindSocketSessionStatus state = session.getStatus();
         WindSessionConnectionPolicy connectionPolicy = session.getSessionConnectionPolicy();
         WindSocketSessionType type = session.getSessionType();
-        return new DefaultWindSocketSession(sessionId, gmtCreate, state, connectionPolicy, type, metadata, redissonClient, sessionService, localConnectionDescriptorCache);
+        ImmutableSocketSessionDescriptor descriptor = ImmutableSocketSessionDescriptor.builder()
+                .id(sessionId)
+                .gmtCreate(gmtCreate)
+                .status(state)
+                .sessionConnectionPolicy(connectionPolicy)
+                .sessionType(type)
+                .metadata(metadata)
+                .build();
+        return new DefaultWindSocketSession(descriptor, redissonClient, sessionService, localConnectionDescriptorCache, connectionFactory);
     }
 }
 

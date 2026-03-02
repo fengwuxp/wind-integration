@@ -1,6 +1,7 @@
 package com.wind.integration.im.connection;
 
 import com.corundumstudio.socketio.SocketIOClient;
+import com.wind.common.exception.AssertUtils;
 import com.wind.common.exception.BaseException;
 import com.wind.common.util.ExecutorServiceUtils;
 import com.wind.integration.im.WindImConstants;
@@ -53,9 +54,11 @@ public class LocalSocketClientConnection implements WindSocketClientClientConnec
      * @param sessionId 当前连接所属的会话 ID
      * @param metadata  连接元数据（可选）
      */
-    public LocalSocketClientConnection(SocketIOClient client, String id, String sessionId, Map<String, Object> metadata) {
+    LocalSocketClientConnection(SocketIOClient client, String sessionId, Map<String, Object> metadata) {
+        String connectionId = client.get(WindImConstants.CONNECTION_ID_VARIABLE_NAME);
+        AssertUtils.hasText(connectionId, "connection id must not empty");
         this.client = client;
-        this.id = id;
+        this.id = connectionId;
         this.sessionId = sessionId;
         this.metadata = metadata;
     }

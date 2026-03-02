@@ -5,6 +5,7 @@ import com.corundumstudio.socketio.listener.ConnectListener;
 import com.corundumstudio.socketio.listener.DisconnectListener;
 import com.wind.integration.im.DefaultSessionMessageSender;
 import com.wind.integration.im.WindSocketIOServerRunner;
+import com.wind.integration.im.connection.DefaultSocketClientClientConnectionFactory;
 import com.wind.integration.im.connection.DefaultWindSocketConnectionListener;
 import com.wind.integration.im.handler.DefaultChatMessageHandler;
 import com.wind.integration.im.handler.DefaultRevokeMessageCommandHandler;
@@ -16,6 +17,7 @@ import com.wind.integration.im.spi.WindChatMessageRevokeCommandHandler;
 import com.wind.integration.im.spi.WindChatSessionService;
 import com.wind.websocket.core.CompositeSessionMessageSender;
 import com.wind.websocket.core.WindSessionMessageSender;
+import com.wind.websocket.core.WindSocketClientClientConnectionFactory;
 import com.wind.websocket.core.WindSocketConnectionListener;
 import com.wind.websocket.core.WindSocketSessionRegistry;
 import org.redisson.api.RedissonClient;
@@ -24,6 +26,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
@@ -36,6 +39,20 @@ import java.util.List;
 @Configuration
 public class WindWebSocketConfiguration {
 
+
+    /**
+     * 创建 SocketClientClientConnectionFactory Bean
+     *
+     * @param restClient RestClient 实例
+     * @return SocketClientClientConnectionFactory 实例
+     */
+    @Bean
+    @ConditionalOnBean(RestClient.class)
+    @ConditionalOnMissingBean(WindSocketClientClientConnectionFactory.class)
+    public WindSocketClientClientConnectionFactory defaultSocketClientClientConnectionFactory(RestClient restClient) {
+        return new DefaultSocketClientClientConnectionFactory(restClient);
+    }
+
     /**
      *
      * 创建 WindSocketSessionRegistry Bean
@@ -43,9 +60,10 @@ public class WindWebSocketConfiguration {
      * @return WindSocketSessionManager 实例
      */
     @Bean
-    @ConditionalOnBean(value = {RedissonClient.class, WindChatSessionService.class})
-    public WindSocketSessionRegistry windSocketSessionRegistry(RedissonClient redissonClient, WindChatSessionService windChatSessionService) {
-        return new DefaultWindSocketSessionRegistry(redissonClient, windChatSessionService);
+    @ConditionalOnBean(value = {RedissonClient.class, WindChatSessionService.class, WindSocketClientClientConnectionFactory.class})
+    public WindSocketSessionRegistry windSocketSessionRegistry(RedissonClient redissonClient, WindChatSessionService windChatSessionService,
+                                                               WindSocketClientClientConnectionFactory factory) {
+        return new DefaultWindSocketSessionRegistry(redissonClient, windChatSessionService, factory);
     }
 
     /**
@@ -61,17 +79,18 @@ public class WindWebSocketConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean(WindSocketConnectionListener.class)
+    @ConditionalOnBean({WindSocketConnectionListener.class, WindSocketClientClientConnectionFactory.class})
     @ConditionalOnMissingBean(ConnectListener.class)
-    public DefaultSocketioConnectListener defaultSocketioConnectListener(WindSocketConnectionListener socketConnectionListener) {
-        return new DefaultSocketioConnectListener(socketConnectionListener);
+    public DefaultSocketioConnectListener defaultSocketioConnectListener(WindSocketConnectionListener socketConnectionListener, WindSocketClientClientConnectionFactory factory) {
+        return new DefaultSocketioConnectListener(socketConnectionListener, factory);
     }
 
     @Bean
-    @ConditionalOnBean(WindSocketConnectionListener.class)
+    @ConditionalOnBean({WindSocketConnectionListener.class, WindSocketClientClientConnectionFactory.class})
     @ConditionalOnMissingBean(DisconnectListener.class)
-    public DefaultSocketioDisconnectListener defaultSocketioDisconnectListener(WindSocketConnectionListener socketConnectionListener) {
-        return new DefaultSocketioDisconnectListener(socketConnectionListener);
+    public DefaultSocketioDisconnectListener defaultSocketioDisconnectListener(WindSocketConnectionListener socketConnectionListener,
+                                                                               WindSocketClientClientConnectionFactory factory) {
+        return new DefaultSocketioDisconnectListener(socketConnectionListener, factory);
     }
 
     @Bean

@@ -124,7 +124,7 @@ public final class ExcelCellDescriptor {
 
         public <T> ExcelCellDescriptorBuilder printer(@Nullable Printer<T> printer) {
             if (printer != null) {
-                AssertUtils.isTrue(attributes.stream().noneMatch(CellPrinter.class::isInstance), "Printer already exists");
+                attributes.removeIf(CellPrinter.class::isInstance);
                 this.attributes.add(new CellPrinter(printer));
             }
             return this;
@@ -132,7 +132,7 @@ public final class ExcelCellDescriptor {
 
         public <T> ExcelCellDescriptorBuilder parser(@Nullable Parser<T> parser) {
             if (parser != null) {
-                AssertUtils.isTrue(attributes.stream().noneMatch(CellPrinter.class::isInstance), "Parser already exists");
+                attributes.removeIf(CellPrinter.class::isInstance);
                 this.attributes.add(new CellParser(parser));
             }
             return this;

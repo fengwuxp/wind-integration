@@ -15,6 +15,7 @@ import org.springframework.format.Printer;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.beans.Introspector;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
 import java.lang.reflect.Member;
@@ -50,16 +51,15 @@ public final class ExcelCellQuickBuilder {
         throw new AssertionError();
     }
 
-    @NotNull
-    public static List<ExcelCellDescriptor> forClass(@NotNull Class<?> clazz) {
-        return forClass(clazz, null);
-    }
-
-    @NotNull
-    public static List<ExcelCellDescriptor> forClass(@NotNull Class<?> clazz, @Nullable List<String> orderedFields) {
-        ExcelCellBuilder builder = with(clazz);
-        getOrderedFields(clazz, orderedFields).forEach(builder::cell);
-        return builder.build();
+    /**
+     * 通过类类型快速构建 ExcelCellDescriptor 集合
+     *
+     * @param clazz 类类型
+     * @return ExcelCellDescriptor 集合
+     */
+    @NonNull
+    public static ExcelColumnBuilder with(@NonNull Class<?> clazz) {
+        return new ExcelColumnBuilder(clazz);
     }
 
     /**
@@ -68,32 +68,27 @@ public final class ExcelCellQuickBuilder {
      * @param clazz 类类型
      * @return ExcelCellDescriptor 集合
      */
-    public static ExcelCellBuilder with(Class<?> clazz) {
-        return new ExcelCellBuilder(clazz);
+    @NonNull
+    public static List<ExcelCellDescriptor> forClass(@NonNull Class<?> clazz) {
+        return forClass(clazz, null);
     }
 
-    private static List<String> getOrderedFields(@NotNull Class<?> clazz, @Nullable List<String> orderedFields) {
-        if (CollectionUtils.isEmpty(orderedFields)) {
-            Method[] getterMethods = WindReflectUtils.getGetterMethods(clazz);
-            List<String> result = Arrays.stream(WindReflectUtils.getFields(clazz)).map(Field::getName).collect(Collectors.toList());
-            result.addAll(Arrays.stream(getterMethods).map(ExcelCellQuickBuilder::convertGetMethodNameToFieldName).filter(name -> !result.contains(name)).toList());
-            return result;
-        }
-        return orderedFields;
-    }
-
-    private static String convertGetMethodNameToFieldName(Method method) {
-        String methodName = method.getName();
-        if (methodName.startsWith("get")) {
-            methodName = methodName.substring(3);
-        } else {
-            methodName = methodName.substring(2);
-        }
-        return methodName.substring(0, 1).toLowerCase() + methodName.substring(1);
+    /**
+     * 通过类类型快速构建 ExcelCellDescriptor 集合
+     *
+     * @param clazz         类类型
+     * @param orderedFields 指定字段顺序
+     * @return ExcelCellDescriptor 集合
+     */
+    @NonNull
+    public static List<ExcelCellDescriptor> forClass(@NonNull Class<?> clazz, @Nullable List<String> orderedFields) {
+        ExcelColumnBuilder builder = with(clazz);
+        builder.getOrderedFields(orderedFields).forEach(builder::column);
+        return builder.build();
     }
 
     @Nullable
-    private static Printer<?> ofPrinter(String name, Member member) {
+    private static Printer<?> ofPrinter(@NotNull String name, Member member) {
         Printer<?> printer = EXCEL_CELL_PRINTER.get().apply(name, member);
         if (member instanceof Field field) {
             return printer == null ? createDefaultPrinterByClass(field.getType()) : printer;
@@ -136,7 +131,7 @@ public final class ExcelCellQuickBuilder {
             if (annotation == null) {
                 return switch (annotatedElement) {
                     case Field field -> field.getName();
-                    case Method method -> convertGetMethodNameToFieldName(method);
+                    case Method method -> ExcelColumnBuilder.convertGetMethodNameToFieldName(method);
                     default -> WindConstants.EMPTY;
                 };
             }
@@ -154,21 +149,24 @@ public final class ExcelCellQuickBuilder {
     }
 
     /**
-     * Excel Cell 构建器
+     * Excel Column 构建器
      */
-    public static class ExcelCellBuilder {
+    public static class ExcelColumnBuilder {
+
+        private final Class<?> targetClass;
 
         private final Map<String, Field> fields;
 
         private final Map<String, Method> getterMethods;
 
-        private final List<ExcelCellDescriptor> cells;
+        private final List<ExcelCellDescriptor> columns;
 
-        public ExcelCellBuilder(Class<?> targetClass) {
+        private ExcelColumnBuilder(@NotNull Class<?> targetClass) {
+            this.targetClass = targetClass;
             this.fields = Arrays.stream(WindReflectUtils.getFields(targetClass)).collect(Collectors.toMap(Field::getName, Function.identity()));
-            this.getterMethods = Arrays.stream(WindReflectUtils.getGetterMethods(targetClass)).collect(Collectors.toMap(ExcelCellQuickBuilder::convertGetMethodNameToFieldName,
-                    Function.identity()));
-            this.cells = new ArrayList<>();
+            this.getterMethods = Arrays.stream(WindReflectUtils.getGetterMethods(targetClass))
+                    .collect(Collectors.toMap(ExcelColumnBuilder::convertGetMethodNameToFieldName, Function.identity(), (m1, m2) -> m1));
+            this.columns = new ArrayList<>();
         }
 
         /**
@@ -179,9 +177,10 @@ public final class ExcelCellQuickBuilder {
          * @param customizer 自定义器
          * @return ExcelCellBuilder
          */
-        public ExcelCellBuilder cell(@NonNull String title, @NonNull String fieldName, @NonNull Consumer<ExcelCellDescriptor.ExcelCellDescriptorBuilder> customizer) {
+        public ExcelColumnBuilder column(@NonNull String title, @NonNull String fieldName, @NonNull Consumer<ExcelCellDescriptor.ExcelCellDescriptorBuilder> customizer) {
             ExcelCellDescriptor.ExcelCellDescriptorBuilder builder = create(title, fieldName);
             customizer.accept(builder);
+            this.columns.add(builder.build());
             return this;
         }
 
@@ -192,8 +191,8 @@ public final class ExcelCellQuickBuilder {
          * @param fieldName 字段名称
          * @return ExcelCellBuilder
          */
-        public ExcelCellBuilder cell(@NonNull String title, @NonNull String fieldName) {
-            this.cells.add(create(title, fieldName).build());
+        public ExcelColumnBuilder column(@NonNull String title, @NonNull String fieldName) {
+            this.columns.add(create(title, fieldName).build());
             return this;
         }
 
@@ -203,16 +202,16 @@ public final class ExcelCellQuickBuilder {
          * @param fieldName 字段名称
          * @return ExcelCellBuilder
          */
-        public ExcelCellBuilder cell(@NonNull String fieldName) {
-            this.cells.add(create(null, fieldName).build());
+        public ExcelColumnBuilder column(@NonNull String fieldName) {
+            this.columns.add(create(null, fieldName).build());
             return this;
         }
 
+        @NonNull
         public List<ExcelCellDescriptor> build() {
-            return this.cells;
+            return List.copyOf(this.columns);
         }
 
-        @NotNull
         private ExcelCellDescriptor.ExcelCellDescriptorBuilder create(@Nullable String title, @NonNull String fieldName) {
             Field field = fields.get(fieldName);
             if (field != null) {
@@ -222,7 +221,7 @@ public final class ExcelCellQuickBuilder {
             if (method != null) {
                 return buildExcelCellDescriptor(method, title);
             }
-            throw BaseException.common("not found name = " + fieldName + " field");
+            throw BaseException.common("not found property '" + fieldName + "' in class " + targetClass.getName());
         }
 
         private ExcelCellDescriptor.ExcelCellDescriptorBuilder buildExcelCellDescriptor(Field field, @Nullable String title) {
@@ -232,6 +231,35 @@ public final class ExcelCellQuickBuilder {
         private ExcelCellDescriptor.ExcelCellDescriptorBuilder buildExcelCellDescriptor(Method method, @Nullable String title) {
             String fieldName = convertGetMethodNameToFieldName(method);
             return ExcelCellDescriptor.builder(title == null ? EXCEL_TITLE_PARSE.get().apply(method) : title, fieldName).printer(ofPrinter(fieldName, method));
+        }
+
+        private static String convertGetMethodNameToFieldName(Method method) {
+            String name = method.getName();
+            if (name.startsWith("get") && name.length() > 3) {
+                name = name.substring(3);
+            } else if (name.startsWith("is") && name.length() > 2) {
+                name = name.substring(2);
+            } else {
+                throw new IllegalArgumentException("Not a getter: " + name);
+            }
+            return Introspector.decapitalize(name);
+        }
+
+        /**
+         * 获取有序字段
+         *
+         * @param orderedFields 有序字段，如果为 null，优先使用字段顺序并且将不存在 {@link Field} 且有 getter 方法的字段加入列表最后
+         * @return 有序字段
+         */
+        private List<String> getOrderedFields(@Nullable List<String> orderedFields) {
+            if (CollectionUtils.isEmpty(orderedFields)) {
+                // 按照类定义顺序获取字段和 getter 方法
+                Method[] methods = WindReflectUtils.getGetterMethods(targetClass);
+                List<String> result = Arrays.stream(WindReflectUtils.getFields(targetClass)).map(Field::getName).collect(Collectors.toList());
+                result.addAll(Arrays.stream(methods).map(ExcelColumnBuilder::convertGetMethodNameToFieldName).filter(name -> !result.contains(name)).toList());
+                return result;
+            }
+            return orderedFields;
         }
     }
 }

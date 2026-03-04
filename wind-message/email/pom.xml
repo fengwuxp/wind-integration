@@ -25,5 +25,9 @@
             <groupId>com.wind.integration</groupId>
             <artifactId>wind-integration-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib</artifactId>
+        </dependency>
     </dependencies>
 </project>

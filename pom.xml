@@ -43,7 +43,7 @@
         <aliyun.oss.version>3.18.5</aliyun.oss.version>
         <aliyun.kms.version>1.4.0</aliyun.kms.version>
         <aliyun.tea.version>1.4.1</aliyun.tea.version>
-        <aliyun.tea-openapi.version>0.3.11</aliyun.tea-openapi.version>
+        <aliyun.tea-openapi.version>0.3.10</aliyun.tea-openapi.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <dom4j.version>2.1.5</dom4j.version>
         <embedded-redis.version>1.4.3</embedded-redis.version>

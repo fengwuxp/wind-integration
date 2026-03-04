@@ -98,6 +98,11 @@
                 <artifactId>wind-message-dingtalk</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.socketio4j</groupId>
+                <artifactId>netty-socketio-core</artifactId>
+                <version>${netty-socketio-core.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 </project>

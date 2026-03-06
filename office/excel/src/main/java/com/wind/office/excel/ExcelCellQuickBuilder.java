@@ -102,7 +102,7 @@ public final class ExcelCellQuickBuilder {
     @SuppressWarnings("unchecked")
     @Nullable
     private static Printer<?> createDefaultPrinterByClass(Class<?> clazz) {
-        if (clazz.isAssignableFrom(DescriptiveEnum.class)) {
+        if (DescriptiveEnum.class.isAssignableFrom(clazz)) {
             return DefaultFormatterFactory.ofEnum((Class<? extends DescriptiveEnum>) clazz);
         }
         if (Objects.equals(clazz, Boolean.class) || Objects.equals(clazz, boolean.class)) {
@@ -117,7 +117,7 @@ public final class ExcelCellQuickBuilder {
         if (clazz.isArray()) {
             return DefaultFormatterFactory.ofArray();
         }
-        if (clazz.isAssignableFrom(Collection.class)) {
+        if (Collection.class.isAssignableFrom(clazz)) {
             return DefaultFormatterFactory.ofCollection();
         }
         return null;

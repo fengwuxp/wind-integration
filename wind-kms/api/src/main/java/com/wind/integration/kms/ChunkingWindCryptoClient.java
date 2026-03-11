@@ -36,26 +36,23 @@ public class ChunkingWindCryptoClient implements WindCryptoClient {
     @Override
     public String encrypt(String keyId, String plaintext, Map<String, Object> options) {
         byte[] bytes = plaintext.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length < chunkSizeBytes) {
-            return delegate.encrypt(keyId, plaintext, options);
-        }
-
-        List<String> encryptedParts = new ArrayList<>();
-        int offset = 0;
-        while (offset < bytes.length) {
-            int end = Math.min(offset + chunkSizeBytes, bytes.length);
-            // 避免截断 UTF-8 多字节字符
-            while (end < bytes.length && (bytes[end] & 0xC0) == 0x80) {
-                end--;
+        if (bytes.length >= chunkSizeBytes) {
+            List<String> encryptedParts = new ArrayList<>();
+            int offset = 0;
+            while (offset < bytes.length) {
+                int end = Math.min(offset + chunkSizeBytes, bytes.length);
+                // 避免截断 UTF-8 多字节字符
+                while (end < bytes.length && (bytes[end] & 0xC0) == 0x80) {
+                    end--;
+                }
+                String part = new String(bytes, offset, end - offset, StandardCharsets.UTF_8);
+                encryptedParts.add(delegate.encrypt(keyId, part, options));
+                offset = end;
             }
-            String part = new String(bytes, offset, end - offset, StandardCharsets.UTF_8);
-
-            encryptedParts.add(delegate.encrypt(keyId, part, options));
-
-            offset = end;
+            return String.join(CHUNK_SEPARATOR, encryptedParts);
         }
+        return delegate.encrypt(keyId, plaintext, options);
 
-        return String.join(CHUNK_SEPARATOR, encryptedParts);
     }
 
     @Override

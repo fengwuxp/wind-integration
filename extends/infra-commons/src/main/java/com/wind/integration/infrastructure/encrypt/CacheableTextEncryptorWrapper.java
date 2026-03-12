@@ -37,20 +37,16 @@ public class CacheableTextEncryptorWrapper implements TextEncryptor {
     }
 
     public CacheableTextEncryptorWrapper(TextEncryptor delegate) {
-        this(delegate, Duration.ofMinutes(45), 32 * 1024);
-    }
-
-    public static CacheableTextEncryptorWrapper alibabaKms() {
-        return new CacheableTextEncryptorWrapper(new AlibabaKmsEncryptor());
+        this(delegate, Duration.ofMinutes(90), 16 * 1024);
     }
 
     @Override
-    public String encrypt(String text) {
+    public @NonNull String encrypt(@NonNull String text) {
         return delegate.encrypt(text);
     }
 
     @Override
-    public String decrypt(String encryptedText) {
+    public @NonNull String decrypt(String encryptedText) {
         String localEncrypt = decryptedCaches.get(DigestUtils.sha256Hex(encryptedText.getBytes(StandardCharsets.UTF_8)), k -> {
             String val = delegate.decrypt(encryptedText);
             return localTextEncryptor.encrypt(val);

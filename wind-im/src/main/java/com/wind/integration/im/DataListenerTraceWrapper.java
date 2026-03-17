@@ -31,15 +31,10 @@ public record DataListenerTraceWrapper<T>(DataListener<T> delegate) implements D
 
     @Override
     public void onData(SocketIOClient client, T data, AckRequest ackSender) throws Exception {
-        try {
-            // 在当前线程上下文生成 trackingId
-            WindTracer.TRACER.trace();
-            // 委托给原始 listener
+        WindTracer.TRACER.call(() -> {
             delegate.onData(client, data, ackSender);
-        } finally {
-            // 确保清理，避免 traceId 泄漏
-            WindTracer.TRACER.clear();
-        }
+            return null;
+        });
     }
 
 

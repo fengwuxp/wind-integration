@@ -8,11 +8,13 @@ import com.aliyun.kms20160120.models.EncryptResponse;
 import com.aliyun.kms20160120.models.GetSecretValueRequest;
 import com.aliyun.kms20160120.models.GetSecretValueResponse;
 import com.aliyun.kms20160120.models.GetSecretValueResponseBody;
+import com.aliyun.teaopenapi.models.Config;
 import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.exception.BaseException;
 import com.wind.common.exception.DefaultExceptionCode;
 import com.wind.common.jul.WindJulLogFactory;
+import com.wind.integration.alibaba.credential.AlibabaCloudCredentialUtils;
 import com.wind.integration.kms.WindCredentialsClient;
 import com.wind.integration.kms.WindCryptoClient;
 import com.wind.integration.kms.WindKmsException;
@@ -48,6 +50,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     /**
      * 用于解密 kms ak/sk 的秘钥文件路径
      */
+    @Deprecated(forRemoval = true)
     private static final String KMS_KEY_AES_KEY_FILEPATH = "classpath*:kms_key_aes.key";
 
     /**
@@ -62,7 +65,8 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
 
     /**
      * kms endpoint
-     * 小规格 KMS 建议采用共享网关模式：https://help.aliyun.com/zh/kms/key-management-service/developer-reference/classic-kms-sdkclassic-kms-sdk/?spm=5176.2020520104.console-base_help.dexternal.56ab3a98uyH16c
+     * 小规格 KMS 建议采用共享网关模式：https://help.aliyun.com/zh/kms/key-management-service/developer-reference/classic-kms-sdkclassic-kms-sdk/?spm=5176.2020520104.console-base_help
+     * .dexternal.56ab3a98uyH16c
      * 避免 QPS  超限
      */
     private static final String ALIBABA_CLOUD_ENDPOINT = "ALIBABA_CLOUD_K_ENDPOINT";
@@ -71,26 +75,50 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
 
     private static final String ALIBABA_CLOUD_ACCESS_SECRET_NAME = "ALIBABA_CLOUD_K_SK";
 
+    private static final String ALIBABA_CLOUD_KMS_INSTANCE_ID_VALUE = "";
+
     private final Client client;
 
-    public AlibabaCloudKmsCryptoClient(Client client) {
+    private AlibabaCloudKmsCryptoClient(Client client) {
         this.client = client;
     }
 
     /**
-     * 从环境变量中获取配置创建 client
+     * 通过 OIDCRoleArn 方式创建
      *
-     * @return AlibabaCloudKmsReadyOnlyClient
+     * @return AlibabaCloudKmsCryptoClient
+     */
+    public static AlibabaCloudKmsCryptoClient withOIDCRoleArn() {
+        Config config = AlibabaCloudCredentialUtils.withOIDCRoleArnFormEnv();
+        return new AlibabaCloudKmsCryptoClient(buildKmsClient(config));
+    }
+
+    /**
+     * 通过 OIDCRoleArn 方式创建
+     *
+     * @return AlibabaCloudKmsCryptoClient
+     */
+    public static AlibabaCloudKmsCryptoClient withOIDCRoleArn(com.aliyun.credentials.models.Config credentialConfig) {
+        Config config = AlibabaCloudCredentialUtils.withOIDCRoleArn(credentialConfig);
+        return new AlibabaCloudKmsCryptoClient(buildKmsClient(config));
+    }
+
+    /**
+     * 通过 withOIDCRoleArn 或 凭据配置文件创建
+     *
+     * @return AlibabaCloudKmsCryptoClient
      */
     public static AlibabaCloudKmsCryptoClient defaults() {
-        return of(text -> text);
+        Config config = AlibabaCloudCredentialUtils.defaults();
+        return new AlibabaCloudKmsCryptoClient(buildKmsClient(config));
     }
 
     /**
      * 从环境变量中获取配置创建 client
      *
-     * @return AlibabaCloudKmsReadyOnlyClient
+     * @return AlibabaCloudKmsCryptoClient
      */
+    @Deprecated(forRemoval = true)
     public static AlibabaCloudKmsCryptoClient of() {
         String key = loadFileAsText();
         if (StringUtils.hasText(key)) {
@@ -109,12 +137,12 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
      * 从环境变量中获取配置创建 client
      *
      * @param decryptFunc 解密函数
-     * @return AlibabaCloudKmsReadyOnlyClient
+     * @return AlibabaCloudKmsCryptoClient
      */
+    @Deprecated(forRemoval = true)
     public static AlibabaCloudKmsCryptoClient of(UnaryOperator<String> decryptFunc) {
         // 必填，请确保代码运行环境设置了环境变量 ALIBABA_CLOUD_ACCESS_KEY_ID。
-        return form(decryptFunc.apply(requireEnv(ALIBABA_CLOUD_ACCESS_KEY_NAME)),
-                decryptFunc.apply(requireEnv(ALIBABA_CLOUD_ACCESS_SECRET_NAME)), getAlibabaCloudKmsEndpoint());
+        return create(decryptFunc.apply(requireEnv(ALIBABA_CLOUD_ACCESS_KEY_NAME)), decryptFunc.apply(requireEnv(ALIBABA_CLOUD_ACCESS_SECRET_NAME)), getAlibabaCloudKmsEndpoint());
     }
 
     /**
@@ -122,10 +150,10 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
      *
      * @param ak       assess key
      * @param sk       access secret key
-     * @param endpoint Endpoint 请参考：https://api.aliyun.com/product/Kms
+     * @param endpoint Endpoint 请参考：<a href="https://api.aliyun.com/product/Kms">密钥管理服务</a>
      * @return AlibabaCloudKmsReadyOnlyClient
      */
-    public static AlibabaCloudKmsCryptoClient form(String ak, String sk, String endpoint) {
+    static AlibabaCloudKmsCryptoClient create(String ak, String sk, String endpoint) {
         AssertUtils.hasText(ak, "argument ak must not empty");
         AssertUtils.hasText(sk, "argument sk must not empty");
         AssertUtils.hasText(endpoint, "argument endpoint must not empty");
@@ -137,11 +165,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
                 .setAccessKeyId(ak)
                 .setAccessKeySecret(sk)
                 .setEndpoint(endpoint);
-        try {
-            return new AlibabaCloudKmsCryptoClient(new Client(config));
-        } catch (Exception exception) {
-            throw new WindKmsException(exception);
-        }
+        return new AlibabaCloudKmsCryptoClient(buildKmsClient(config));
     }
 
     @Override
@@ -231,5 +255,16 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
         }
         // 使用指定的端点
         return requireEnv(ALIBABA_CLOUD_ENDPOINT);
+    }
+
+    private static Client buildKmsClient(Config config) {
+        try {
+            if (config.getEndpoint() == null || config.getEndpoint().isBlank()) {
+                config.setEndpoint(getAlibabaCloudKmsEndpoint());
+            }
+            return new Client(config);
+        } catch (Exception exception) {
+            throw new BaseException(DefaultExceptionCode.COMMON_ERROR, "build kms client error", exception);
+        }
     }
 }

@@ -12,7 +12,11 @@
     <artifactId>wind-kms-alibabacloud</artifactId>
 
     <dependencies>
-        <!-- https://mvnrepository.com/artifact/com.aliyun/kms20160120 -->
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>credentials-java</artifactId>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>com.aliyun</groupId>
             <artifactId>kms20160120</artifactId>

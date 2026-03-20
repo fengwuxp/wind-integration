@@ -1,0 +1,123 @@
+package com.wind.integration.alibaba.credential;
+
+import com.aliyun.credentials.models.Config;
+import com.wind.common.exception.AssertUtils;
+import com.wind.common.exception.BaseException;
+import com.wind.common.exception.DefaultExceptionCode;
+import org.jspecify.annotations.NonNull;
+import org.springframework.security.crypto.encrypt.TextEncryptor;
+import org.springframework.util.StringUtils;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.StringReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * TODO 待移动到独立的包模块下
+ * 阿里云凭证工具类
+ *
+ * @author wuxp
+ * @date 2026-03-20 12:50
+ **/
+public final class AlibabaCloudCredentialUtils {
+
+    private static final AtomicReference<TextEncryptor> CREDENTIAL_ENCRYPTOR = new AtomicReference<>(new TextEncryptor() {
+        @Override
+        public @NonNull String encrypt(@NonNull String text) {
+            return text;
+        }
+
+        @Override
+        public @NonNull String decrypt(@NonNull String encryptedText) {
+            return encryptedText;
+        }
+    });
+
+    /**
+     * 阿里云凭据文件
+     */
+    private static final String ALIBABA_CLOUD_ACCESS_KEY_FILEPATH = "/etc/secrets/alibaba_cloud_credential";
+
+    private AlibabaCloudCredentialUtils() {
+        throw new AssertionError();
+    }
+
+    /**
+     * 通过 OIDCRole 方式创建阿里云 api 凭证配置
+     *
+     * @return AlibabaCloudKmsCryptoClient
+     */
+    public static com.aliyun.teaopenapi.models.Config withOIDCRoleArnFormEnv() {
+        Config credentialConfig = new Config();
+        return withOIDCRoleArn(credentialConfig);
+    }
+
+    /**
+     * 通过 OIDCRole 方式创建阿里云 api 凭证配置
+     * 参见 <a href="https://help.aliyun.com/zh/sdk/developer-reference/v2-manage-access-credentials?spm=a2c4g.11186623.0.0.19284c3eNavDAp#ec8021b053aqe">管理访问凭据#方式六：OIDCRoleArn</a>
+     *
+     * @param credentialConfig 凭证获取配置
+     * @return AlibabaCloudKmsCryptoClient
+     */
+    public static com.aliyun.teaopenapi.models.Config withOIDCRoleArn(Config credentialConfig) {
+        credentialConfig.setType("oidc_role_arn");
+        com.aliyun.credentials.Client credentialClient = new com.aliyun.credentials.Client(credentialConfig);
+        com.aliyun.teaopenapi.models.Config result = new com.aliyun.teaopenapi.models.Config();
+        result.setCredential(credentialClient);
+        return result;
+    }
+
+    /**
+     * 默认的阿里云凭证获取方式
+     *
+     * @return AlibabaCloudKmsCryptoClient
+     */
+    public static com.aliyun.teaopenapi.models.Config defaults() {
+        if (StringUtils.hasText(System.getenv("ALIBABA_CLOUD_ROLE_ARN")) && StringUtils.hasText(System.getenv("ALIBABA_CLOUD_OIDC_PROVIDER_ARN"))) {
+            return withOIDCRoleArnFormEnv();
+        }
+        return withCredentialFile();
+    }
+
+    /**
+     * 从文件中加载阿里云 AK/SK
+     *
+     * @return AlibabaCloudKmsCryptoClient
+     */
+    public static com.aliyun.teaopenapi.models.Config withCredentialFile() {
+        List<String> credential = loadCredentialConfig();
+        com.aliyun.teaopenapi.models.Config result = new com.aliyun.teaopenapi.models.Config();
+        result.setAccessKeyId(credential.getFirst());
+        result.setAccessKeySecret(credential.get(1));
+        return result;
+    }
+
+    /**
+     * 设置阿里云凭证解密器
+     *
+     * @param credentialEncryptor 凭证解密器
+     */
+    public static void setCredentialEncryptor(@NonNull TextEncryptor credentialEncryptor) {
+        CREDENTIAL_ENCRYPTOR.set(credentialEncryptor);
+    }
+
+    private static List<String> loadCredentialConfig() {
+        Path filepath = Path.of(ALIBABA_CLOUD_ACCESS_KEY_FILEPATH);
+        AssertUtils.isTrue(Files.exists(filepath), "alibaba cloud credential file not found");
+        AssertUtils.notNull(CREDENTIAL_ENCRYPTOR.get(), "credential encryptor not init");
+        try {
+            String content = Files.readString(filepath);
+            String config = CREDENTIAL_ENCRYPTOR.get().decrypt(content);
+            BufferedReader reader = new BufferedReader(new StringReader(config));
+            List<String> result = reader.lines().filter(StringUtils::hasText).toList();
+            AssertUtils.isTrue(result.size() >= 2, "alibaba cloud credential file format error");
+            return result;
+        } catch (IOException exception) {
+            throw new BaseException(DefaultExceptionCode.COMMON_ERROR, "load alibaba cloud credential file failure", exception);
+        }
+    }
+}

@@ -27,7 +27,7 @@ public class AlibabaKmsEncryptor implements TextEncryptor {
     }
 
     public AlibabaKmsEncryptor() {
-        this(AlibabaCloudKmsCryptoClient.of());
+        this(AlibabaCloudKmsCryptoClient.defaults());
     }
 
     /**
@@ -44,7 +44,7 @@ public class AlibabaKmsEncryptor implements TextEncryptor {
      * @return TextEncryptor
      */
     public static TextEncryptor withChunk() {
-        ChunkingWindCryptoClient client = new ChunkingWindCryptoClient(AlibabaCloudKmsCryptoClient.of());
+        ChunkingWindCryptoClient client = new ChunkingWindCryptoClient(AlibabaCloudKmsCryptoClient.defaults());
         return new AlibabaKmsEncryptor(client);
     }
 

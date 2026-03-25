@@ -60,7 +60,7 @@ public class WindWebSocketConfiguration {
      * @return WindSocketSessionManager 实例
      */
     @Bean
-    @ConditionalOnBean(value = {RedissonClient.class, WindChatSessionService.class, WindSocketClientClientConnectionFactory.class})
+    @ConditionalOnBean(value = {WindSocketClientClientConnectionFactory.class})
     public WindSocketSessionRegistry windSocketSessionRegistry(RedissonClient redissonClient, WindChatSessionService windChatSessionService,
                                                                WindSocketClientClientConnectionFactory factory) {
         return new DefaultWindSocketSessionRegistry(redissonClient, windChatSessionService, factory);
@@ -79,22 +79,22 @@ public class WindWebSocketConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean({WindSocketConnectionListener.class, WindSocketClientClientConnectionFactory.class})
+    @ConditionalOnBean({WindSocketClientClientConnectionFactory.class})
     @ConditionalOnMissingBean(ConnectListener.class)
     public DefaultSocketioConnectListener defaultSocketioConnectListener(WindSocketConnectionListener socketConnectionListener, WindSocketClientClientConnectionFactory factory) {
         return new DefaultSocketioConnectListener(socketConnectionListener, factory);
     }
 
     @Bean
-    @ConditionalOnBean({WindSocketConnectionListener.class, WindSocketClientClientConnectionFactory.class})
+    @ConditionalOnBean({WindSocketClientClientConnectionFactory.class})
     @ConditionalOnMissingBean(DisconnectListener.class)
-    public DefaultSocketioDisconnectListener defaultSocketioDisconnectListener(WindSocketConnectionListener socketConnectionListener,
-                                                                               WindSocketClientClientConnectionFactory factory) {
+    public DisconnectListener defaultSocketioDisconnectListener(WindSocketConnectionListener socketConnectionListener,
+                                                                WindSocketClientClientConnectionFactory factory) {
         return new DefaultSocketioDisconnectListener(socketConnectionListener, factory);
     }
 
     @Bean
-    @ConditionalOnBean(value = {WindSocketSessionRegistry.class, WindChatMessageRepository.class, WindChatMessageRevokeCommandHandler.class})
+    @ConditionalOnBean(value = {WindSocketSessionRegistry.class})
     public DefaultSessionMessageSender defaultSessionMessageSender(WindSocketSessionRegistry sessionRegistry, WindChatMessageRepository chatMessageRepository,
                                                                    WindChatMessageRevokeCommandHandler handler) {
         return new DefaultSessionMessageSender(sessionRegistry, chatMessageRepository, handler);
@@ -102,7 +102,6 @@ public class WindWebSocketConfiguration {
 
     @Bean
     @Primary
-    @ConditionalOnBean(WindSessionMessageSender.class)
     public CompositeSessionMessageSender compositeSessionMessageSender(List<WindSessionMessageSender> senders) {
         return new CompositeSessionMessageSender(senders);
     }

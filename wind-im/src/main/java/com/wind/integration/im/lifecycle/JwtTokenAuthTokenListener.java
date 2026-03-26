@@ -12,6 +12,8 @@ import com.wind.websocket.WindWebSocketMetadataNames;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 
+import java.util.Map;
+
 /**
  * Netty-SocketIO 的认证 Token 处理监听器实现
  * <p>
@@ -44,12 +46,13 @@ public record JwtTokenAuthTokenListener(AuthenticationTokenCodecService authenti
 
     private static final AuthTokenResult INVALID_TOKEN = new AuthTokenResult(false, "Invalid token");
 
+    private static final String AUTH_TOKEN_NAME = "token";
+
     @Override
     public AuthTokenResult getAuthTokenResult(Object authToken, SocketIOClient client) {
         try {
-            // 1. 从连接包中解析传入的 token（需为字符串类型）
-            String token = (String) authToken;
-            if (StringUtils.hasText(token)) {
+            String token = parseAuthToken(authToken);
+            if (!StringUtils.hasText(token)) {
                 return INVALID_TOKEN;
             }
 
@@ -68,5 +71,15 @@ public record JwtTokenAuthTokenListener(AuthenticationTokenCodecService authenti
             client.disconnect();
         }
         return INVALID_TOKEN;
+    }
+
+    private String parseAuthToken(Object authToken) {
+        if (authToken instanceof String token) {
+            return token;
+        }
+        if (authToken instanceof Map<?, ?> tokenMap && tokenMap.get(AUTH_TOKEN_NAME) instanceof String token) {
+            return token;
+        }
+        return null;
     }
 }

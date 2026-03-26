@@ -22,10 +22,10 @@ public final class WindInternalApiConstants {
     /**
      * 内网开放 API 前缀 （不需要验签）
      */
-    public static final String INC_BASIC_API_PREFIX = INC_API_PREFIX + "/basic/";
+    public static final String INC_BASIC_API_PREFIX = INC_API_PREFIX + "/basic";
 
     /**
      * 内网安全 API 前缀 （需要验签）
      */
-    public static final String INC_SECURE_API_PREFIX = INC_API_PREFIX + "/secure/";
+    public static final String INC_SECURE_API_PREFIX = INC_API_PREFIX + "/secure";
 }

@@ -46,6 +46,8 @@ public record DefaultSocketioConnectListener(String nodeIpAddress, WindSocketCon
 
             // 2. 填充客户端元数据
             Map<String, Object> metadata = new HashMap<>();
+            metadata.put(WindWebSocketMetadataNames.USER_ID_NAME, client.get(WindWebSocketMetadataNames.USER_ID_NAME));
+            metadata.put(WindImConstants.USERNAME_VARIABLE_NAME, client.get(WindImConstants.USERNAME_VARIABLE_NAME));
             metadata.put(WindWebSocketMetadataNames.CLIENT_ID_NAME, clientId);
             metadata.put(WindWebSocketMetadataNames.CLIENT_DEVICE_TYPE_NAME, deviceType);
             metadata.put(WindWebSocketMetadataNames.GMT_CONNECTED_NAME, LocalDateTime.now());

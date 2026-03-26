@@ -36,7 +36,7 @@ public record RouteMessageRequest<T>(@NonNull String sessionId,
             @JsonProperty(Fields.payload) T payload,
             @JsonProperty(Fields.receiveUserId) String receiveUserId,
             @JsonProperty(Fields.receiveClientDeviceType) String receiveClientDeviceType,
-            @JsonProperty(Fields.receiveClientDeviceType) Map<String, Object> metadata
+            @JsonProperty(Fields.metadata) Map<String, Object> metadata
     ) {
         this.sessionId = sessionId;
         this.payload = payload;

@@ -32,7 +32,7 @@ public class RemoteSocketRouteClientConnection implements WindSocketRouteClientC
     private static final ExecutorService EXECUTOR = ExecutorServiceUtils.custom("route-message-sent-", 1, 4, 128);
 
     // TODO 支持端口号配置
-    private static final String REMOTE_NODE_URL_PATTERN = "http://%s:8080%s";
+    private static final String REMOTE_NODE_URL_PATTERN = "http://%s:8080/%s";
 
     private final String remoteNodeAddress;
 
@@ -42,7 +42,7 @@ public class RemoteSocketRouteClientConnection implements WindSocketRouteClientC
 
     private final RestClient restClient;
 
-     RemoteSocketRouteClientConnection(String remoteNodeAddress, String sessionId, Map<String, Object> metadata, RestClient restClient) {
+    RemoteSocketRouteClientConnection(String remoteNodeAddress, String sessionId, Map<String, Object> metadata, RestClient restClient) {
         this.remoteNodeAddress = remoteNodeAddress;
         this.sessionId = sessionId;
         this.metadata = metadata;

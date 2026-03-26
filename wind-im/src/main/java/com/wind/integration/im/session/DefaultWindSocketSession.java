@@ -6,6 +6,7 @@ import com.wind.integration.im.connection.DefaultWindSocketConnectionListener;
 import com.wind.integration.im.connection.ImmutableSocketClientConnectionMetadata;
 import com.wind.integration.im.spi.WindChatSessionService;
 import com.wind.websocket.core.SocketClientConnectionDescriptor;
+import com.wind.websocket.core.WindSessionConnectionPolicy;
 import com.wind.websocket.core.WindSocketClientClientConnection;
 import com.wind.websocket.core.WindSocketClientClientConnectionFactory;
 import com.wind.websocket.core.WindSocketSession;
@@ -400,6 +401,11 @@ public class DefaultWindSocketSession implements WindSocketSession {
     @Override
     public WindSocketSessionStatus getStatus() {
         return sessionDescriptor.getStatus();
+    }
+
+    @Override
+    public @NotNull WindSessionConnectionPolicy getSessionConnectionPolicy() {
+        return sessionDescriptor.getSessionConnectionPolicy();
     }
 
     @Override

@@ -4,6 +4,8 @@ import com.aliyun.credentials.models.Config;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.exception.BaseException;
 import com.wind.common.exception.DefaultExceptionCode;
+import com.wind.common.jul.WindJulLogFactory;
+import com.wind.integration.alibaba.AlibabaCloudKmsCryptoClient;
 import com.wind.integration.kms.WindKmsClientCredentialsDecryptor;
 import org.springframework.util.StringUtils;
 
@@ -13,6 +15,8 @@ import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * TODO 待移动到独立的包模块下
@@ -22,6 +26,8 @@ import java.util.List;
  * @date 2026-03-20 12:50
  **/
 public final class AlibabaCloudCredentialUtils {
+
+    private static final Logger LOGGER = WindJulLogFactory.getLogger(AlibabaCloudCredentialUtils.class);
 
     private static final WindKmsClientCredentialsDecryptor CREDENTIALS_DECRYPTOR = WindKmsClientCredentialsDecryptor.getInstance();
 

@@ -30,11 +30,6 @@
         </dependency>
         <dependency>
             <groupId>com.wind.integration</groupId>
-            <artifactId>wind-kms-alibabacloud</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>com.wind.integration</groupId>
             <artifactId>wind-kms-api</artifactId>
         </dependency>
         <dependency>

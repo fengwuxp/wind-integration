@@ -1,42 +1,44 @@
-package com.wind.integration.infrastructure.encrypt;
+package com.wind.integration.infrastructure.kms;
 
 import com.wind.common.util.ServiceInfoUtils;
-import com.wind.integration.alibaba.AlibabaCloudKmsCryptoClient;
 import com.wind.integration.kms.ChunkingWindCryptoClient;
 import com.wind.integration.kms.WindCryptoClient;
+import com.wind.integration.kms.WindKmsClientProvider;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 
 /**
- * 阿里云 KMS 加密
+ * 基于 kms 文本加密器
  *
- * @author fanqingwei
- * @since 2025-05-13
- */
-@Deprecated(forRemoval = true)
-public class AlibabaKmsEncryptor implements TextEncryptor {
+ * @author wuxp
+ * @date 2026-03-27 10:53
+ **/
+public class KmsTextEncryptor implements TextEncryptor {
 
     /**
      * 线上 kms 加密秘钥 ID
      */
     private static final String ONLINE_DB_ENCRYPT_KEY_ID = ServiceInfoUtils.getSystemProperty("wind.kms.db.encrypt.id");
 
+    static final WindKmsClientProvider KMS_CLIENT_PROVIDER = WindKmsClientProvider.getInstance();
+
     private final WindCryptoClient cryptoClient;
 
-    public AlibabaKmsEncryptor(WindCryptoClient cryptoClient) {
+    public KmsTextEncryptor(WindCryptoClient cryptoClient) {
         this.cryptoClient = cryptoClient;
     }
 
-    public AlibabaKmsEncryptor() {
-        this(AlibabaCloudKmsCryptoClient.defaults());
+    private KmsTextEncryptor() {
+        this(KMS_CLIENT_PROVIDER.getCryptoClient());
     }
 
     /**
      * 默认
+     *
      * @return TextEncryptor
      */
     public static TextEncryptor defaults() {
-        return new AlibabaKmsEncryptor();
+        return new KmsTextEncryptor();
     }
 
     /**
@@ -45,8 +47,8 @@ public class AlibabaKmsEncryptor implements TextEncryptor {
      * @return TextEncryptor
      */
     public static TextEncryptor withChunk() {
-        ChunkingWindCryptoClient client = new ChunkingWindCryptoClient(AlibabaCloudKmsCryptoClient.defaults());
-        return new AlibabaKmsEncryptor(client);
+        ChunkingWindCryptoClient client = new ChunkingWindCryptoClient(KMS_CLIENT_PROVIDER.getCryptoClient());
+        return new KmsTextEncryptor(client);
     }
 
     @Override

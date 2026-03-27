@@ -1,22 +1,22 @@
-package com.wind.integration.alibaba;
+package com.wind.integration.infrastructure.kms;
 
 import com.wind.common.jul.WindJulLogFactory;
 import com.wind.core.WindCredentialsProvider;
 import com.wind.integration.kms.WindCredentialsClient;
-
 import jakarta.validation.constraints.NotBlank;
+
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
 /**
- * 阿里云 kms 凭据提供者
+ * 基于 kms 凭据提供者，例如：阿里云
  *
  * @author wuxp
- * @date 2025-02-18 15:41
+ * @date 2026-03-27 10:58
  **/
-public class AlibabaCloudKmsCredentialsProvider implements WindCredentialsProvider {
+public class DefaultKmsCredentialsProvider implements WindCredentialsProvider {
 
-    private static final Logger LOGGER = WindJulLogFactory.getLogger(AlibabaCloudKmsCredentialsProvider.class);
+    private static final Logger LOGGER = WindJulLogFactory.getLogger(DefaultKmsCredentialsProvider.class);
 
     private final AtomicReference<WindCredentialsClient> client = new AtomicReference<>();
 
@@ -27,7 +27,7 @@ public class AlibabaCloudKmsCredentialsProvider implements WindCredentialsProvid
             // 改为延迟初始化，避免不强依赖 kms 时初始化错误
             if (client.get() == null) {
                 LOGGER.info("Init WindCredentialsClient");
-                client.set(AlibabaCloudKmsCryptoClient.defaults());
+                client.set(KmsTextEncryptor.KMS_CLIENT_PROVIDER.getCredentialsClient());
             }
         }
         return client.get().getCredentialsAsText(credentialsName);

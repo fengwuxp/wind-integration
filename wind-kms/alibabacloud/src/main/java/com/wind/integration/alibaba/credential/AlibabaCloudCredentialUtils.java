@@ -4,8 +4,7 @@ import com.aliyun.credentials.models.Config;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.exception.BaseException;
 import com.wind.common.exception.DefaultExceptionCode;
-import org.jspecify.annotations.NonNull;
-import org.springframework.security.crypto.encrypt.TextEncryptor;
+import com.wind.integration.kms.WindKmsClientCredentialsDecryptor;
 import org.springframework.util.StringUtils;
 
 import java.io.BufferedReader;
@@ -14,7 +13,6 @@ import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * TODO 待移动到独立的包模块下
@@ -25,17 +23,7 @@ import java.util.concurrent.atomic.AtomicReference;
  **/
 public final class AlibabaCloudCredentialUtils {
 
-    private static final AtomicReference<TextEncryptor> CREDENTIAL_ENCRYPTOR = new AtomicReference<>(new TextEncryptor() {
-        @Override
-        public @NonNull String encrypt(@NonNull String text) {
-            return text;
-        }
-
-        @Override
-        public @NonNull String decrypt(@NonNull String encryptedText) {
-            return encryptedText;
-        }
-    });
+    private static final WindKmsClientCredentialsDecryptor CREDENTIALS_DECRYPTOR = WindKmsClientCredentialsDecryptor.getInstance();
 
     /**
      * 阿里云凭据文件
@@ -96,22 +84,12 @@ public final class AlibabaCloudCredentialUtils {
         return result;
     }
 
-    /**
-     * 设置阿里云凭证解密器
-     *
-     * @param credentialEncryptor 凭证解密器
-     */
-    public static void setCredentialEncryptor(@NonNull TextEncryptor credentialEncryptor) {
-        CREDENTIAL_ENCRYPTOR.set(credentialEncryptor);
-    }
-
     private static List<String> loadCredentialConfig() {
         Path filepath = Path.of(ALIBABA_CLOUD_ACCESS_KEY_FILEPATH);
         AssertUtils.isTrue(Files.exists(filepath), "alibaba cloud credential file not found");
-        AssertUtils.notNull(CREDENTIAL_ENCRYPTOR.get(), "credential encryptor not init");
         try {
             String content = Files.readString(filepath);
-            String config = CREDENTIAL_ENCRYPTOR.get().decrypt(content);
+            String config = CREDENTIALS_DECRYPTOR.decrypt(content);
             BufferedReader reader = new BufferedReader(new StringReader(config));
             List<String> result = reader.lines().filter(StringUtils::hasText).toList();
             AssertUtils.isTrue(result.size() >= 2, "alibaba cloud credential file format error");

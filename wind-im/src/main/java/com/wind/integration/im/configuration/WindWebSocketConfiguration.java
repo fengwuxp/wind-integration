@@ -121,7 +121,7 @@ public class WindWebSocketConfiguration {
     @Bean
     @ConditionalOnBean(value = {WindSocketIOServerFactory.class})
     @ConditionalOnMissingBean(SocketIOServer.class)
-    public SocketIOServer socketIOServer(WindSocketIOServerFactory serverFactory) {
+    public SocketIOServer defaultDocketIOServer(WindSocketIOServerFactory serverFactory) {
         com.corundumstudio.socketio.Configuration config = new com.corundumstudio.socketio.Configuration();
         config.setHostname("0.0.0.0");
         config.setPort(8081);

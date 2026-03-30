@@ -4,8 +4,11 @@ import com.wind.common.util.ServiceInfoUtils;
 import com.wind.integration.kms.ChunkingWindCryptoClient;
 import com.wind.integration.kms.WindCryptoClient;
 import com.wind.integration.kms.WindKmsClientProvider;
+import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
+
+import java.util.ServiceLoader;
 
 /**
  * 基于 kms 文本加密器
@@ -20,7 +23,7 @@ public class KmsTextEncryptor implements TextEncryptor {
      */
     private static final String ONLINE_DB_ENCRYPT_KEY_ID = ServiceInfoUtils.getSystemProperty("wind.kms.db.encrypt.id");
 
-    static final WindKmsClientProvider KMS_CLIENT_PROVIDER = WindKmsClientProvider.getInstance();
+    static final WindKmsClientProvider KMS_CLIENT_PROVIDER = getProviderInstance();
 
     private final WindCryptoClient cryptoClient;
 
@@ -59,5 +62,17 @@ public class KmsTextEncryptor implements TextEncryptor {
     @Override
     public @NonNull String decrypt(@NonNull String encryptedText) {
         return cryptoClient.decrypt(ONLINE_DB_ENCRYPT_KEY_ID, encryptedText);
+    }
+
+
+    /**
+     * 获取 kms 凭据提供者
+     *
+     * @return WindCredentialsProvider
+     */
+    @NotNull
+    private static WindKmsClientProvider getProviderInstance() {
+        ServiceLoader<WindKmsClientProvider> services = ServiceLoader.load(WindKmsClientProvider.class);
+        return services.findFirst().orElseThrow(() -> new IllegalStateException("No " + WindKmsClientProvider.class.getName() + " found"));
     }
 }

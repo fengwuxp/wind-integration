@@ -4,9 +4,8 @@ import com.aliyun.credentials.models.Config;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.exception.BaseException;
 import com.wind.common.exception.DefaultExceptionCode;
-import com.wind.common.jul.WindJulLogFactory;
-import com.wind.integration.alibaba.AlibabaCloudKmsCryptoClient;
 import com.wind.integration.kms.WindKmsClientCredentialsDecryptor;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.util.StringUtils;
 
 import java.io.BufferedReader;
@@ -15,8 +14,7 @@ import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.ServiceLoader;
 
 /**
  * TODO 待移动到独立的包模块下
@@ -27,9 +25,7 @@ import java.util.logging.Logger;
  **/
 public final class AlibabaCloudCredentialUtils {
 
-    private static final Logger LOGGER = WindJulLogFactory.getLogger(AlibabaCloudCredentialUtils.class);
-
-    private static final WindKmsClientCredentialsDecryptor CREDENTIALS_DECRYPTOR = WindKmsClientCredentialsDecryptor.getInstance();
+    private static final WindKmsClientCredentialsDecryptor CREDENTIALS_DECRYPTOR = getCredentialsDepcryptorInstance();
 
     /**
      * 阿里云凭据文件
@@ -103,5 +99,16 @@ public final class AlibabaCloudCredentialUtils {
         } catch (IOException exception) {
             throw new BaseException(DefaultExceptionCode.COMMON_ERROR, "load alibaba cloud credential file failure", exception);
         }
+    }
+
+    /**
+     * 获取默认的 kms client 凭据解密器
+     *
+     * @return WindKmsClientCredentialsDecryptor
+     */
+    @NotNull
+    private static WindKmsClientCredentialsDecryptor getCredentialsDepcryptorInstance() {
+        ServiceLoader<WindKmsClientCredentialsDecryptor> services = ServiceLoader.load(WindKmsClientCredentialsDecryptor.class);
+        return services.findFirst().orElseThrow(() -> new IllegalStateException("No " + WindKmsClientCredentialsDecryptor.class.getName() + " found"));
     }
 }

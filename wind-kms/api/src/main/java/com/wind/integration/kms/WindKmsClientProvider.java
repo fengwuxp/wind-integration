@@ -1,9 +1,6 @@
 package com.wind.integration.kms;
 
-import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
-
-import java.util.ServiceLoader;
 
 /**
  * kms 客户端提供者
@@ -29,14 +26,4 @@ public interface WindKmsClientProvider {
     @NonNull
     WindCryptoClient getCryptoClient();
 
-    /**
-     * 获取 kms 凭据提供者
-     *
-     * @return WindCredentialsProvider
-     */
-    @NotNull
-    static WindKmsClientProvider getInstance() {
-        ServiceLoader<WindKmsClientProvider> services = ServiceLoader.load(WindKmsClientProvider.class);
-        return services.findFirst().orElseThrow(() -> new IllegalStateException("No " + WindKmsClientProvider.class.getName() + " found"));
-    }
 }

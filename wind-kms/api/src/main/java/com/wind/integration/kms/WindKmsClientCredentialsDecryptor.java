@@ -1,9 +1,6 @@
 package com.wind.integration.kms;
 
-import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NullMarked;
-
-import java.util.ServiceLoader;
 
 /**
  * 用于提供 kms client 凭据解密器
@@ -19,14 +16,4 @@ public interface WindKmsClientCredentialsDecryptor {
      */
     String decrypt(String encryptedText);
 
-    /**
-     * 获取默认的 kms client 凭据解密器
-     *
-     * @return WindKmsClientCredentialsDecryptor
-     */
-    @NotNull
-    static WindKmsClientCredentialsDecryptor getInstance() {
-        ServiceLoader<WindKmsClientCredentialsDecryptor> services = ServiceLoader.load(WindKmsClientCredentialsDecryptor.class);
-        return services.findFirst().orElseThrow(() -> new IllegalStateException("No " + WindKmsClientCredentialsDecryptor.class.getName() + " found"));
-    }
 }

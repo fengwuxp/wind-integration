@@ -9,6 +9,7 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 
 import java.util.ServiceLoader;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 基于 kms 文本加密器
@@ -23,16 +24,16 @@ public class KmsTextEncryptor implements TextEncryptor {
      */
     private static final String ONLINE_DB_ENCRYPT_KEY_ID = ServiceInfoUtils.getSystemProperty("wind.kms.db.encrypt.id");
 
-    static final WindKmsClientProvider KMS_CLIENT_PROVIDER = getProviderInstance();
-
     private final WindCryptoClient cryptoClient;
+
+    private static final AtomicReference<WindKmsClientProvider> KMS_CLIENT_PROVIDER = new AtomicReference<>();
 
     public KmsTextEncryptor(WindCryptoClient cryptoClient) {
         this.cryptoClient = cryptoClient;
     }
 
     private KmsTextEncryptor() {
-        this(KMS_CLIENT_PROVIDER.getCryptoClient());
+        this(getProviderInstance().getCryptoClient());
     }
 
     /**
@@ -50,7 +51,7 @@ public class KmsTextEncryptor implements TextEncryptor {
      * @return TextEncryptor
      */
     public static TextEncryptor withChunk() {
-        ChunkingWindCryptoClient client = new ChunkingWindCryptoClient(KMS_CLIENT_PROVIDER.getCryptoClient());
+        ChunkingWindCryptoClient client = new ChunkingWindCryptoClient(getProviderInstance().getCryptoClient());
         return new KmsTextEncryptor(client);
     }
 
@@ -71,8 +72,16 @@ public class KmsTextEncryptor implements TextEncryptor {
      * @return WindCredentialsProvider
      */
     @NotNull
-    private static WindKmsClientProvider getProviderInstance() {
-        ServiceLoader<WindKmsClientProvider> services = ServiceLoader.load(WindKmsClientProvider.class);
-        return services.findFirst().orElseThrow(() -> new IllegalStateException("No " + WindKmsClientProvider.class.getName() + " found"));
+    static WindKmsClientProvider getProviderInstance() {
+        if (KMS_CLIENT_PROVIDER.get() == null) {
+            synchronized (KmsTextEncryptor.class) {
+                if (KMS_CLIENT_PROVIDER.get() == null) {
+                    ServiceLoader<WindKmsClientProvider> services = ServiceLoader.load(WindKmsClientProvider.class);
+                    KMS_CLIENT_PROVIDER.set(services.findFirst().orElseThrow(() -> new IllegalStateException("No " + WindKmsClientProvider.class.getName() + " found")));
+                }
+            }
+        }
+        return KMS_CLIENT_PROVIDER.get();
+
     }
 }

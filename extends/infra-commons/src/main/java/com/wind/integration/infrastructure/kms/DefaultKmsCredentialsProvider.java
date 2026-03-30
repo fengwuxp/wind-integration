@@ -27,7 +27,7 @@ public class DefaultKmsCredentialsProvider implements WindCredentialsProvider {
             // 改为延迟初始化，避免不强依赖 kms 时初始化错误
             if (client.get() == null) {
                 LOGGER.info("Init WindCredentialsClient");
-                client.set(KmsTextEncryptor.KMS_CLIENT_PROVIDER.getCredentialsClient());
+                client.set(KmsTextEncryptor.getProviderInstance().getCredentialsClient());
             }
         }
         return client.get().getCredentialsAsText(credentialsName);

@@ -13,16 +13,14 @@ import org.jspecify.annotations.NonNull;
  **/
 public class AlibabaCloudKmsClientProvider implements WindKmsClientProvider {
 
-    private final AlibabaCloudKmsCryptoClient client = AlibabaCloudKmsCryptoClient.defaults();
-
     @Override
     @NonNull
     public WindCredentialsClient getCredentialsClient() {
-        return client;
+        return AlibabaCloudKmsCryptoClient.defaults();
     }
 
     @Override
     public @NonNull WindCryptoClient getCryptoClient() {
-        return client;
+        return AlibabaCloudKmsCryptoClient.defaults();
     }
 }

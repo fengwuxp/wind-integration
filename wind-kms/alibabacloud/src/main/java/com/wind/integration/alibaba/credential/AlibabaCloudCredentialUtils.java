@@ -25,8 +25,6 @@ import java.util.ServiceLoader;
  **/
 public final class AlibabaCloudCredentialUtils {
 
-    private static final WindKmsClientCredentialsDecryptor CREDENTIALS_DECRYPTOR = getCredentialsDepcryptorInstance();
-
     /**
      * 阿里云凭据文件
      */
@@ -91,7 +89,7 @@ public final class AlibabaCloudCredentialUtils {
         AssertUtils.isTrue(Files.exists(filepath), "alibaba cloud credential file not found");
         try {
             String content = Files.readString(filepath);
-            String config = CREDENTIALS_DECRYPTOR.decrypt(content);
+            String config = loadDecryptor().decrypt(content);
             BufferedReader reader = new BufferedReader(new StringReader(config));
             List<String> result = reader.lines().filter(StringUtils::hasText).toList();
             AssertUtils.isTrue(result.size() >= 2, "alibaba cloud credential file format error");
@@ -107,7 +105,7 @@ public final class AlibabaCloudCredentialUtils {
      * @return WindKmsClientCredentialsDecryptor
      */
     @NotNull
-    private static WindKmsClientCredentialsDecryptor getCredentialsDepcryptorInstance() {
+    private static WindKmsClientCredentialsDecryptor loadDecryptor() {
         ServiceLoader<WindKmsClientCredentialsDecryptor> services = ServiceLoader.load(WindKmsClientCredentialsDecryptor.class);
         return services.findFirst().orElseThrow(() -> new IllegalStateException("No " + WindKmsClientCredentialsDecryptor.class.getName() + " found"));
     }

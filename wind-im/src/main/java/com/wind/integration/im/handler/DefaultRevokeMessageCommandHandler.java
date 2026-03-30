@@ -32,6 +32,8 @@ public class DefaultRevokeMessageCommandHandler implements DataListener<Immutabl
         try {
             // 发送撤回事件
             sessionMessageSender.sendMessage(command);
+            // 发送消息撤回成功 ACK
+            ackSender.sendAckData(command.getId());
         } catch (Exception exception) {
             log.error("消息撤回处理异常: sessionId = {}, messageId = {}, revokeUserId = {}, message = {}", command.sessionId(), command.messageId(), command.revokeUserId(),
                     exception.getMessage(), exception);

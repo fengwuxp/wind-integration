@@ -32,7 +32,7 @@ public final class DefaultFormatterFactory {
     private static final Map<String, DateTimeFormatter> DEFAULT_FORMATTERS = new HashMap<>();
 
     static {
-        DEFAULT_FORMATTERS.put(WindDateFormatPatterns.ISO_8601_EXTENDED_DATETIME, WindDateFormater.ISO_8601_EXTENDED_DATETIME.getFormatter());
+        DEFAULT_FORMATTERS.put(WindDateFormatPatterns.ISO_8601_LOCAL_DATETIME, WindDateFormater.ISO_8601_LOCAL_DATETIME.getFormatter());
         DEFAULT_FORMATTERS.put(WindDateFormatPatterns.YYYY_MM_DD_HH_MM_SS, WindDateFormater.YYYY_MM_DD_HH_MM_SS.getFormatter());
         DEFAULT_FORMATTERS.put(WindDateFormatPatterns.YYYY_MM_DD_HH_MM, WindDateFormater.YYYY_MM_DD_HH_MM.getFormatter());
         DEFAULT_FORMATTERS.put(WindDateFormatPatterns.YYYY_MM_DD_HH, WindDateFormater.YYYY_MM_DD_HH.getFormatter());

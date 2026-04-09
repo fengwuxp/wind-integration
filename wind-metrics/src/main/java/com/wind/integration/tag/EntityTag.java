@@ -42,16 +42,6 @@ public record EntityTag(@JsonProperty("name") @NonNull String name,
         AssertUtils.notNull(sourceId, "argument sourceId must not null");
     }
 
-    @Override
-    public @NonNull String getName() {
-        return name();
-    }
-
-    @Override
-    public @NonNull String getValue() {
-        return value();
-    }
-
     /**
      * 创建标签
      *

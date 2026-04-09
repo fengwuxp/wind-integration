@@ -20,7 +20,7 @@
         <module>core</module>
         <module>office</module>
         <module>extends</module>
-        <module>transaction</module>
+        <module>wind-money</module>
         <module>tests</module>
         <module>dependencies</module>
         <module>wind-oss</module>
@@ -29,6 +29,7 @@
         <module>wind-message</module>
         <module>wind-im</module>
         <module>wind-workflow</module>
+        <module>wind-funds</module>
     </modules>
 
     <properties>
@@ -126,12 +127,12 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
-                <artifactId>wind-transaction-core</artifactId>
+                <artifactId>wind-transaction-money</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
-                <artifactId>wind-transaction-money</artifactId>
+                <artifactId>wind-money</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
@@ -147,6 +148,11 @@
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-im</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-funds</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

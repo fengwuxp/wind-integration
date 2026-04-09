@@ -1,7 +1,5 @@
 package com.wind.integration.tag;
 
-import org.jspecify.annotations.NonNull;
-
 /**
  * 不可变标签
  *
@@ -10,13 +8,5 @@ import org.jspecify.annotations.NonNull;
  **/
 record ImmutableTag(String name, String value) implements WindTag {
 
-    @Override
-    public @NonNull String getName() {
-        return name();
-    }
 
-    @Override
-    public @NonNull String getValue() {
-        return value();
-    }
 }

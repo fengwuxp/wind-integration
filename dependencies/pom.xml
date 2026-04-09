@@ -55,7 +55,7 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
-                <artifactId>wind-transaction-money</artifactId>
+                <artifactId>wind-money</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

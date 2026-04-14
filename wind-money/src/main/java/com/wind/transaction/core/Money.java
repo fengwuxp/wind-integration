@@ -35,6 +35,8 @@ public final class Money implements Serializable, Comparable<Money> {
     @VisibleForTesting
     static final String CURRENCY_ISO_CODE_NOT_MATCH = "currency mismatch";
 
+    public static final Money ZERO = Money.immutable(0, CurrencyIsoCode.UNKNOWN);
+
     /**
      * 数额，单位: 分
      */

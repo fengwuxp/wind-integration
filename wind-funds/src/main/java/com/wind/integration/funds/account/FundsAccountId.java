@@ -35,7 +35,7 @@ public class FundsAccountId implements WritableContextVariables, Serializable {
      * 账户类型
      */
     @NonNull
-    private final String accountType;
+    private final String type;
 
     /**
      * 上下文变量
@@ -43,11 +43,11 @@ public class FundsAccountId implements WritableContextVariables, Serializable {
     @NonNull
     private final Map<String, Object> variables = new HashMap<>();
 
-    private FundsAccountId(@NonNull String id, @NonNull String accountType) {
+    private FundsAccountId(@NonNull String id, @NonNull String type) {
         AssertUtils.hasText(id, "argument id must not empty");
-        AssertUtils.hasText(accountType, "argument accountType must not empty");
+        AssertUtils.hasText(type, "argument type must not empty");
         this.id = id;
-        this.accountType = accountType;
+        this.type = type;
     }
 
     @NonNull

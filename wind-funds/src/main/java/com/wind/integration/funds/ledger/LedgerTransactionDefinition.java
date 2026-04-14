@@ -3,12 +3,16 @@ package com.wind.integration.funds.ledger;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.integration.funds.account.FundsAccountId;
 import com.wind.integration.funds.enums.LedgerEntryPostingType;
+import com.wind.integration.funds.enums.LedgerTransactionStatus;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
+import org.jspecify.annotations.NonNull;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 账本交易定义
@@ -16,19 +20,18 @@ import java.util.List;
  * @author wuxp
  * @date 2026-04-09 09:17
  **/
-public interface LedgerTransactionDefinition extends TenantIsolationObject<Long>, LedgerReconciliationDefinition {
+public interface LedgerTransactionDefinition extends TenantIsolationObject<Long> {
 
     /**
-     * 付款账户 id
+     * 发起交易账户
      */
     @NotNull
-    FundsAccountId getPayerAccountId();
+    FundsAccountId getInitiatorAccountId();
 
     /**
-     * 收款账户 id
+     * 对手方账户（可能没有）
      */
-    @NotNull
-    FundsAccountId getPayeeAccountId();
+    FundsAccountId getCounterpartyAccountId();
 
     /**
      * 交易编号
@@ -37,9 +40,56 @@ public interface LedgerTransactionDefinition extends TenantIsolationObject<Long>
     String getSn();
 
     /**
+     * 事件 id
+     */
+    @NotNull
+    String getEventId();
+
+    /**
+     * 事件类型
+     */
+    @NotNull
+    String getEventType();
+
+    /**
+     * @return 账本交易状态
+     */
+    @NonNull
+    LedgerTransactionStatus getStatus();
+
+    /**
+     * 记账金额，单位：分
+     */
+    @NotNull
+    Money getAmount();
+
+    /**
+     * 原始金额，单位：分
+     */
+    @NotNull
+    Money getOriginalAmount();
+
+    /**
+     * 汇率
+     */
+    @NotNull
+    BigDecimal getExchangeRate();
+
+    /**
      * 业务交易编号
      */
-    String getBusinessTransactionSn();
+    String getBusinessSn();
+
+    /**
+     * 业务场景
+     */
+    @NotNull
+    String getBusinessScene();
+
+    /**
+     * 关联的账本交易流水号
+     */
+    String getReferenceLedgerTransactionSn();
 
     /**
      * 交易发生时间
@@ -48,20 +98,21 @@ public interface LedgerTransactionDefinition extends TenantIsolationObject<Long>
     LocalDateTime getTransactionTime();
 
     /**
-     * 交易完成时间
-     */
-    LocalDateTime getTransactionFinishTime();
-
-    /**
      * 描述
      */
     String getDescription();
 
     /**
+     * 上下文
+     */
+    @NotNull
+    Map<String, Object> getContextVariables();
+
+    /**
      * 账本交易条目
      */
     @NotNull
-    List<LedgerEntryDefinition> getEntries();
+    List<? extends LedgerEntryDefinition> getEntries();
 
     /**
      * 借方金额

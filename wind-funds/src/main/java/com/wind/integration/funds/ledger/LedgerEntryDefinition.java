@@ -1,9 +1,10 @@
 package com.wind.integration.funds.ledger;
 
-import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.integration.funds.account.FundsAccountId;
-import com.wind.integration.funds.enums.LedgerEntryBalanceType;
 import com.wind.integration.funds.enums.LedgerEntryPostingType;
+import com.wind.integration.funds.enums.LedgerType;
+import com.wind.integration.funds.reconcile.LedgerReconciliationDefinition;
+import com.wind.integration.funds.settlement.LedgerSettlementDefinition;
 import com.wind.transaction.core.Money;
 import jakarta.validation.constraints.NotNull;
 
@@ -17,7 +18,7 @@ import java.util.Map;
  * @author wuxp
  * @date 2026-04-09 09:04
  **/
-public interface LedgerEntryDefinition extends TenantIsolationObject<Long>, LedgerReconciliationDefinition {
+public interface LedgerEntryDefinition extends LedgerReconciliationDefinition, LedgerSettlementDefinition {
 
     /**
      * 创建时间 （记账时间（posting time））
@@ -38,16 +39,40 @@ public interface LedgerEntryDefinition extends TenantIsolationObject<Long>, Ledg
     FundsAccountId getAccountId();
 
     /**
-     * 交易类型
+     * 账目编码
+     * 会计科目编码（如 CASH / REVENUE / FEE)
      */
     @NotNull
-    String getCategory();
+    String getLedgerCode();
+
+    /**
+     * 账目类型
+     */
+    @NotNull
+    LedgerType getLedgerType();
+
+    /**
+     * 账本交易流水号
+     */
+    @NotNull
+    String getLedgerTransactionSn();
+
+    /**
+     * 账目处理类型
+     */
+    @NotNull
+    LedgerEntryPostingType getPostingType();
 
     /**
      * 业务场景
      */
     @NotNull
     String getBusinessScene();
+
+    /**
+     * 业务流水号（订单号、业务交易流水）
+     */
+    String getBusinessSn();
 
     /**
      * 记账金额，单位：分
@@ -73,34 +98,10 @@ public interface LedgerEntryDefinition extends TenantIsolationObject<Long>, Ledg
     String getDescription();
 
     /**
-     * 会计科目编码（如 CASH / REVENUE / FEE)
-     */
-    @NotNull
-    String getAccountSubjectCode();
-
-    /**
-     * 账本条目类型
-     */
-    @NotNull
-    LedgerEntryPostingType getPostingType();
-
-    /**
-     * 账本余额类型
-     */
-    @NotNull
-    LedgerEntryBalanceType getBalanceType();
-
-    /**
-     * 账本交易流水号
-     */
-    @NotNull
-    String getLedgerTransactionSn();
-
-    /**
      * 上下文
      */
     @NotNull
-    Map<String, String> getContextVariables();
+    Map<String, Object> getContextVariables();
 
     /**
      * sha256，防止数据篡改

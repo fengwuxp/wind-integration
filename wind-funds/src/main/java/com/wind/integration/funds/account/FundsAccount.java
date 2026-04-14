@@ -4,6 +4,7 @@ import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.integration.funds.enums.FundsAccountCapability;
+import com.wind.integration.funds.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 
@@ -47,7 +48,7 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
      * @return 账户可用数额
      */
     default Long getAvailableBalance() {
-        return getDepositAmount() + getRefundedAmount() - getTotalOutflowAmount() - getFrozenBalance();
+        return getTotalDepositedAmount() + getTotalRefundedAmount() - getTotalOutflowAmount() - getFrozenBalance();
     }
 
     /**
@@ -64,7 +65,7 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
      *
      * @return 账户总转入数额 （总转入）
      */
-    Long getDepositAmount();
+    Long getTotalDepositedAmount();
 
     /**
      * 累计资金流出（包含支付、提现、手续费）
@@ -72,27 +73,27 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
      * @return 累计账户已支出的数额（总支出）
      */
     default Long getTotalOutflowAmount() {
-        return getPaymentAmount() + getFeeAmount() + getWithdrawAmount();
+        return getTotalSpentAmount() + getTotalFeeAmount() + getTotalWithdrawnAmount();
     }
 
     /**
      * 累计支付金额（消费支出）
      */
-    Long getPaymentAmount();
+    Long getTotalSpentAmount();
 
     /**
      * 累计提现
      *
      * @return 累计账户已提现的数额
      */
-    Long getWithdrawAmount();
+    Long getTotalWithdrawnAmount();
 
     /**
      * 累计手续费
      *
      * @return 交易服务费用
      */
-    default Long getFeeAmount() {
+    default Long getTotalFeeAmount() {
         return 0L;
     }
 
@@ -101,7 +102,7 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
      *
      * @return 已退款数额（总退款）
      */
-    Long getRefundedAmount();
+    Long getTotalRefundedAmount();
 
     /**
      * 累计账户因某些交易被冻结的余额（只增加）
@@ -112,7 +113,7 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
 
     /**
      * 累计解冻总金额（只增加）
-     * 注意：冻结金额在支付成功后转为支出时，先计入总解冻金额（恢复可用余额），在通过累计 {@link #getPaymentAmount()} 支出
+     * 注意：冻结金额在支付成功后转为支出时，先计入总解冻金额（恢复可用余额），在通过累计 {@link #getTotalSpentAmount()} 支出
      *
      * @return 已解冻数额（总解冻）
      */
@@ -123,11 +124,20 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
      *
      * @return 账户已冻结数额（已冻结）
      */
+    @NonNull
     default Long getFrozenBalance() {
         long result = getTotalFrozenAmount() - getTotalUnfrozenAmount();
         AssertUtils.isTrue(result >= 0, "account freeze balance less than 0");
         return result;
     }
+
+    /**
+     * 账户状态
+     *
+     * @return 账户状态
+     */
+    @NonNull
+    FundsAccountStatus getStatus();
 
     /**
      * 账户能力
@@ -140,15 +150,15 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
     }
 
     default boolean canWithdraw() {
-        return getCapabilities().contains(FundsAccountCapability.WITHDRAW);
+        return getStatus().canDebit() && getCapabilities().contains(FundsAccountCapability.WITHDRAW);
     }
 
     default boolean canPay() {
-        return getCapabilities().contains(FundsAccountCapability.PAY);
+        return getStatus().canDebit() && getCapabilities().contains(FundsAccountCapability.PAY);
     }
 
     default boolean canReceive() {
-        return getCapabilities().contains(FundsAccountCapability.RECEIVE);
+        return getStatus().canCredit() && getCapabilities().contains(FundsAccountCapability.RECEIVE);
     }
 
     /**
@@ -166,7 +176,10 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
      * @return if true 可用
      */
     default boolean isAvailable() {
-        return getAvailableBalance() > 0;
+        if (canOverdraft()){
+            return getStatus() == FundsAccountStatus.ACTIVE;
+        }
+        return getStatus() == FundsAccountStatus.ACTIVE && getTotalBalance() >= 0;
     }
 
     /**
@@ -174,7 +187,7 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
      *
      * @return if true 账户可以透支
      */
-    default boolean isAllowOverdraft() {
+    default boolean canOverdraft() {
         return false;
     }
 

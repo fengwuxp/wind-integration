@@ -2,7 +2,7 @@ package com.wind.integration.funds.ledger;
 
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.integration.funds.account.FundsAccountId;
-import com.wind.integration.funds.enums.LedgerType;
+import com.wind.integration.funds.enums.LedgerAccountType;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -41,5 +41,5 @@ public interface LedgerDefinition extends TenantIsolationObject<Long> {
      * @return 账本类型
      */
     @NonNull
-    LedgerType getLedgerType();
+    LedgerAccountType getLedgerAccountType();
 }

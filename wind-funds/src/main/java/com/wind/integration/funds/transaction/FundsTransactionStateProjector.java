@@ -1,6 +1,6 @@
 package com.wind.integration.funds.transaction;
 
-import com.wind.integration.funds.event.FundsTransactionEvent;
+import com.wind.integration.funds.event.FundsEvent;
 
 /**
  * 交易状态投影器（Event → Transaction State）
@@ -16,7 +16,7 @@ public interface FundsTransactionStateProjector {
      *
      * @param event 资金交易事件
      */
-    void apply(FundsTransactionEvent event);
+    void apply(FundsEvent event);
 
     /**
      * 是否支持该事件
@@ -24,5 +24,5 @@ public interface FundsTransactionStateProjector {
      * @param event 资金交易事件
      * @return true 支持
      */
-    boolean supports(FundsTransactionEvent event);
+    boolean supports(FundsEvent event);
 }

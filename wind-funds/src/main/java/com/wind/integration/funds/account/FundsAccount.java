@@ -1,7 +1,6 @@
 package com.wind.integration.funds.account;
 
 import com.wind.common.WindConstants;
-import com.wind.common.exception.AssertUtils;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.integration.funds.enums.FundsAccountCapability;
 import com.wind.integration.funds.enums.FundsAccountStatus;
@@ -11,7 +10,23 @@ import org.jspecify.annotations.NonNull;
 import java.util.Set;
 
 /**
- * 这是一个可用于支出、收入的资金账户定义，所有金额字段的单位都是分
+ * 资金账户（FundsAccount）
+ *
+ * <p>表示一个具备资金收支能力的账户实体，是 Ledger 系统的业务入口对象。</p>
+ *
+ * <h3>模型分层</h3>
+ * <ul>
+ *   <li>Account Entity：账户身份与状态</li>
+ *   <li>Balance View：账户资金状态（由 Ledger 投影生成）</li>
+ *   <li>Capability Policy：账户行为能力控制</li>
+ * </ul>
+ *
+ * <h3>重要原则</h3>
+ * <ul>
+ *   <li>账户余额来源于 Ledger，不可直接修改</li>
+ *   <li>账户能力不等于余额能力（需同时满足 Policy + Balance）</li>
+ *   <li>账户状态变化不应直接修改余额</li>
+ * </ul>
  *
  * @author wuxp
  * @date 2023-12-01 10:37
@@ -40,96 +55,6 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
      */
     @NonNull
     FundsAccountOwner getOwner();
-
-    /**
-     * 账户当下可用于支出的数额
-     * 可用余额 = 累计转入 + 累计退款 - 累计支出 - 冻结余额
-     *
-     * @return 账户可用数额
-     */
-    default Long getAvailableBalance() {
-        return getTotalDepositedAmount() + getTotalRefundedAmount() - getTotalOutflowAmount() - getFrozenBalance();
-    }
-
-    /**
-     * 账户余额 = 可用余额 + 累计冻结金额
-     *
-     * @return 账户余额
-     */
-    default Long getTotalBalance() {
-        return getAvailableBalance() + getFrozenBalance();
-    }
-
-    /**
-     * 账户转入（充值）累计数额
-     *
-     * @return 账户总转入数额 （总转入）
-     */
-    Long getTotalDepositedAmount();
-
-    /**
-     * 累计资金流出（包含支付、提现、手续费）
-     *
-     * @return 累计账户已支出的数额（总支出）
-     */
-    default Long getTotalOutflowAmount() {
-        return getTotalSpentAmount() + getTotalFeeAmount() + getTotalWithdrawnAmount();
-    }
-
-    /**
-     * 累计支付金额（消费支出）
-     */
-    Long getTotalSpentAmount();
-
-    /**
-     * 累计提现
-     *
-     * @return 累计账户已提现的数额
-     */
-    Long getTotalWithdrawnAmount();
-
-    /**
-     * 累计手续费
-     *
-     * @return 交易服务费用
-     */
-    default Long getTotalFeeAmount() {
-        return 0L;
-    }
-
-    /**
-     * 累计账户由于成功支付后、交易取消或部分取消退回账户的余额
-     *
-     * @return 已退款数额（总退款）
-     */
-    Long getTotalRefundedAmount();
-
-    /**
-     * 累计账户因某些交易被冻结的余额（只增加）
-     *
-     * @return 账户累计冻结金额
-     */
-    Long getTotalFrozenAmount();
-
-    /**
-     * 累计解冻总金额（只增加）
-     * 注意：冻结金额在支付成功后转为支出时，先计入总解冻金额（恢复可用余额），在通过累计 {@link #getTotalSpentAmount()} 支出
-     *
-     * @return 已解冻数额（总解冻）
-     */
-    Long getTotalUnfrozenAmount();
-
-    /**
-     * 累计账户由于未来某时刻支出需要临时冻结一部分余额，以保证在支付阶段不会由于 {@link #getAvailableBalance()} 不够导致支付失败
-     *
-     * @return 账户已冻结数额（已冻结）
-     */
-    @NonNull
-    default Long getFrozenBalance() {
-        long result = getTotalFrozenAmount() - getTotalUnfrozenAmount();
-        AssertUtils.isTrue(result >= 0, "account freeze balance less than 0");
-        return result;
-    }
 
     /**
      * 账户状态
@@ -166,21 +91,14 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
      *
      * @return 币种
      */
-    default CurrencyIsoCode getCurrency() {
-        return CurrencyIsoCode.CNY;
-    }
+     CurrencyIsoCode getCurrency();
 
     /**
      * 账户是否可用，由具体实现决定
      *
      * @return if true 可用
      */
-    default boolean isAvailable() {
-        if (canOverdraft()){
-            return getStatus() == FundsAccountStatus.ACTIVE;
-        }
-        return getStatus() == FundsAccountStatus.ACTIVE && getTotalBalance() >= 0;
-    }
+     boolean isAvailable();
 
     /**
      * 是否允许透支，由具体实现决定

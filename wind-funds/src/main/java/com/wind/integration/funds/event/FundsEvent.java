@@ -1,19 +1,29 @@
 package com.wind.integration.funds.event;
 
 import com.wind.core.ReadonlyContextVariables;
+import com.wind.integration.core.task.WindRetryableTask;
 import com.wind.integration.funds.account.FundsAccountId;
+import com.wind.integration.funds.enums.FundsTransactionEventStatus;
 import com.wind.transaction.core.Money;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
 
 /**
- * 资金交易事件，用于创建交易订单、驱动交易生命周期完成，不一定会涉及记账或余额更新
+ * 资金事件
+ * 例如：用于创建交易订单、驱动交易生命周期完成，不一定会涉及记账或余额更新
  *
  * @author wuxp
  * @date 2026-04-10 09:57
  **/
-public interface FundsTransactionEvent {
+public interface FundsEvent extends WindRetryableTask {
+
+    @Override
+    @NonNull
+    default String getRetryId() {
+        return getEventId();
+    }
 
     /**
      * 事件 ID 全局唯一
@@ -34,6 +44,12 @@ public interface FundsTransactionEvent {
     LocalDateTime getEventTime();
 
     /**
+     * 事件处理状态
+     */
+    @NonNull
+    FundsTransactionEventStatus getStatus();
+
+    /**
      * 业务场景
      */
     @NonNull
@@ -51,15 +67,16 @@ public interface FundsTransactionEvent {
     Money getAmount();
 
     /**
-     * 付款方
+     * 交易发起方账户
      */
-    @NonNull
-    FundsAccountId getPayer();
+    @Nullable
+    FundsAccountId getInitiatorAccountId();
 
     /**
-     * 收款方
+     * 交易对手方账户
      */
-    FundsAccountId getPayee();
+    @Nullable
+    FundsAccountId getCounterpartyAccountId();
 
     /**
      * 上下文
@@ -72,9 +89,4 @@ public interface FundsTransactionEvent {
      */
     String getDescription();
 
-    /**
-     * 操作人
-     */
-    @NonNull
-    String getOperator();
 }

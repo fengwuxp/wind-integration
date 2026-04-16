@@ -1,6 +1,6 @@
 package com.wind.integration.funds;
 
-import com.wind.integration.funds.event.FundsTransactionEvent;
+import com.wind.integration.funds.event.FundsEvent;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -9,14 +9,14 @@ import org.jspecify.annotations.NonNull;
  * @author wuxp
  * @date 2026-04-14 09:22
  **/
-public interface FundsTransactionEventHandler {
+public interface WindFundsEventHandler {
 
     /**
      * 处理
      *
      * @param event 资金交易事件
      */
-    void handle(@NonNull FundsTransactionEvent event);
+    void handle(@NonNull FundsEvent event);
 
     /**
      * 是否支持
@@ -24,5 +24,5 @@ public interface FundsTransactionEventHandler {
      * @param event 资金交易事件
      * @return if true 支持
      */
-    boolean support(@NonNull FundsTransactionEvent event);
+    boolean support(@NonNull FundsEvent event);
 }

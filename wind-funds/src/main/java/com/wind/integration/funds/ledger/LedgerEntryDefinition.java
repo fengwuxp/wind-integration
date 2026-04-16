@@ -1,12 +1,15 @@
 package com.wind.integration.funds.ledger;
 
 import com.wind.integration.funds.account.FundsAccountId;
-import com.wind.integration.funds.enums.LedgerEntryPostingType;
-import com.wind.integration.funds.enums.LedgerType;
+import com.wind.integration.funds.enums.LedgerAccountType;
+import com.wind.integration.funds.enums.LedgerDirection;
+import com.wind.integration.funds.enums.LedgerFundsFlowType;
 import com.wind.integration.funds.reconcile.LedgerReconciliationDefinition;
 import com.wind.integration.funds.settlement.LedgerSettlementDefinition;
 import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -46,10 +49,10 @@ public interface LedgerEntryDefinition extends LedgerReconciliationDefinition, L
     String getLedgerCode();
 
     /**
-     * 账目类型
+     * 账本账户类型
      */
     @NotNull
-    LedgerType getLedgerType();
+    LedgerAccountType getLedgerAccountType();
 
     /**
      * 账本交易流水号
@@ -58,10 +61,16 @@ public interface LedgerEntryDefinition extends LedgerReconciliationDefinition, L
     String getLedgerTransactionSn();
 
     /**
-     * 账目处理类型
+     * 账本资金流向
+     */
+    @NonNull
+    LedgerFundsFlowType getFundsFlowType();
+
+    /**
+     * 账本分录方向
      */
     @NotNull
-    LedgerEntryPostingType getPostingType();
+    LedgerDirection getLedgerDirection();
 
     /**
      * 业务场景
@@ -81,6 +90,14 @@ public interface LedgerEntryDefinition extends LedgerReconciliationDefinition, L
     Money getAmount();
 
     /**
+     * 币种
+     */
+    @NonNull
+    default CurrencyIsoCode getCurrency() {
+        return getAmount().getCurrency();
+    }
+
+    /**
      * 原始金额，单位：分
      */
     @NotNull
@@ -91,6 +108,12 @@ public interface LedgerEntryDefinition extends LedgerReconciliationDefinition, L
      */
     @NotNull
     BigDecimal getExchangeRate();
+
+    /**
+     * 交易发生时间
+     */
+    @NotNull
+    LocalDateTime getTransactionTime();
 
     /**
      * 描述

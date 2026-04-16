@@ -22,6 +22,15 @@ public interface FundsAccountBalancePostingService {
     FundsAccount getAccount(@NonNull FundsAccountId accountId);
 
     /**
+     * 获取账户余额
+     *
+     * @param accountId 账户标识
+     * @return 账户余额
+     */
+    @NonNull
+    FundsAccountBalanceView getBalance(@NonNull FundsAccountId accountId);
+
+    /**
      * 账户余额流水
      *
      * @param ledger 流水

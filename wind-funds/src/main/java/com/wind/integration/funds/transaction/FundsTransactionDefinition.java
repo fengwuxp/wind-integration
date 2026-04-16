@@ -2,8 +2,8 @@ package com.wind.integration.funds.transaction;
 
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.integration.funds.account.FundsAccountId;
-import com.wind.integration.funds.enums.LedgerTransactionStatus;
 import com.wind.transaction.core.Money;
+import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
@@ -36,10 +36,15 @@ public interface FundsTransactionDefinition extends TenantIsolationObject<Long> 
     String getTransactionStatus();
 
     /**
-     * @return 交易归属的账户
+     * 发起交易账户
      */
-    @NonNull
-    FundsAccountId getAccountId();
+    @NotNull
+    FundsAccountId getInitiatorAccountId();
+
+    /**
+     * 对手方账户（可能没有）
+     */
+    FundsAccountId getCounterpartyAccountId();
 
     /**
      * @return 业务流水号，需要唯一
@@ -94,10 +99,6 @@ public interface FundsTransactionDefinition extends TenantIsolationObject<Long> 
      */
     LocalDateTime getLastRefundedTime();
 
-    /**
-     * @return 交易对手方账户 id
-     */
-    FundsAccountId getCounterpartyAccountId();
 
     /**
      * @return 交易描述

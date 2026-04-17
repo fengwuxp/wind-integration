@@ -8,6 +8,7 @@ import com.wind.transaction.core.Money;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -61,10 +62,28 @@ public interface FundsEvent extends WindRetryableTask {
     String getBusinessSn();
 
     /**
-     * 交易（原始）金额
+     * 交易金额
      */
     @NonNull
     Money getAmount();
+
+    /**
+     * 手续费
+     */
+    @NonNull
+    Money getFee();
+
+    /**
+     * 原始交易金额
+     */
+    @NonNull
+    Money getOriginalAmount();
+
+    /**
+     * 汇率
+     */
+    @NonNull
+    BigDecimal getExchangeRate();
 
     /**
      * 交易发起方账户

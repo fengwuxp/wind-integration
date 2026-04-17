@@ -31,7 +31,7 @@ import java.util.Set;
  * @author wuxp
  * @date 2023-12-01 10:37
  **/
-public interface FundsAccount extends TenantIsolationObject<Long> {
+public interface FundsAccount extends TenantIsolationObject<Long> ,FundsAccountBalanceView{
 
     /**
      * 账户标识

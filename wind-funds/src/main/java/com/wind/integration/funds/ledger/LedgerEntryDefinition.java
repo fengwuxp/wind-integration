@@ -26,38 +26,44 @@ public interface LedgerEntryDefinition extends LedgerReconciliationDefinition, L
     /**
      * 创建时间 （记账时间（posting time））
      */
-    @NotNull
+    @NonNull
     LocalDateTime getGmtCreate();
 
     /**
      * 最后更新时间
      */
-    @NotNull
+    @NonNull
     LocalDateTime getGmtModified();
+
+    /**
+     * 资金事件类型
+     */
+//    @NotNull
+//    String getEventType();
 
     /**
      * 资金账户 id
      */
-    @NotNull
+    @NonNull
     FundsAccountId getAccountId();
 
     /**
      * 账目编码
      * 会计科目编码（如 CASH / REVENUE / FEE)
      */
-    @NotNull
+    @NonNull
     String getLedgerCode();
 
     /**
      * 账本账户类型
      */
-    @NotNull
+    @NonNull
     LedgerAccountType getLedgerAccountType();
 
     /**
      * 账本交易流水号
      */
-    @NotNull
+    @NonNull
     String getLedgerTransactionSn();
 
     /**
@@ -69,13 +75,13 @@ public interface LedgerEntryDefinition extends LedgerReconciliationDefinition, L
     /**
      * 账本分录方向
      */
-    @NotNull
+    @NonNull
     LedgerDirection getLedgerDirection();
 
     /**
      * 业务场景
      */
-    @NotNull
+    @NonNull
     String getBusinessScene();
 
     /**
@@ -86,7 +92,7 @@ public interface LedgerEntryDefinition extends LedgerReconciliationDefinition, L
     /**
      * 记账金额，单位：分
      */
-    @NotNull
+    @NonNull
     Money getAmount();
 
     /**
@@ -100,19 +106,19 @@ public interface LedgerEntryDefinition extends LedgerReconciliationDefinition, L
     /**
      * 原始金额，单位：分
      */
-    @NotNull
+    @NonNull
     Money getOriginalAmount();
 
     /**
      * 汇率
      */
-    @NotNull
+    @NonNull
     BigDecimal getExchangeRate();
 
     /**
      * 交易发生时间
      */
-    @NotNull
+    @NonNull
     LocalDateTime getTransactionTime();
 
     /**
@@ -123,12 +129,12 @@ public interface LedgerEntryDefinition extends LedgerReconciliationDefinition, L
     /**
      * 上下文
      */
-    @NotNull
+    @NonNull
     Map<String, Object> getContextVariables();
 
     /**
      * sha256，防止数据篡改
      */
-    @NotNull
+    @NonNull
     String getSha256();
 }

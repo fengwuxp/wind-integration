@@ -1,6 +1,6 @@
 package com.wind.integration.funds.account;
 
-import com.wind.integration.funds.ledger.LedgerEntryDefinition;
+import com.wind.integration.funds.ledger.spec.LedgerEntrySpec;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -19,7 +19,7 @@ public interface FundsAccountBalancePostingService {
      * @return 账户流水标识
      */
     @NonNull
-    String post(@NonNull LedgerEntryDefinition ledger);
+    String post(@NonNull LedgerEntrySpec ledger);
 
     /**
      * 是否支持该资金账户

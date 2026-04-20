@@ -20,7 +20,7 @@ import java.util.Map;
  * @author wuxp
  * @date 2024-05-14 16:26
  **/
-@EqualsAndHashCode
+@EqualsAndHashCode(of = {"id", "type"})
 @ToString
 @Getter
 public class FundsAccountId implements WritableContextVariables, Serializable {

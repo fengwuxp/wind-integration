@@ -1,4 +1,4 @@
-package com.wind.integration.funds.settlement;
+package com.wind.integration.funds.settlement.spec;
 
 import com.wind.integration.core.model.IdObject;
 import com.wind.integration.funds.enums.LedgerSettlementStatus;
@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  * @author wuxp
  * @date 2026-04-13 15:45
  **/
-public interface LedgerSettlementDefinition extends IdObject<Long> {
+public interface LedgerSettlementSpec extends IdObject<Long> {
 
     /**
      * 交易所属账期（用于清结算）例如：

@@ -1,4 +1,4 @@
-package com.wind.integration.funds.ledger;
+package com.wind.integration.funds.ledger.spec;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.core.model.TenantIsolationObject;
@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
  * @author wuxp
  * @date 2026-04-09 09:17
  **/
-public interface LedgerTransactionDefinition extends TenantIsolationObject<Long> {
+public interface LedgerTransactionSpec extends TenantIsolationObject<Long> {
 
     /**
      * 交易编号
@@ -112,7 +112,7 @@ public interface LedgerTransactionDefinition extends TenantIsolationObject<Long>
      * 账本交易条目
      */
     @NotNull
-    List<? extends LedgerEntryDefinition> getEntries();
+    List<? extends LedgerEntrySpec> getEntries();
 
 
     /**
@@ -122,7 +122,7 @@ public interface LedgerTransactionDefinition extends TenantIsolationObject<Long>
     default Money getTotalDebitAmount() {
         return getEntries().stream()
                 .filter(e -> e.getLedgerDirection() == LedgerDirection.DEBIT)
-                .map(LedgerEntryDefinition::getAmount)
+                .map(LedgerEntrySpec::getAmount)
                 .reduce(Money::add)
                 .orElse(Money.immutable(0, getCurrency()));
     }
@@ -134,7 +134,7 @@ public interface LedgerTransactionDefinition extends TenantIsolationObject<Long>
     default Money getTotalCreditAmount() {
         return getEntries().stream()
                 .filter(e -> e.getLedgerDirection() == LedgerDirection.CREDIT)
-                .map(LedgerEntryDefinition::getAmount)
+                .map(LedgerEntrySpec::getAmount)
                 .reduce(Money::add)
                 .orElse(Money.immutable(0, getCurrency()));
     }
@@ -146,7 +146,7 @@ public interface LedgerTransactionDefinition extends TenantIsolationObject<Long>
      */
     @NonNull
     default Set<FundsAccountId> getLedgerAccountIds() {
-        return getEntries().stream().map(LedgerEntryDefinition::getAccountId)
+        return getEntries().stream().map(LedgerEntrySpec::getAccountId)
                 .collect(Collectors.toSet());
     }
 
@@ -159,7 +159,7 @@ public interface LedgerTransactionDefinition extends TenantIsolationObject<Long>
     default Set<FundsAccountId> getDebitAccounts() {
         return getEntries().stream()
                 .filter(entry -> entry.getLedgerDirection() == LedgerDirection.DEBIT)
-                .map(LedgerEntryDefinition::getAccountId)
+                .map(LedgerEntrySpec::getAccountId)
                 .collect(Collectors.toSet());
     }
 
@@ -172,7 +172,7 @@ public interface LedgerTransactionDefinition extends TenantIsolationObject<Long>
     default Set<FundsAccountId> getCreditAccounts() {
         return getEntries().stream()
                 .filter(entry -> entry.getLedgerDirection() == LedgerDirection.CREDIT)
-                .map(LedgerEntryDefinition::getAccountId)
+                .map(LedgerEntrySpec::getAccountId)
                 .collect(Collectors.toSet());
     }
 

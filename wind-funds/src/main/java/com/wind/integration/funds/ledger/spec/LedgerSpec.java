@@ -1,4 +1,4 @@
-package com.wind.integration.funds.ledger;
+package com.wind.integration.funds.ledger.spec;
 
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.integration.funds.account.FundsAccountId;
@@ -11,7 +11,7 @@ import org.jspecify.annotations.NonNull;
  * @author wuxp
  * @date 2026-04-13 09:06
  **/
-public interface LedgerDefinition extends TenantIsolationObject<Long> {
+public interface LedgerSpec extends TenantIsolationObject<Long> {
 
     /**
      * @return 资金账户ID

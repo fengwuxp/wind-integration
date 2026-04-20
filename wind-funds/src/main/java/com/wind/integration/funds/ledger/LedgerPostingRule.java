@@ -1,6 +1,7 @@
 package com.wind.integration.funds.ledger;
 
 import com.wind.integration.funds.event.FundsEvent;
+import com.wind.integration.funds.ledger.spec.LedgerEntrySpec;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
@@ -24,5 +25,5 @@ public interface LedgerPostingRule {
      * @param event 资金事件
      */
     @NonNull
-    List<LedgerEntryDefinition> generateEntries(@NonNull FundsEvent event);
+    List<LedgerEntrySpec> generateEntries(@NonNull FundsEvent event);
 }

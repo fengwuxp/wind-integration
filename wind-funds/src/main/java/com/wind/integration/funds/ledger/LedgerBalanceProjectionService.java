@@ -1,5 +1,7 @@
 package com.wind.integration.funds.ledger;
 
+import com.wind.integration.funds.ledger.spec.LedgerEntrySpec;
+
 import java.util.List;
 
 /**
@@ -15,5 +17,5 @@ public interface LedgerBalanceProjectionService {
      *
      * @param entries 账本条目定义
      */
-    void project(List<LedgerEntryDefinition> entries);
+    void project(List<LedgerEntrySpec> entries);
 }

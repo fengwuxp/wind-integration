@@ -1,10 +1,11 @@
 package com.wind.integration.funds.ledger;
 
 import com.wind.integration.funds.event.FundsEvent;
+import com.wind.integration.funds.ledger.spec.LedgerTransactionSpec;
 import org.jspecify.annotations.NonNull;
 
 /**
- * 将 {@link FundsEvent} 转换为 {@link LedgerTransactionDefinition}
+ * 将 {@link FundsEvent} 转换为 {@link LedgerTransactionSpec}
  *
  * @author wuxp
  * @date 2026-04-10 13:59
@@ -18,7 +19,7 @@ public interface LedgerTransactionConverter {
      * @return 账本交易定义
      */
     @NonNull
-    LedgerTransactionDefinition convert(@NonNull FundsEvent event);
+    LedgerTransactionSpec convert(@NonNull FundsEvent event);
 
     /**
      * 是否支持该业务信息

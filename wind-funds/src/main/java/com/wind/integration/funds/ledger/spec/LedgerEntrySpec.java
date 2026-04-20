@@ -1,14 +1,13 @@
-package com.wind.integration.funds.ledger;
+package com.wind.integration.funds.ledger.spec;
 
 import com.wind.integration.funds.account.FundsAccountId;
 import com.wind.integration.funds.enums.LedgerAccountType;
 import com.wind.integration.funds.enums.LedgerDirection;
 import com.wind.integration.funds.enums.LedgerFundsFlowType;
-import com.wind.integration.funds.reconcile.LedgerReconciliationDefinition;
-import com.wind.integration.funds.settlement.LedgerSettlementDefinition;
+import com.wind.integration.funds.reconcile.spec.LedgerReconciliationSpec;
+import com.wind.integration.funds.settlement.spec.LedgerSettlementSpec;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
-import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
@@ -21,7 +20,7 @@ import java.util.Map;
  * @author wuxp
  * @date 2026-04-09 09:04
  **/
-public interface LedgerEntryDefinition extends LedgerReconciliationDefinition, LedgerSettlementDefinition {
+public interface LedgerEntrySpec extends LedgerReconciliationSpec, LedgerSettlementSpec {
 
     /**
      * 创建时间 （记账时间（posting time））

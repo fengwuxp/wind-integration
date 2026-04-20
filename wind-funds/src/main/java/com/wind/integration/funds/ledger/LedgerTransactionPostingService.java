@@ -1,5 +1,6 @@
 package com.wind.integration.funds.ledger;
 
+import com.wind.integration.funds.ledger.spec.LedgerTransactionSpec;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -15,6 +16,6 @@ public interface LedgerTransactionPostingService {
      *
      * @param transaction 账本交易
      */
-    void post(@NonNull LedgerTransactionDefinition transaction);
+    void post(@NonNull LedgerTransactionSpec transaction);
 
 }

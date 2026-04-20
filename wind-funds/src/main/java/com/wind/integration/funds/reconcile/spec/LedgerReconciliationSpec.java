@@ -1,4 +1,4 @@
-package com.wind.integration.funds.reconcile;
+package com.wind.integration.funds.reconcile.spec;
 
 import com.wind.integration.core.model.IdObject;
 import com.wind.integration.funds.enums.LedgerReconcileStatus;
@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  * @author wuxp
  * @date 2026-04-09 09:19
  **/
-public interface LedgerReconciliationDefinition extends IdObject<Long> {
+public interface LedgerReconciliationSpec extends IdObject<Long> {
 
     /**
      * 对账批次，例如：

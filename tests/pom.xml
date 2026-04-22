@@ -114,6 +114,11 @@
             </exclusions>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-funds</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

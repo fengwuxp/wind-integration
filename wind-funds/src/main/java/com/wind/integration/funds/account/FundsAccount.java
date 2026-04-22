@@ -31,7 +31,7 @@ import java.util.Set;
  * @author wuxp
  * @date 2023-12-01 10:37
  **/
-public interface FundsAccount extends TenantIsolationObject<Long> ,FundsAccountBalanceView{
+public interface FundsAccount extends TenantIsolationObject<Long> {
 
     /**
      * 账户标识
@@ -87,20 +87,6 @@ public interface FundsAccount extends TenantIsolationObject<Long> ,FundsAccountB
     }
 
     /**
-     * 账户金额的币种
-     *
-     * @return 币种
-     */
-     CurrencyIsoCode getCurrency();
-
-    /**
-     * 账户是否可用，由具体实现决定
-     *
-     * @return if true 可用
-     */
-     boolean isAvailable();
-
-    /**
      * 是否允许透支，由具体实现决定
      *
      * @return if true 账户可以透支
@@ -114,9 +100,23 @@ public interface FundsAccount extends TenantIsolationObject<Long> ,FundsAccountB
      *
      * @return if true 允许
      */
-    default boolean isAllowParentFallback() {
+    default boolean canDelegateParent() {
         return false;
     }
+
+    /**
+     * 账户金额的币种
+     *
+     * @return 币种
+     */
+    CurrencyIsoCode getCurrency();
+
+    /**
+     * 账户是否可用，由具体实现决定
+     *
+     * @return if true 可用
+     */
+    boolean isAvailable();
 
     /**
      * @return 账户描述

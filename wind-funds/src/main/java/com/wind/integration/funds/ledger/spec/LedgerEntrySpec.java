@@ -1,13 +1,14 @@
 package com.wind.integration.funds.ledger.spec;
 
 import com.wind.integration.funds.account.FundsAccountId;
+import com.wind.integration.funds.enums.AccountBalancePostingType;
 import com.wind.integration.funds.enums.LedgerAccountType;
 import com.wind.integration.funds.enums.LedgerDirection;
-import com.wind.integration.funds.enums.LedgerFundsFlowType;
 import com.wind.integration.funds.reconcile.spec.LedgerReconciliationSpec;
 import com.wind.integration.funds.settlement.spec.LedgerSettlementSpec;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
@@ -35,12 +36,6 @@ public interface LedgerEntrySpec extends LedgerReconciliationSpec, LedgerSettlem
     LocalDateTime getGmtModified();
 
     /**
-     * 资金事件类型
-     */
-//    @NotNull
-//    String getEventType();
-
-    /**
      * 资金账户 id
      */
     @NonNull
@@ -66,10 +61,10 @@ public interface LedgerEntrySpec extends LedgerReconciliationSpec, LedgerSettlem
     String getLedgerTransactionSn();
 
     /**
-     * 账本资金流向
+     * 账本余额变动类型
      */
     @NonNull
-    LedgerFundsFlowType getFundsFlowType();
+    AccountBalancePostingType getBalancePostingType();
 
     /**
      * 账本分录方向

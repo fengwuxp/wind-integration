@@ -32,12 +32,6 @@ public interface LedgerTransactionSpec extends TenantIsolationObject<Long> {
     String getSn();
 
     /**
-     * 事件 id
-     */
-    @NotNull
-    String getEventId();
-
-    /**
      * 事件类型
      */
     @NotNull

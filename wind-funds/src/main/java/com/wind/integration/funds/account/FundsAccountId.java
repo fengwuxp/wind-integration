@@ -1,18 +1,11 @@
 package com.wind.integration.funds.account;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.wind.common.enums.DescriptiveEnum;
-import com.wind.common.exception.AssertUtils;
-import com.wind.core.WritableContextVariables;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.ToString;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * 资金账户标识
@@ -20,63 +13,40 @@ import java.util.Map;
  * @author wuxp
  * @date 2024-05-14 16:26
  **/
-@EqualsAndHashCode(of = {"id", "type"})
-@ToString
-@Getter
-public class FundsAccountId implements WritableContextVariables, Serializable {
+public interface FundsAccountId extends Serializable {
 
     /**
-     * 账号唯一标识
+     * @return 资金账户ID
      */
     @NonNull
-    private final String id;
+    String id();
 
     /**
-     * 账户类型
+     * @return 账户类型
      */
     @NonNull
-    private final String type;
+    String type();
 
     /**
-     * 上下文变量
+     * 创建不可变资金账户标识
+     *
+     * @param id   资金账户ID
+     * @param type 资金账户类型
+     * @return FundsAccountId 实例
      */
-    @NonNull
-    private final Map<String, Object> variables = new HashMap<>();
-
-    private FundsAccountId(@NonNull String id, @NonNull String type) {
-        AssertUtils.hasText(id, "argument id must not empty");
-        AssertUtils.hasText(type, "argument type must not empty");
-        this.id = id;
-        this.type = type;
+    @JsonCreator
+    static FundsAccountId immutable(@NonNull @JsonProperty("id") String id, @JsonProperty("type") @NonNull String type) {
+        return new ImmutableAccountId(id, type);
     }
 
-    @NonNull
-    public static FundsAccountId of(@NonNull String id, @NonNull String accountType) {
-        return new FundsAccountId(id, accountType);
-    }
-
-    @NonNull
-    public static FundsAccountId of(@NonNull String id, @NonNull DescriptiveEnum accountType) {
-        return of(id, accountType.name());
-    }
-
-    @Override
-    @NonNull
-    public FundsAccountId putVariable(@NonNull String name, @Nullable Object val) {
-        variables.put(name, val);
-        return this;
-    }
-
-    @Override
-    @NonNull
-    public WritableContextVariables removeVariable(@NonNull String name) {
-        variables.remove(name);
-        return this;
-    }
-
-    @Override
-    @NonNull
-    public Map<String, Object> getContextVariables() {
-        return Collections.unmodifiableMap(variables);
+    /**
+     * 创建不可变资金账户标识
+     *
+     * @param id   资金账户ID
+     * @param type 资金账户类型
+     * @return FundsAccountId 实例
+     */
+    static FundsAccountId immutable(String id, DescriptiveEnum type) {
+        return new ImmutableAccountId(id, type.name());
     }
 }

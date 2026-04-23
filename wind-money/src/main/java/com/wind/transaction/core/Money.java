@@ -159,6 +159,7 @@ public final class Money implements Serializable, Comparable<Money> {
      *
      * @return if true 为 0
      */
+    @Transient
     public boolean isZero() {
         return amount == 0;
     }

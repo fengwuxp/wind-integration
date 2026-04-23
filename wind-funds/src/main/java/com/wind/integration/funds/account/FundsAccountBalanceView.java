@@ -1,5 +1,6 @@
 package com.wind.integration.funds.account;
 
+import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
@@ -34,7 +35,7 @@ import org.jspecify.annotations.NonNull;
  * @author wuxp
  * @date 2026-04-15 16:58
  **/
-public interface FundsAccountBalanceView {
+public interface FundsAccountBalanceView extends TenantIsolationObject<Long> {
 
     /**
      * 账户标识
@@ -43,6 +44,7 @@ public interface FundsAccountBalanceView {
      */
     @NonNull
     FundsAccountId getAccountId();
+    
 
     /**
      * 账户金额的币种

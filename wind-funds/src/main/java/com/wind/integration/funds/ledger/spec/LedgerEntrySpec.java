@@ -1,14 +1,14 @@
 package com.wind.integration.funds.ledger.spec;
 
 import com.wind.integration.funds.account.FundsAccountId;
-import com.wind.integration.funds.enums.AccountBalancePostingType;
+import com.wind.integration.funds.enums.LedgerAccountCode;
 import com.wind.integration.funds.enums.LedgerAccountType;
 import com.wind.integration.funds.enums.LedgerDirection;
+import com.wind.integration.funds.enums.LedgerPhaseCode;
 import com.wind.integration.funds.reconcile.spec.LedgerReconciliationSpec;
 import com.wind.integration.funds.settlement.spec.LedgerSettlementSpec;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
-import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
@@ -46,7 +46,13 @@ public interface LedgerEntrySpec extends LedgerReconciliationSpec, LedgerSettlem
      * 会计科目编码（如 CASH / REVENUE / FEE)
      */
     @NonNull
-    String getLedgerCode();
+    LedgerAccountCode getLedgerCode();
+
+    /**
+     * 账本交易阶段编码
+     */
+    @NonNull
+    LedgerPhaseCode getPhaseCode();
 
     /**
      * 账本账户类型
@@ -59,12 +65,6 @@ public interface LedgerEntrySpec extends LedgerReconciliationSpec, LedgerSettlem
      */
     @NonNull
     String getLedgerTransactionSn();
-
-    /**
-     * 账本余额变动类型
-     */
-    @NonNull
-    AccountBalancePostingType getBalancePostingType();
 
     /**
      * 账本分录方向

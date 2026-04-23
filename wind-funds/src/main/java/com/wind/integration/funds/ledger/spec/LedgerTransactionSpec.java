@@ -10,6 +10,7 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 
+import java.beans.Transient;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,13 +29,13 @@ public interface LedgerTransactionSpec extends TenantIsolationObject<Long> {
     /**
      * 交易编号
      */
-    @NotNull
+    @NonNull
     String getSn();
 
     /**
      * 事件类型
      */
-    @NotNull
+    @NonNull
     String getEventType();
 
     /**
@@ -46,7 +47,7 @@ public interface LedgerTransactionSpec extends TenantIsolationObject<Long> {
     /**
      * 记账金额，单位：分
      */
-    @NotNull
+    @NonNull
     Money getAmount();
 
     /**
@@ -60,13 +61,13 @@ public interface LedgerTransactionSpec extends TenantIsolationObject<Long> {
     /**
      * 原始金额，单位：分
      */
-    @NotNull
+    @NonNull
     Money getOriginalAmount();
 
     /**
      * 汇率
      */
-    @NotNull
+    @NonNull
     BigDecimal getExchangeRate();
 
     /**
@@ -77,7 +78,7 @@ public interface LedgerTransactionSpec extends TenantIsolationObject<Long> {
     /**
      * 业务场景
      */
-    @NotNull
+    @NonNull
     String getBusinessScene();
 
     /**
@@ -88,7 +89,7 @@ public interface LedgerTransactionSpec extends TenantIsolationObject<Long> {
     /**
      * 交易发生时间
      */
-    @NotNull
+    @NonNull
     LocalDateTime getTransactionTime();
 
     /**
@@ -99,15 +100,29 @@ public interface LedgerTransactionSpec extends TenantIsolationObject<Long> {
     /**
      * 上下文
      */
-    @NotNull
+    @NonNull
     Map<String, Object> getContextVariables();
+
+
+    @NotNull
+    JournalSpec getJournal();
+
+    @NotNull
+    List<LedgerPostingGroupSpec> getPostingGroups();
 
     /**
      * 账本交易条目
      */
-    @NotNull
-    List<? extends LedgerEntrySpec> getEntries();
-
+    @NonNull
+    @Transient
+    default List<LedgerEntrySpec> getEntries() {
+        return getPostingGroups().stream()
+                .map(LedgerPostingGroupSpec::getPhases)
+                .flatMap(List::stream)
+                .map(LedgerPostingPhaseSpec::getEntries)
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
+    }
 
     /**
      * 借方金额，
@@ -140,32 +155,7 @@ public interface LedgerTransactionSpec extends TenantIsolationObject<Long> {
      */
     @NonNull
     default Set<FundsAccountId> getLedgerAccountIds() {
-        return getEntries().stream().map(LedgerEntrySpec::getAccountId)
-                .collect(Collectors.toSet());
-    }
-
-    /**
-     * 获取借方资金账户
-     *
-     * @return 借方资金账户
-     */
-    @NonNull
-    default Set<FundsAccountId> getDebitAccounts() {
         return getEntries().stream()
-                .filter(entry -> entry.getLedgerDirection() == LedgerDirection.DEBIT)
-                .map(LedgerEntrySpec::getAccountId)
-                .collect(Collectors.toSet());
-    }
-
-    /**
-     * 获取贷方资金账户
-     *
-     * @return 贷方资金账户
-     */
-    @NonNull
-    default Set<FundsAccountId> getCreditAccounts() {
-        return getEntries().stream()
-                .filter(entry -> entry.getLedgerDirection() == LedgerDirection.CREDIT)
                 .map(LedgerEntrySpec::getAccountId)
                 .collect(Collectors.toSet());
     }

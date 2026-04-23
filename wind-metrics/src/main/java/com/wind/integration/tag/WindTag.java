@@ -25,31 +25,13 @@ public interface WindTag extends Serializable {
      * @return 标签名称
      */
     @NonNull
-    @Deprecated(forRemoval = true)
-    default String getName() {
-        return name();
-    }
+    String name();
 
     /**
      * @return 标签值
      */
     @NonNull
-    @Deprecated(forRemoval = true)
-    default String getValue() {
-        return value();
-    }
-
-    /**
-     * @return 标签名称
-     */
-    @NonNull
-     String name();
-
-    /**
-     * @return 标签值
-     */
-    @NonNull
-     String value();
+    String value();
 
     /**
      * 创建标签

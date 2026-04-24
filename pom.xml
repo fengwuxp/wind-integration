@@ -29,7 +29,6 @@
         <module>wind-message</module>
         <module>wind-im</module>
         <module>wind-workflow</module>
-        <module>wind-funds</module>
     </modules>
 
     <properties>
@@ -148,11 +147,6 @@
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-im</artifactId>
-                <version>${revision}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.wind.integration</groupId>
-                <artifactId>wind-funds</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

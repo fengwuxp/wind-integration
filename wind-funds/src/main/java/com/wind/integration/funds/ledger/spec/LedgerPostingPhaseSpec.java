@@ -1,42 +1,37 @@
 package com.wind.integration.funds.ledger.spec;
 
+import com.wind.integration.funds.enums.LedgerPhaseCode;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
 /**
- * PostingPhase（会计执行阶段 / 分阶段记账）
+ * PostingPhase（记账阶段 / 资金流转阶段）
  *
- * <p>金融语义：
- * 一个 PostingGroup 内部的“原子会计执行步骤”。
+ * <p>定义：
+ * 描述“资金在该批次中经历的业务阶段”，仅用于语义表达与审计，
+ * 不具备事务边界能力。
  *
- * <p>工程语义：
- * - 用于分阶段执行 LedgerEntry
- * - 用于控制清结算流程
- * - 用于失败重试粒度控制
+ * <p>典型用途：
+ * - 表达资金路径（FUND_IN → INTERNAL_SETTLE）
+ * - 对账解释（why money moved）
+ * - 审计日志
  *
- * <p>典型场景：
- * - AUTHORIZATION（冻结额度）
- * - CAPTURE（扣款）
- * - RELEASE（解冻）
- * - SETTLEMENT（清算）
- *
- * <p>核心职责：
- * 1. 定义执行阶段
- * 2. 生成该阶段 LedgerEntry
- * 3. 支持独立重试
+ * <p>职责：
+ * 1. 标识资金流转阶段
+ * 2. 承载该阶段产生的分录
  */
 public interface LedgerPostingPhaseSpec {
 
     /**
-     * 阶段编码
+     * 阶段编码（资金行为）
      */
     @NonNull
-    String getPhaseCode();
+    LedgerPhaseCode getPhaseCode();
 
     /**
-     * 当前阶段生成的分录
+     * 分录列表
      */
     @NonNull
-    List<? extends LedgerEntrySpec> getEntries();
+    List<LedgerEntrySpec> getEntries();
 }

@@ -6,40 +6,70 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.Map;
+
 /**
- * FundsFlowEdge（资金流边 / 转账路径边）
+ * FundsFlowEdge（资金流边 / 意图流转边）
  *
- * <p>金融语义：
- * 表示一条资金从一个账户流向另一个账户的路径边。
+ * <p>定义：
+ * 表达资金从一个账户流向另一个账户的“业务意图路径”，
+ * 是 Ledger 生成的输入结构之一，但不是账本事实。
  *
- * <p>工程语义：
- * Journal 的最小结构单元，用于描述资金路径图（Graph Edge）。
+ * <p>核心原则：
+ * - ❗ 只表达“钱要去哪”
+ * - ❗ 不表达借贷（DR/CR）
+ * - ❗ 不表达 ledgerCode
+ * - ❗ 不直接等价 LedgerEntry
  *
- * <p>特点：
- * - 不涉及借贷
- * - 不涉及账本逻辑
- * - 只表达 money movement
+ * <p>用途：
+ * - LedgerAssembler 输入
+ * - 资金路径建模（graph）
+ * - 风控/路由决策
  *
- * <p>例子：
- * BANK → RESERVE_FUND
- * RESERVE_FUND → USER_WALLET
+ * <p>对标：
+ * - Stripe: Transfer Flow Edge
+ * - Adyen: Payment Movement Leg
  */
 @Getter
 @Builder
 public final class FundsFlowEdgeSpec {
 
     /**
-     * 资金来源账户
+     * 来源账户
      */
     @NotNull
     private final FundsAccountId from;
 
     /**
-     * 资金目标账户
+     * 目标账户
      */
     @NotNull
     private final FundsAccountId to;
 
+    /**
+     * 金额（业务层金额，不是 ledger 分录金额）
+     */
     @NotNull
     private final Money amount;
+
+    /**
+     * 业务流水号
+     */
+    @NotNull
+    private final String businessSn;
+
+    /**
+     * 是否手续费路径
+     */
+    private final boolean fee;
+
+    /**
+     * 是否 FX（汇兑路径）
+     */
+    private final boolean fx;
+
+    /**
+     * 扩展上下文（用于路由 / 风控）
+     */
+    private final Map<String, Object> attributes;
 }

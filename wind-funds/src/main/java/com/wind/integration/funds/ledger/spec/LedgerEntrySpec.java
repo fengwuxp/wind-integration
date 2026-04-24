@@ -4,7 +4,6 @@ import com.wind.integration.funds.account.FundsAccountId;
 import com.wind.integration.funds.enums.LedgerAccountCode;
 import com.wind.integration.funds.enums.LedgerAccountType;
 import com.wind.integration.funds.enums.LedgerDirection;
-import com.wind.integration.funds.enums.LedgerPhaseCode;
 import com.wind.integration.funds.reconcile.spec.LedgerReconciliationSpec;
 import com.wind.integration.funds.settlement.spec.LedgerSettlementSpec;
 import com.wind.transaction.core.Money;
@@ -47,12 +46,6 @@ public interface LedgerEntrySpec extends LedgerReconciliationSpec, LedgerSettlem
      */
     @NonNull
     LedgerAccountCode getLedgerCode();
-
-    /**
-     * 账本交易阶段编码
-     */
-    @NonNull
-    LedgerPhaseCode getPhaseCode();
 
     /**
      * 账本账户类型

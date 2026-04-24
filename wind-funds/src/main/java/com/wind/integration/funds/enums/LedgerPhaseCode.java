@@ -28,44 +28,49 @@ import lombok.Getter;
 public enum LedgerPhaseCode implements DescriptiveEnum {
 
     /**
-     * 外部资金进入系统
+     * 外部入金
      */
     FUND_IN("外部入金"),
 
     /**
-     * 资金离开系统
+     * 外部出金
      */
     FUND_OUT("外部出金"),
 
     /**
-     * 账户之间资金流转
+     * 清算/结算
      */
-    TRANSFER("内部转账"),
+    SETTLEMENT("资金结算"),
 
     /**
-     * 资金冻结（占用）
+     * 转账
+     */
+    TRANSFER("转账"),
+
+    /**
+     * 冻结资金
      */
     FREEZE("资金冻结"),
 
     /**
-     * 资金解冻
+     * 解冻资金
      */
     UNFREEZE("资金解冻"),
 
     /**
-     * 授权占用（预授权）
+     * 预授权占用
      */
-    HOLD("授权占用"),
+    AUTHORIZATION("授权占用"),
 
     /**
-     * 授权释放
+     * 预授权释放
      */
-    RELEASE("授权释放"),
+    REVERSAL("授权释放"),
 
     /**
-     * 资金结算（正式归属）
+     * 授权转结算（capture）
      */
-    SETTLE("资金结算"),
+    CAPTURE("授权结算"),
 
     /**
      * 退款
@@ -73,7 +78,7 @@ public enum LedgerPhaseCode implements DescriptiveEnum {
     REFUND("退款"),
 
     /**
-     * 账务调整
+     * 调账
      */
     ADJUSTMENT("调账");
 

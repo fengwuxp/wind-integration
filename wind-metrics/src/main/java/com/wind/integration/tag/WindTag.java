@@ -1,5 +1,7 @@
 package com.wind.integration.tag;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 
@@ -40,7 +42,8 @@ public interface WindTag extends Serializable {
      * @param value 标签值
      * @return 标签
      */
-    static WindTag of(@NonNull String name, @NonNull String value) {
+    @JsonCreator
+    static WindTag of(@NonNull @JsonProperty("name") String name, @JsonProperty("value") @NonNull String value) {
         return new ImmutableTag(name, value);
     }
 

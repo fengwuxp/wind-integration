@@ -52,19 +52,17 @@ public record JwtTokenAuthTokenListener(AuthenticationTokenCodecService authenti
     public AuthTokenResult getAuthTokenResult(Object authToken, SocketIOClient client) {
         try {
             String token = parseAuthToken(authToken);
-            if (!StringUtils.hasText(token)) {
-                return INVALID_TOKEN;
+            if (StringUtils.hasText(token)) {
+                // 2. 调用业务逻辑解析并验证 Token（例如 JWT）
+                WindAuthenticationToken parsedToken = authenticationTokenCodecService.parseAndValidateToken(token);
+                WindAuthenticationUser user = parsedToken.user();
+                AssertUtils.notNull(user, "token is invalid");
+                // 3. 验证通过后，将用户信息绑定到 client 对象中，供后续连接和消息逻辑使用
+                client.set(WindWebSocketMetadataNames.USER_ID_NAME, user.id());
+                client.set(WindImConstants.USERNAME_VARIABLE_NAME, user.username());
+                // 4. 返回认证成功
+                return AuthTokenResult.AUTH_TOKEN_RESULT_SUCCESS;
             }
-
-            // 2. 调用业务逻辑解析并验证 Token（例如 JWT）
-            WindAuthenticationToken parsedToken = authenticationTokenCodecService.parseAndValidateToken(token);
-            WindAuthenticationUser user = parsedToken.user();
-            AssertUtils.notNull(user, "token is invalid");
-            // 3. 验证通过后，将用户信息绑定到 client 对象中，供后续连接和消息逻辑使用
-            client.set(WindWebSocketMetadataNames.USER_ID_NAME, user.id());
-            client.set(WindImConstants.USERNAME_VARIABLE_NAME, user.username());
-            // 4. 返回认证成功
-            return AuthTokenResult.AUTH_TOKEN_RESULT_SUCCESS;
         } catch (Exception exception) {
             log.error("验证 Token 失败, message = {}", exception.getMessage(), exception);
             // 5. 验证失败，断开连接

@@ -10,6 +10,7 @@ import com.wind.websocket.core.WindSocketClientClientConnection;
 import com.wind.websocket.core.WindSocketClientClientConnectionFactory;
 import com.wind.websocket.core.WindSocketConnectionListener;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -67,6 +68,12 @@ public record DefaultSocketioConnectListener(String nodeIpAddress, WindSocketCon
             metadata.put(WindImConstants.NODE_IP_ADDRESS_VARIABLE_NAME, nodeIpAddress);
             // 5. 注册连接对象
             WindSocketClientClientConnection connection = factory.create(client, sessionId, metadata);
+            if (!StringUtils.hasText(connection.getUserId())) {
+                // hack socketio4j 处理鉴权时没有中断连接流程，这里做一个兼容判断
+                log.warn("用户标识不能为空, sessionId = {}, connectionId = {}", sessionId, connection.getId());
+                client.disconnect();
+                return;
+            }
             socketConnectionListener.onConnect(connection);
             client.sendEvent(CHAT_SESSION_JOIN_EVENT, "join success");
         } catch (Exception e) {

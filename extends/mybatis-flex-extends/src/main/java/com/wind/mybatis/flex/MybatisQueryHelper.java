@@ -93,7 +93,7 @@ public final class MybatisQueryHelper {
      * @param query 查询请求
      * @return QueryOrderBy[]
      */
-    public static QueryOrderBy[] getQueryOrderBy(AbstractPageQuery<?> query) {
+    public static QueryOrderBy[] getQueryOrderBy(WindQuery<? extends QueryOrderField> query) {
         return getQueryOrderBy(query.getOrderFields(), query.getOrderTypes());
     }
 

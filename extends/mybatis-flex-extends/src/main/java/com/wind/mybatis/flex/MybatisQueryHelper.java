@@ -301,6 +301,7 @@ public final class MybatisQueryHelper {
 
         /**
          * 游标分页查询
+         * 参见：<a href="https://www.yuque.com/suiyuerufeng-akjad/wind/wp1gkztr78le04sw#5ee0f417">查询流程说明</a>
          *
          * @param query 游标查询请求
          * @return 游标分页对象

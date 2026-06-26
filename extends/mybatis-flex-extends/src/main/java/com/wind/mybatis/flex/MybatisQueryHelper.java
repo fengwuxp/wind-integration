@@ -324,7 +324,7 @@ public final class MybatisQueryHelper {
                     resultEnricher.accept(records);
                 }
             }
-            return CursorPagination.of(total, records, query);
+            return CursorPagination.withQuery(total, records, query);
         }
 
         /**

@@ -46,7 +46,7 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     GBP("826", "GBP", "英镑", "£"),
 
-    JPY("392", "JPY", "日元", "¥"),
+    JPY("392", "JPY", "日元", "¥", 0),
 
     CHF("756", "CHF", "瑞士法郎", "CHF"),
 
@@ -243,7 +243,7 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     KPW("408", "KPW", "朝鮮圓", "₩"),
 
-    KWD("414", "KWD", "科威特第納爾", "د.ك"),
+    KWD("414", "KWD", "科威特第納爾", "د.ك", 3),
 
     KYD("136", "KYD", "開曼群島元", "$"),
 

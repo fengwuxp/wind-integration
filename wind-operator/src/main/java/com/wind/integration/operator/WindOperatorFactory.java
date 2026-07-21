@@ -37,8 +37,8 @@ public final class WindOperatorFactory {
      * @param actorType  操作主体类型
      * @return 操作者
      */
-    public static WindOperator current(@NonNull Long operatorId, @NonNull OperationActorType actorType) {
-        return create(operatorId, null, requireCurrentApplicationName(), actorType);
+    public static WindOperator current(@NonNull Serializable operatorId, @NonNull OperationActorType actorType) {
+        return create(operatorId, String.valueOf(operatorId), requireCurrentApplicationName(), actorType);
     }
 
     /**
@@ -62,7 +62,7 @@ public final class WindOperatorFactory {
      * @return 操作者
      */
     public static WindOperator fromApplication(@NonNull Serializable operatorId, @NonNull String sourceApplication, @NonNull OperationActorType actorType) {
-        return create(operatorId, null, sourceApplication, actorType);
+        return create(operatorId, String.valueOf(operatorId), sourceApplication, actorType);
     }
 
     /**

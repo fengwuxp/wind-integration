@@ -20,6 +20,11 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
+                <artifactId>wind-operator</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
                 <artifactId>wind-oss-api</artifactId>
                 <version>${project.version}</version>
             </dependency>

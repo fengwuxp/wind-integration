@@ -1,7 +1,7 @@
 package com.wind.integration.metrics.query;
 
-import com.wind.integration.metrics.dsl.MetricDslErrorCode;
-import com.wind.integration.metrics.dsl.MetricDslValidationException;
+import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.enums.MetricErrorCode;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -16,6 +16,9 @@ import java.util.Map;
 
 /**
  * 指标正式查询模型的公共合同测试。
+ *
+ * @author wuxp
+ * @date 2026-07-21 17:51
  */
 class MetricQueryContractTests {
 
@@ -41,12 +44,12 @@ class MetricQueryContractTests {
 
     @Test
     void testRejectUnsupportedDimensionValue() {
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> new MetricQuery(
                         "VCC_APPROVED_TOTAL", "cust_001", START_TIME, END_TIME, Map.of("ratio", 0.5D)));
 
-        Assertions.assertEquals(MetricDslErrorCode.QUERY_INVALID, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.QUERY_INVALID, exception.errorCode());
         Assertions.assertEquals("/dimensionValues/ratio", exception.fieldPath());
     }
 
@@ -54,11 +57,11 @@ class MetricQueryContractTests {
     void testBatchRejectsDuplicateMetricCodes() {
         List<String> metricCodes = new ArrayList<>(List.of("VCC_APPROVED_TOTAL", "VCC_APPROVED_TOTAL"));
 
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> new MetricBatchQuery(metricCodes, "cust_001", START_TIME, END_TIME, Map.of()));
 
-        Assertions.assertEquals(MetricDslErrorCode.QUERY_INVALID, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.QUERY_INVALID, exception.errorCode());
         Assertions.assertEquals("/metricCodes", exception.fieldPath());
     }
 

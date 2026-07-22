@@ -1,5 +1,37 @@
 package com.wind.integration.metrics.dsl;
 
+import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.dsl.definition.MetricDefinitionDsl;
+import com.wind.integration.metrics.dsl.definition.MetricDefinitionSpec;
+import com.wind.integration.metrics.dsl.definition.MetricExpressionDsl;
+import com.wind.integration.metrics.dsl.definition.MetricJoinDsl;
+import com.wind.integration.metrics.dsl.definition.MetricJoinOnDsl;
+import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
+import com.wind.integration.metrics.dsl.definition.MetricOrElseDsl;
+import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
+import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
+import com.wind.integration.metrics.dsl.definition.MetricTimeDsl;
+import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
+import com.wind.integration.metrics.dsl.filter.BooleanMetricLiteralDsl;
+import com.wind.integration.metrics.dsl.filter.ComparisonMetricFilterDsl;
+import com.wind.integration.metrics.dsl.filter.DecimalMetricLiteralDsl;
+import com.wind.integration.metrics.dsl.filter.IntegralMetricLiteralDsl;
+import com.wind.integration.metrics.dsl.filter.LogicalMetricFilterDsl;
+import com.wind.integration.metrics.dsl.filter.MetricFilterDsl;
+import com.wind.integration.metrics.dsl.filter.MetricLiteralDsl;
+import com.wind.integration.metrics.dsl.filter.MetricNumericLiteralDsl;
+import com.wind.integration.metrics.dsl.filter.NullMetricFilterDsl;
+import com.wind.integration.metrics.dsl.filter.SetMetricFilterDsl;
+import com.wind.integration.metrics.dsl.filter.StringMetricLiteralDsl;
+import com.wind.integration.metrics.enums.MetricAggregation;
+import com.wind.integration.metrics.enums.MetricErrorCode;
+import com.wind.integration.metrics.enums.MetricExpressionType;
+import com.wind.integration.metrics.enums.MetricFilterOperator;
+import com.wind.integration.metrics.enums.MetricJoinCardinality;
+import com.wind.integration.metrics.enums.MetricJoinType;
+import com.wind.integration.metrics.enums.MetricOrElseMode;
+import com.wind.integration.metrics.enums.MetricValueShape;
+import com.wind.integration.metrics.enums.MetricValueType;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
@@ -21,31 +53,49 @@ import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.required;
 import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.string;
 
 /**
- * Definition DSL v1 的关闭世界解析与确定性规范化实现。
+ * 指标 Definition DSL v1 的关闭世界解析、基础校验与确定性规范化入口。
+ *
+ * <p>只接受白名单字段和封闭 AST，不执行表达式，也不解析物理表或数据源。</p>
+ *
+ * @author wuxp
+ * @date 2026-07-21 17:51
  */
 public final class MetricDefinitionDslCodec {
 
+    /** 当前支持的 Definition DSL 结构版本。 */
     private static final int SCHEMA_VERSION = 1;
 
+    /** DSL 编码和别名允许使用的标识符格式。 */
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z][A-Za-z0-9_]*");
 
+    /** 主事实字段或带一个关联事实别名前缀的字段引用格式。 */
     private static final Pattern FIELD_REFERENCE = Pattern.compile(
             "[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)?");
 
+    /** Definition DSL 根节点允许出现的字段。 */
     private static final Set<String> ROOT_FIELDS = Set.of("schemaVersion", "metric");
 
+    /** 指标定义节点允许出现的字段。 */
     private static final Set<String> METRIC_FIELDS = Set.of(
             "code", "valueShape", "fact", "joins", "subject", "time", "dimensions", "metricRefs", "value", "fields");
 
+    /** 不允许用作指标引用别名或多值字段名的 SpEL 保留名称。 */
     private static final Set<String> RESERVED_NAMES = Set.of(
             "metric", "T", "new", "true", "false", "null", "root", "this", "and", "or", "not", "div", "mod",
             "eq", "ne", "lt", "le", "gt", "ge", "between", "matches", "instanceof");
 
+    /**
+     * 解析并校验指标 Definition DSL JSON。
+     *
+     * @param json Definition DSL JSON
+     * @return 不可变的指标定义对象
+     * @throws MetricValidationException JSON、字段或指标结构不符合 v1 契约时抛出
+     */
     public MetricDefinitionDsl parse(String json) {
         Map<String, Object> root = MetricDslJsonSupport.parseRootObject(json);
         int schemaVersion = MetricDslJsonSupport.integer(required(root, "schemaVersion", ""), "/schemaVersion");
         if (schemaVersion != SCHEMA_VERSION) {
-            throw error(MetricDslErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
+            throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
         MetricDslJsonSupport.rejectUnknown(root, "", ROOT_FIELDS);
         MetricDefinitionDsl definition = new MetricDefinitionDsl(
@@ -55,35 +105,47 @@ public final class MetricDefinitionDslCodec {
         return definition;
     }
 
+    /**
+     * 校验已构造的指标定义是否满足 v1 基础结构约束。
+     *
+     * @param definition 指标定义
+     * @throws MetricValidationException 定义不满足封闭字段、分支或值约束时抛出
+     */
     public void validateBasic(MetricDefinitionDsl definition) {
         if (definition.schemaVersion() != SCHEMA_VERSION) {
-            throw error(MetricDslErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
+            throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
         MetricDefinitionSpec metric = definition.metric();
         validateIdentifier(metric.code(), 100, "/metric/code");
         validateIdentifier(metric.subject().type(), 64, "/metric/subject/type");
         validateMetricStructure(metric);
         if (metric.dimensions().size() != new LinkedHashSet<>(metric.dimensions()).size()) {
-            throw error(MetricDslErrorCode.DSL_VALUE_INVALID, "/metric/dimensions", "Dimensions must be unique");
+            throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/dimensions", "Dimensions must be unique");
         }
         boolean factBased = metric.fact() != null;
         if (factBased) {
             if (metric.time() == null) {
-                throw error(MetricDslErrorCode.DSL_FIELD_REQUIRED, "/metric/time", "Fact-based metric requires time");
+                throw error(MetricErrorCode.DSL_FIELD_REQUIRED, "/metric/time", "Fact-based metric requires time");
             }
             if ("GLOBAL".equals(metric.subject().type())) {
                 if (metric.subject().field() != null) {
-                    throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric/subject/field", "GLOBAL forbids subject field");
+                    throw error(
+                            MetricErrorCode.DSL_VALUE_BRANCH_INVALID,
+                            "/metric/subject/field",
+                            "GLOBAL forbids subject field");
                 }
             } else if (metric.subject().field() == null) {
-                throw error(MetricDslErrorCode.DSL_FIELD_REQUIRED, "/metric/subject/field", "Subject field is required");
+                throw error(MetricErrorCode.DSL_FIELD_REQUIRED, "/metric/subject/field", "Subject field is required");
             }
         } else {
             if (metric.time() != null || !metric.joins().isEmpty() || metric.subject().field() != null) {
-                throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric", "Derived metric contains fact fields");
+                throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric", "Derived metric contains fact fields");
             }
             if (metric.metricRefs().isEmpty()) {
-                throw error(MetricDslErrorCode.DSL_FIELD_REQUIRED, "/metric/metricRefs", "Derived metric requires metricRefs");
+                throw error(
+                        MetricErrorCode.DSL_FIELD_REQUIRED,
+                        "/metric/metricRefs",
+                        "Derived metric requires metricRefs");
             }
         }
         validateValueShape(metric, factBased);
@@ -104,14 +166,16 @@ public final class MetricDefinitionDslCodec {
             validateFieldName(metric.time().field(), "/metric/time/field");
         }
         for (int index = 0; index < metric.dimensions().size(); index++) {
-            validateFieldReference(metric.dimensions().get(index), child("/metric/dimensions", Integer.toString(index)));
+            validateFieldReference(
+                    metric.dimensions().get(index),
+                    child("/metric/dimensions", Integer.toString(index)));
         }
         validateJoins(metric.fact(), metric.joins());
         metric.metricRefs().forEach((alias, reference) -> {
             String path = child("/metric/metricRefs", alias);
             validateIdentifier(alias, 64, path);
             if (metric.valueShape() == MetricValueShape.SCALAR && "value".equals(alias)) {
-                throw error(MetricDslErrorCode.DSL_VALUE_INVALID, path, "Alias conflicts with SCALAR value field");
+                throw error(MetricErrorCode.DSL_VALUE_INVALID, path, "Alias conflicts with SCALAR value field");
             }
             validateIdentifier(reference.metricCode(), 100, child(path, "metricCode"));
             validateIdentifier(reference.valueField(), 64, child(path, "valueField"));
@@ -120,14 +184,14 @@ public final class MetricDefinitionDslCodec {
             String path = child("/metric/fields", fieldName);
             validateIdentifier(fieldName, 64, path);
             if (metric.metricRefs().containsKey(fieldName)) {
-                throw error(MetricDslErrorCode.DSL_VALUE_INVALID, path, "Field conflicts with metric reference alias");
+                throw error(MetricErrorCode.DSL_VALUE_INVALID, path, "Field conflicts with metric reference alias");
             }
         });
     }
 
     private void validateJoins(@Nullable String primaryFact, List<MetricJoinDsl> joins) {
         if (joins.size() > 2) {
-            throw error(MetricDslErrorCode.DSL_VALUE_INVALID, "/metric/joins", "At most two joins are supported");
+            throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/joins", "At most two joins are supported");
         }
         Set<String> aliases = new LinkedHashSet<>();
         for (int index = 0; index < joins.size(); index++) {
@@ -136,16 +200,16 @@ public final class MetricDefinitionDslCodec {
             validateIdentifier(join.alias(), 64, child(path, "alias"));
             if (join.alias().equals(primaryFact)) {
                 throw error(
-                        MetricDslErrorCode.DSL_IDENTIFIER_INVALID,
+                        MetricErrorCode.DSL_IDENTIFIER_INVALID,
                         child(path, "alias"),
                         "Join alias conflicts with primary fact");
             }
             if (!aliases.add(join.alias())) {
-                throw error(MetricDslErrorCode.DSL_VALUE_INVALID, child(path, "alias"), "Join alias must be unique");
+                throw error(MetricErrorCode.DSL_VALUE_INVALID, child(path, "alias"), "Join alias must be unique");
             }
             validateIdentifier(join.fact(), 100, child(path, "fact"));
             if (join.on().isEmpty()) {
-                throw error(MetricDslErrorCode.DSL_VALUE_INVALID, child(path, "on"), "Join keys must not be empty");
+                throw error(MetricErrorCode.DSL_VALUE_INVALID, child(path, "on"), "Join keys must not be empty");
             }
             for (int onIndex = 0; onIndex < join.on().size(); onIndex++) {
                 MetricJoinOnDsl joinOn = join.on().get(onIndex);
@@ -156,6 +220,13 @@ public final class MetricDefinitionDslCodec {
         }
     }
 
+    /**
+     * 将合法指标定义输出为字段顺序稳定的规范 JSON。
+     *
+     * @param definition 指标定义
+     * @return 可用于内容比对和签名的规范 JSON
+     * @throws MetricValidationException 定义不满足 v1 契约时抛出
+     */
     public String canonicalize(MetricDefinitionDsl definition) {
         validateBasic(definition);
         return MetricDslJsonSupport.toJson(toCanonicalMap(definition));
@@ -167,7 +238,8 @@ public final class MetricDefinitionDslCodec {
         MetricValueShape valueShape = MetricDslJsonSupport.enumValue(
                 required(source, "valueShape", "/metric"), MetricValueShape.class, "/metric/valueShape");
         String fact = optionalString(source, "fact", "/metric/fact");
-        List<MetricJoinDsl> joins = parseJoins(source.get("joins"));
+        List<MetricJoinDsl> joins = parseJoins(
+                MetricDslJsonSupport.optionalValue(source, "joins", "/metric/joins"));
         MetricSubjectDsl subject = parseSubject(MetricDslJsonSupport.object(
                 required(source, "subject", "/metric"), "/metric/subject"));
         MetricTimeDsl time = source.containsKey("time")
@@ -176,11 +248,13 @@ public final class MetricDefinitionDslCodec {
         List<String> dimensions = parseStringList(
                 required(source, "dimensions", "/metric"), "/metric/dimensions", false);
         dimensions = dimensions.stream().sorted().toList();
-        Map<String, MetricReferenceDsl> metricRefs = parseMetricRefs(source.get("metricRefs"));
+        Map<String, MetricReferenceDsl> metricRefs = parseMetricRefs(
+                MetricDslJsonSupport.optionalValue(source, "metricRefs", "/metric/metricRefs"));
         MetricValueDsl value = source.containsKey("value")
                 ? parseValue(MetricDslJsonSupport.object(source.get("value"), "/metric/value"), "/metric/value")
                 : null;
-        Map<String, MetricValueDsl> fields = parseFields(source.get("fields"));
+        Map<String, MetricValueDsl> fields = parseFields(
+                MetricDslJsonSupport.optionalValue(source, "fields", "/metric/fields"));
         return new MetricDefinitionSpec(
                 code, valueShape, fact, joins, subject, time, dimensions, metricRefs, value, fields);
     }
@@ -203,7 +277,7 @@ public final class MetricDefinitionDslCodec {
         }
         List<Object> source = MetricDslJsonSupport.array(value, "/metric/joins");
         if (source.isEmpty() || source.size() > 2) {
-            throw error(MetricDslErrorCode.DSL_VALUE_INVALID, "/metric/joins", "Joins must contain one or two items");
+            throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/joins", "Joins must contain one or two items");
         }
         List<MetricJoinDsl> result = new ArrayList<>(source.size());
         for (int index = 0; index < source.size(); index++) {
@@ -212,7 +286,7 @@ public final class MetricDefinitionDslCodec {
             MetricDslJsonSupport.rejectUnknown(join, path, Set.of("alias", "fact", "joinType", "cardinality", "on"));
             List<Object> onSource = MetricDslJsonSupport.array(required(join, "on", path), child(path, "on"));
             if (onSource.isEmpty()) {
-                throw error(MetricDslErrorCode.DSL_VALUE_INVALID, child(path, "on"), "Join keys must not be empty");
+                throw error(MetricErrorCode.DSL_VALUE_INVALID, child(path, "on"), "Join keys must not be empty");
             }
             List<MetricJoinOnDsl> on = new ArrayList<>(onSource.size());
             for (int onIndex = 0; onIndex < onSource.size(); onIndex++) {
@@ -229,7 +303,9 @@ public final class MetricDefinitionDslCodec {
                     MetricDslJsonSupport.enumValue(
                             required(join, "joinType", path), MetricJoinType.class, child(path, "joinType")),
                     MetricDslJsonSupport.enumValue(
-                            required(join, "cardinality", path), MetricJoinCardinality.class, child(path, "cardinality")),
+                            required(join, "cardinality", path),
+                            MetricJoinCardinality.class,
+                            child(path, "cardinality")),
                     on));
         }
         return result.stream().sorted(Comparator.comparing(MetricJoinDsl::alias)).toList();
@@ -241,7 +317,7 @@ public final class MetricDefinitionDslCodec {
         }
         Map<String, Object> source = MetricDslJsonSupport.object(value, "/metric/metricRefs");
         if (source.isEmpty()) {
-            throw error(MetricDslErrorCode.DSL_VALUE_INVALID, "/metric/metricRefs", "metricRefs must not be empty");
+            throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/metricRefs", "metricRefs must not be empty");
         }
         Map<String, MetricReferenceDsl> result = new LinkedHashMap<>();
         source.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
@@ -262,7 +338,7 @@ public final class MetricDefinitionDslCodec {
         }
         Map<String, Object> source = MetricDslJsonSupport.object(value, "/metric/fields");
         if (source.isEmpty()) {
-            throw error(MetricDslErrorCode.DSL_VALUE_INVALID, "/metric/fields", "fields must not be empty");
+            throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/fields", "fields must not be empty");
         }
         Map<String, MetricValueDsl> result = new LinkedHashMap<>();
         source.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
@@ -285,22 +361,25 @@ public final class MetricDefinitionDslCodec {
                     ? MetricDslJsonSupport.integer(source.get("scale"), child(path, "scale"))
                     : 4;
             if (scale < 4 || scale > 6) {
-                throw error(MetricDslErrorCode.DSL_VALUE_INVALID, child(path, "scale"), "Scale must be between 4 and 6");
+                throw error(MetricErrorCode.DSL_VALUE_INVALID, child(path, "scale"), "Scale must be between 4 and 6");
             }
             roundingMode = source.containsKey("roundingMode")
                     ? MetricDslJsonSupport.enumValue(
                             source.get("roundingMode"), RoundingMode.class, child(path, "roundingMode"))
                     : RoundingMode.HALF_UP;
             if (roundingMode != RoundingMode.HALF_UP) {
-                throw error(MetricDslErrorCode.DSL_VALUE_INVALID, child(path, "roundingMode"), "Only HALF_UP is supported");
+                throw error(
+                        MetricErrorCode.DSL_VALUE_INVALID,
+                        child(path, "roundingMode"),
+                        "Only HALF_UP is supported");
             }
         } else if (source.containsKey("scale") || source.containsKey("roundingMode")) {
-            throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Non-decimal value forbids precision fields");
+            throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Non-decimal value forbids precision fields");
         }
         boolean hasMeasure = source.containsKey("measure") && source.get("measure") != null;
         boolean hasExpression = source.containsKey("expression") && source.get("expression") != null;
         if (hasMeasure == hasExpression) {
-            throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Exactly one calculation branch is required");
+            throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Exactly one calculation branch is required");
         }
         MetricMeasureDsl measure = hasMeasure
                 ? parseMeasure(MetricDslJsonSupport.object(
@@ -323,10 +402,10 @@ public final class MetricDefinitionDslCodec {
                 required(source, "aggregation", path), MetricAggregation.class, child(path, "aggregation"));
         String field = optionalString(source, "field", child(path, "field"));
         if (aggregation == MetricAggregation.COUNT && field != null) {
-            throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, child(path, "field"), "COUNT forbids field");
+            throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, child(path, "field"), "COUNT forbids field");
         }
         if (aggregation != MetricAggregation.COUNT && field == null) {
-            throw error(MetricDslErrorCode.DSL_FIELD_REQUIRED, child(path, "field"), "Aggregation field is required");
+            throw error(MetricErrorCode.DSL_FIELD_REQUIRED, child(path, "field"), "Aggregation field is required");
         }
         MetricFilterDsl filter = source.containsKey("filter")
                 ? parseFilter(MetricDslJsonSupport.object(
@@ -348,17 +427,19 @@ public final class MetricDefinitionDslCodec {
         MetricOrElseMode mode = MetricDslJsonSupport.enumValue(
                 required(source, "mode", path), MetricOrElseMode.class, child(path, "mode"));
         if (mode == MetricOrElseMode.VALUE) {
-            return new MetricOrElseDsl(mode, parseNumericLiteral(required(source, "value", path), child(path, "value")));
+            return new MetricOrElseDsl(
+                    mode,
+                    parseNumericLiteral(required(source, "value", path), child(path, "value")));
         }
         if (source.containsKey("value")) {
-            throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, child(path, "value"), "Only VALUE accepts a value");
+            throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, child(path, "value"), "Only VALUE accepts a value");
         }
         return new MetricOrElseDsl(mode, null);
     }
 
     private MetricFilterDsl parseFilter(Map<String, Object> source, String path) {
         if (source.size() != 1) {
-            throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Filter must contain exactly one operator");
+            throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Filter must contain exactly one operator");
         }
         Map.Entry<String, Object> entry = source.entrySet().iterator().next();
         return switch (entry.getKey()) {
@@ -376,14 +457,20 @@ public final class MetricDefinitionDslCodec {
                     MetricFilterOperator.IS_NOT_NULL, string(entry.getValue(), child(path, "isNotNull")));
             case "and" -> parseLogical(MetricFilterOperator.AND, entry.getValue(), path);
             case "or" -> parseLogical(MetricFilterOperator.OR, entry.getValue(), path);
-            default -> throw error(MetricDslErrorCode.DSL_VALUE_INVALID, child(path, entry.getKey()), "Unsupported filter operator");
+            default -> throw error(
+                    MetricErrorCode.DSL_VALUE_INVALID,
+                    child(path, entry.getKey()),
+                    "Unsupported filter operator");
         };
     }
 
     private ComparisonMetricFilterDsl parseComparison(MetricFilterOperator operator, Object value, String path) {
         String operatorPath = child(path, operatorName(operator));
         Map.Entry<String, Object> entry = singleEntry(MetricDslJsonSupport.object(value, operatorPath), operatorPath);
-        return new ComparisonMetricFilterDsl(operator, entry.getKey(), parseLiteral(entry.getValue(), child(operatorPath, entry.getKey())));
+        return new ComparisonMetricFilterDsl(
+                operator,
+                entry.getKey(),
+                parseLiteral(entry.getValue(), child(operatorPath, entry.getKey())));
     }
 
     private SetMetricFilterDsl parseSet(MetricFilterOperator operator, Object value, String path) {
@@ -391,11 +478,16 @@ public final class MetricDefinitionDslCodec {
         Map.Entry<String, Object> entry = singleEntry(MetricDslJsonSupport.object(value, operatorPath), operatorPath);
         List<Object> source = MetricDslJsonSupport.array(entry.getValue(), child(operatorPath, entry.getKey()));
         if (source.isEmpty()) {
-            throw error(MetricDslErrorCode.DSL_VALUE_INVALID, child(operatorPath, entry.getKey()), "Set must not be empty");
+            throw error(
+                    MetricErrorCode.DSL_VALUE_INVALID,
+                    child(operatorPath, entry.getKey()),
+                    "Set must not be empty");
         }
-        List<MetricLiteralDsl> values = source.stream()
-                .map(item -> parseLiteral(item, child(operatorPath, entry.getKey())))
-                .toList();
+        String valuePath = child(operatorPath, entry.getKey());
+        List<MetricLiteralDsl> values = new ArrayList<>(source.size());
+        for (int index = 0; index < source.size(); index++) {
+            values.add(parseLiteral(source.get(index), child(valuePath, Integer.toString(index))));
+        }
         return new SetMetricFilterDsl(operator, entry.getKey(), values);
     }
 
@@ -403,11 +495,16 @@ public final class MetricDefinitionDslCodec {
         String operatorPath = child(path, operatorName(operator));
         List<Object> source = MetricDslJsonSupport.array(value, operatorPath);
         if (source.size() < 2) {
-            throw error(MetricDslErrorCode.DSL_VALUE_INVALID, operatorPath, "Logical filter requires at least two operands");
+            throw error(
+                    MetricErrorCode.DSL_VALUE_INVALID,
+                    operatorPath,
+                    "Logical filter requires at least two operands");
         }
-        List<MetricFilterDsl> operands = source.stream()
-                .map(item -> parseFilter(MetricDslJsonSupport.object(item, operatorPath), operatorPath))
-                .toList();
+        List<MetricFilterDsl> operands = new ArrayList<>(source.size());
+        for (int index = 0; index < source.size(); index++) {
+            String operandPath = child(operatorPath, Integer.toString(index));
+            operands.add(parseFilter(MetricDslJsonSupport.object(source.get(index), operandPath), operandPath));
+        }
         return new LogicalMetricFilterDsl(operator, operands);
     }
 
@@ -428,65 +525,68 @@ public final class MetricDefinitionDslCodec {
         if (value instanceof BigDecimal decimal) {
             return new DecimalMetricLiteralDsl(decimal);
         }
-        throw error(MetricDslErrorCode.DSL_FIELD_TYPE_INVALID, path, "Expected numeric literal");
+        throw error(MetricErrorCode.DSL_FIELD_TYPE_INVALID, path, "Expected numeric literal");
     }
 
     private void validateValueShape(MetricDefinitionSpec metric, boolean factBased) {
         List<MetricValueDsl> values;
         if (metric.valueShape() == MetricValueShape.SCALAR) {
             if (metric.value() == null || !metric.fields().isEmpty()) {
-                throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric", "SCALAR requires only value");
+                throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric", "SCALAR requires only value");
             }
             values = List.of(metric.value());
         } else {
             if (metric.value() != null || metric.fields().isEmpty()) {
-                throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric", "FIELD_SET requires only fields");
+                throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric", "FIELD_SET requires only fields");
             }
             values = List.copyOf(metric.fields().values());
         }
         long measureCount = values.stream().filter(value -> value.measure() != null).count();
         if (factBased && measureCount == 0) {
-            throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric", "Fact-based metric requires a measure");
+            throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric", "Fact-based metric requires a measure");
         }
         if (!factBased && measureCount > 0) {
-            throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric", "Derived metric forbids measures");
+            throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric", "Derived metric forbids measures");
         }
         if (metric.valueShape() == MetricValueShape.SCALAR && factBased && metric.value().measure() == null) {
-            throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric/value", "Fact-based SCALAR requires a measure");
+            throw error(
+                    MetricErrorCode.DSL_VALUE_BRANCH_INVALID,
+                    "/metric/value",
+                    "Fact-based SCALAR requires a measure");
         }
     }
 
     private void validateValue(MetricValueDsl value, String path) {
         if (value.valueType() == MetricValueType.DECIMAL) {
             if (value.scale() == null) {
-                throw error(MetricDslErrorCode.DSL_FIELD_REQUIRED, child(path, "scale"), "Scale is required");
+                throw error(MetricErrorCode.DSL_FIELD_REQUIRED, child(path, "scale"), "Scale is required");
             }
             if (value.scale() < 4 || value.scale() > 6) {
-                throw error(MetricDslErrorCode.DSL_VALUE_INVALID, child(path, "scale"), "Scale must be between 4 and 6");
+                throw error(MetricErrorCode.DSL_VALUE_INVALID, child(path, "scale"), "Scale must be between 4 and 6");
             }
             if (value.roundingMode() == null) {
                 throw error(
-                        MetricDslErrorCode.DSL_FIELD_REQUIRED,
+                        MetricErrorCode.DSL_FIELD_REQUIRED,
                         child(path, "roundingMode"),
                         "Rounding mode is required");
             }
             if (value.roundingMode() != RoundingMode.HALF_UP) {
                 throw error(
-                        MetricDslErrorCode.DSL_VALUE_INVALID,
+                        MetricErrorCode.DSL_VALUE_INVALID,
                         child(path, "roundingMode"),
                         "Only HALF_UP is supported");
             }
         } else if (value.scale() != null || value.roundingMode() != null) {
-            throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Non-decimal value forbids precision fields");
+            throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Non-decimal value forbids precision fields");
         }
         if ((value.measure() == null) == (value.expression() == null)) {
-            throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Exactly one calculation branch is required");
+            throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Exactly one calculation branch is required");
         }
         if (value.measure() != null) {
             validateMeasure(value.measure(), child(path, "measure"));
         } else if (value.expression().value().isBlank()) {
             throw error(
-                    MetricDslErrorCode.DSL_VALUE_INVALID,
+                    MetricErrorCode.DSL_VALUE_INVALID,
                     child(child(path, "expression"), "value"),
                     "Expression must not be blank");
         }
@@ -497,14 +597,14 @@ public final class MetricDefinitionDslCodec {
         if (measure.aggregation() == MetricAggregation.COUNT) {
             if (measure.field() != null) {
                 throw error(
-                        MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID,
+                        MetricErrorCode.DSL_VALUE_BRANCH_INVALID,
                         child(path, "field"),
                         "COUNT forbids field");
             }
         } else {
             if (measure.field() == null) {
                 throw error(
-                        MetricDslErrorCode.DSL_FIELD_REQUIRED,
+                        MetricErrorCode.DSL_FIELD_REQUIRED,
                         child(path, "field"),
                         "Aggregation field is required");
             }
@@ -520,14 +620,14 @@ public final class MetricDefinitionDslCodec {
         if (orElse.mode() != MetricOrElseMode.VALUE) {
             if (fallbackValue != null) {
                 throw error(
-                        MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID,
+                        MetricErrorCode.DSL_VALUE_BRANCH_INVALID,
                         child(path, "value"),
                         "Only VALUE accepts a value");
             }
             return;
         }
         if (fallbackValue == null) {
-            throw error(MetricDslErrorCode.DSL_FIELD_REQUIRED, child(path, "value"), "Fallback value is required");
+            throw error(MetricErrorCode.DSL_FIELD_REQUIRED, child(path, "value"), "Fallback value is required");
         }
         if (valueType == MetricValueType.DECIMAL) {
             return;
@@ -539,14 +639,14 @@ public final class MetricDefinitionDslCodec {
                     : ((DecimalMetricLiteralDsl) fallbackValue).value().toBigIntegerExact();
         } catch (ArithmeticException exception) {
             throw error(
-                    MetricDslErrorCode.DSL_FIELD_TYPE_INVALID,
+                    MetricErrorCode.DSL_FIELD_TYPE_INVALID,
                     child(path, "value"),
                     "Fallback value does not fit valueType");
         }
         int maxBitLength = valueType == MetricValueType.INTEGER ? Integer.SIZE - 1 : Long.SIZE - 1;
         if (integralValue.bitLength() > maxBitLength) {
             throw error(
-                    MetricDslErrorCode.DSL_FIELD_TYPE_INVALID,
+                    MetricErrorCode.DSL_FIELD_TYPE_INVALID,
                     child(path, "value"),
                     "Fallback value does not fit valueType");
         }
@@ -560,18 +660,18 @@ public final class MetricDefinitionDslCodec {
                     || comparison.operator() == MetricFilterOperator.IS_NOT_NULL
                     || comparison.operator() == MetricFilterOperator.AND
                     || comparison.operator() == MetricFilterOperator.OR) {
-                throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Invalid comparison operator");
+                throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Invalid comparison operator");
             }
             validateFieldReference(comparison.fieldRef(), child(path, operatorName(comparison.operator())));
             return;
         }
         if (filter instanceof SetMetricFilterDsl set) {
             if (set.operator() != MetricFilterOperator.IN && set.operator() != MetricFilterOperator.NOT_IN) {
-                throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Invalid set operator");
+                throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Invalid set operator");
             }
             validateFieldReference(set.fieldRef(), child(path, operatorName(set.operator())));
             if (set.values().isEmpty()) {
-                throw error(MetricDslErrorCode.DSL_VALUE_INVALID, path, "Set must not be empty");
+                throw error(MetricErrorCode.DSL_VALUE_INVALID, path, "Set must not be empty");
             }
             MetricLiteralDsl first = set.values().getFirst();
             boolean numeric = first instanceof MetricNumericLiteralDsl;
@@ -583,7 +683,7 @@ public final class MetricDefinitionDslCodec {
                 if (!sameType) {
                     String valuesPath = child(child(path, operatorName(set.operator())), set.fieldRef());
                     throw error(
-                            MetricDslErrorCode.DSL_FIELD_TYPE_INVALID,
+                            MetricErrorCode.DSL_FIELD_TYPE_INVALID,
                             child(valuesPath, Integer.toString(index)),
                             "Set values must use one literal type");
                 }
@@ -593,17 +693,17 @@ public final class MetricDefinitionDslCodec {
         if (filter instanceof NullMetricFilterDsl nullFilter) {
             if (nullFilter.operator() != MetricFilterOperator.IS_NULL
                     && nullFilter.operator() != MetricFilterOperator.IS_NOT_NULL) {
-                throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Invalid null operator");
+                throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Invalid null operator");
             }
             validateFieldReference(nullFilter.fieldRef(), child(path, operatorName(nullFilter.operator())));
             return;
         }
         LogicalMetricFilterDsl logical = (LogicalMetricFilterDsl) filter;
         if (logical.operator() != MetricFilterOperator.AND && logical.operator() != MetricFilterOperator.OR) {
-            throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Invalid logical operator");
+            throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Invalid logical operator");
         }
         if (logical.operands().size() < 2) {
-            throw error(MetricDslErrorCode.DSL_VALUE_INVALID, path, "Logical filter requires at least two operands");
+            throw error(MetricErrorCode.DSL_VALUE_INVALID, path, "Logical filter requires at least two operands");
         }
         for (int index = 0; index < logical.operands().size(); index++) {
             validateFilter(logical.operands().get(index), child(path, Integer.toString(index)));
@@ -637,7 +737,11 @@ public final class MetricDefinitionDslCodec {
             Map<String, Object> references = new LinkedHashMap<>();
             metric.metricRefs().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> references.put(
                     entry.getKey(),
-                    orderedMap("metricCode", entry.getValue().metricCode(), "valueField", entry.getValue().valueField())));
+                    orderedMap(
+                            "metricCode",
+                            entry.getValue().metricCode(),
+                            "valueField",
+                            entry.getValue().valueField())));
             result.put("metricRefs", references);
         }
         if (metric.value() != null) {
@@ -682,7 +786,13 @@ public final class MetricDefinitionDslCodec {
         if (value.measure() != null) {
             result.put("measure", toCanonicalMeasure(value.measure()));
         } else {
-            result.put("expression", orderedMap("type", value.expression().type().name(), "value", value.expression().value()));
+            result.put(
+                    "expression",
+                    orderedMap(
+                            "type",
+                            value.expression().type().name(),
+                            "value",
+                            value.expression().value()));
         }
         result.put("orElse", toCanonicalOrElse(value.orElse()));
         return result;
@@ -709,7 +819,9 @@ public final class MetricDefinitionDslCodec {
 
     private Map<String, Object> toCanonicalFilter(MetricFilterDsl filter) {
         if (filter instanceof ComparisonMetricFilterDsl comparison) {
-            return Map.of(operatorName(comparison.operator()), Map.of(comparison.fieldRef(), literalValue(comparison.value())));
+            return Map.of(
+                    operatorName(comparison.operator()),
+                    Map.of(comparison.fieldRef(), literalValue(comparison.value())));
         }
         if (filter instanceof SetMetricFilterDsl set) {
             Map<String, Object> valuesByCanonicalJson = new TreeMap<>();
@@ -764,7 +876,7 @@ public final class MetricDefinitionDslCodec {
 
     private Map.Entry<String, Object> singleEntry(Map<String, Object> source, String path) {
         if (source.size() != 1) {
-            throw error(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Expected exactly one field");
+            throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Expected exactly one field");
         }
         return source.entrySet().iterator().next();
     }
@@ -772,14 +884,14 @@ public final class MetricDefinitionDslCodec {
     private List<String> parseStringList(Object value, String path, boolean requireNonEmpty) {
         List<Object> source = MetricDslJsonSupport.array(value, path);
         if (requireNonEmpty && source.isEmpty()) {
-            throw error(MetricDslErrorCode.DSL_VALUE_INVALID, path, "Array must not be empty");
+            throw error(MetricErrorCode.DSL_VALUE_INVALID, path, "Array must not be empty");
         }
         List<String> result = new ArrayList<>(source.size());
         for (int index = 0; index < source.size(); index++) {
             result.add(string(source.get(index), child(path, Integer.toString(index))));
         }
         if (result.size() != new LinkedHashSet<>(result).size()) {
-            throw error(MetricDslErrorCode.DSL_VALUE_INVALID, path, "Array values must be unique");
+            throw error(MetricErrorCode.DSL_VALUE_INVALID, path, "Array values must be unique");
         }
         return result;
     }
@@ -789,26 +901,26 @@ public final class MetricDefinitionDslCodec {
             return null;
         }
         if (source.get(field) == null) {
-            throw error(MetricDslErrorCode.DSL_FIELD_TYPE_INVALID, path, "Explicit null is not allowed");
+            throw error(MetricErrorCode.DSL_FIELD_TYPE_INVALID, path, "Explicit null is not allowed");
         }
         return string(source.get(field), path);
     }
 
     private void validateIdentifier(String value, int maxLength, String path) {
         if (value.length() > maxLength || !IDENTIFIER.matcher(value).matches() || RESERVED_NAMES.contains(value)) {
-            throw error(MetricDslErrorCode.DSL_IDENTIFIER_INVALID, path, "Invalid identifier");
+            throw error(MetricErrorCode.DSL_IDENTIFIER_INVALID, path, "Invalid identifier");
         }
     }
 
     private void validateFieldReference(String value, String path) {
         if (value.length() > 128 || !FIELD_REFERENCE.matcher(value).matches()) {
-            throw error(MetricDslErrorCode.DSL_IDENTIFIER_INVALID, path, "Invalid field reference");
+            throw error(MetricErrorCode.DSL_IDENTIFIER_INVALID, path, "Invalid field reference");
         }
     }
 
     private void validateFieldName(String value, String path) {
         if (value.length() > 64 || !IDENTIFIER.matcher(value).matches()) {
-            throw error(MetricDslErrorCode.DSL_IDENTIFIER_INVALID, path, "Invalid field name");
+            throw error(MetricErrorCode.DSL_IDENTIFIER_INVALID, path, "Invalid field name");
         }
     }
 

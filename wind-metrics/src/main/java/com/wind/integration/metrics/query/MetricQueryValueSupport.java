@@ -1,8 +1,8 @@
 package com.wind.integration.metrics.query;
 
-import com.wind.integration.metrics.dsl.MetricDslErrorCode;
-import com.wind.integration.metrics.dsl.MetricDslValidationException;
-import com.wind.integration.metrics.dsl.MetricValueType;
+import com.wind.integration.metrics.enums.MetricErrorCode;
+import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.enums.MetricValueType;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -16,6 +16,12 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 指标查询契约共享的值校验与防御性复制工具。
+ *
+ * @author wuxp
+ * @date 2026-07-21 17:51
+ */
 final class MetricQueryValueSupport {
 
     private MetricQueryValueSupport() {
@@ -23,16 +29,16 @@ final class MetricQueryValueSupport {
 
     static Map<String, Object> immutableDimensions(Map<String, Object> source) {
         if (source == null) {
-            throw error(MetricDslErrorCode.QUERY_INVALID, "/dimensionValues", "dimensionValues must not be null");
+            throw error(MetricErrorCode.QUERY_INVALID, "/dimensionValues", "dimensionValues must not be null");
         }
         Map<String, Object> result = new LinkedHashMap<>();
         source.forEach((key, value) -> {
             if (key == null || key.isBlank()) {
-                throw error(MetricDslErrorCode.QUERY_INVALID, "/dimensionValues", "Dimension name must not be blank");
+                throw error(MetricErrorCode.QUERY_INVALID, "/dimensionValues", "Dimension name must not be blank");
             }
             if (!isSupportedDimensionValue(value)) {
                 throw error(
-                        MetricDslErrorCode.QUERY_INVALID,
+                        MetricErrorCode.QUERY_INVALID,
                         "/dimensionValues/" + escape(key),
                         "Unsupported dimension value");
             }
@@ -47,7 +53,7 @@ final class MetricQueryValueSupport {
         return Collections.unmodifiableMap(result);
     }
 
-    static void validateWindow(LocalDateTime startTime, LocalDateTime endTime, MetricDslErrorCode code) {
+    static void validateWindow(LocalDateTime startTime, LocalDateTime endTime, MetricErrorCode code) {
         if (startTime == null) {
             throw error(code, "/startTime", "startTime must not be null");
         }
@@ -69,12 +75,12 @@ final class MetricQueryValueSupport {
             case DECIMAL -> value instanceof BigDecimal;
         };
         if (!valid) {
-            throw error(MetricDslErrorCode.RESULT_INVALID, path, "Metric value type does not match valueType");
+            throw error(MetricErrorCode.RESULT_INVALID, path, "Metric value type does not match valueType");
         }
     }
 
-    static MetricDslValidationException error(MetricDslErrorCode code, String path, String message) {
-        return new MetricDslValidationException(code, path, message);
+    static MetricValidationException error(MetricErrorCode code, String path, String message) {
+        return new MetricValidationException(code, path, message);
     }
 
     private static boolean isSupportedDimensionValue(Object value) {

@@ -1,6 +1,25 @@
 package com.wind.integration.metrics.dsl;
 
+import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.dsl.definition.MetricDefinitionDsl;
+import com.wind.integration.metrics.dsl.definition.MetricDefinitionSpec;
+import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
+import com.wind.integration.metrics.dsl.definition.MetricOrElseDsl;
+import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
+import com.wind.integration.metrics.dsl.definition.MetricTimeDsl;
+import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
+import com.wind.integration.metrics.dsl.filter.DecimalMetricLiteralDsl;
+import com.wind.integration.metrics.dsl.filter.IntegralMetricLiteralDsl;
+import com.wind.integration.metrics.dsl.filter.MetricFilterDsl;
+import com.wind.integration.metrics.dsl.filter.SetMetricFilterDsl;
+import com.wind.integration.metrics.enums.MetricAggregation;
+import com.wind.integration.metrics.enums.MetricErrorCode;
+import com.wind.integration.metrics.enums.MetricFilterOperator;
+import com.wind.integration.metrics.enums.MetricOrElseMode;
+import com.wind.integration.metrics.enums.MetricValueShape;
+import com.wind.integration.metrics.enums.MetricValueType;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -10,6 +29,9 @@ import java.util.Map;
 
 /**
  * 指标 Definition DSL 的公共 JSON 合同测试。
+ *
+ * @author wuxp
+ * @date 2026-07-21 17:51
  */
 class MetricDefinitionDslCodecTests {
 
@@ -49,6 +71,7 @@ class MetricDefinitionDslCodecTests {
     }
 
     @Test
+    @DisplayName("DSL-T001 Definition 拒绝未知字段")
     void testRejectUnknownField() {
         String source = """
                 {
@@ -66,11 +89,11 @@ class MetricDefinitionDslCodecTests {
                 }
                 """;
 
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> codec.parse(source));
 
-        Assertions.assertEquals(MetricDslErrorCode.DSL_FIELD_UNKNOWN, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.DSL_FIELD_UNKNOWN, exception.errorCode());
         Assertions.assertEquals("/metric/unexpected", exception.fieldPath());
     }
 
@@ -84,12 +107,27 @@ class MetricDefinitionDslCodecTests {
                 }
                 """;
 
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> codec.parse(source));
 
-        Assertions.assertEquals(MetricDslErrorCode.DSL_FIELD_DUPLICATED, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.DSL_FIELD_DUPLICATED, exception.errorCode());
         Assertions.assertEquals("/schemaVersion", exception.fieldPath());
+    }
+
+    @Test
+    void testRejectExplicitNullOptionalCollections() {
+        for (Map.Entry<String, String> input : Map.of(
+                "\"joins\": null,", "/metric/joins",
+                "\"metricRefs\": null,", "/metric/metricRefs",
+                "\"fields\": null,", "/metric/fields").entrySet()) {
+            MetricValidationException exception = Assertions.assertThrows(
+                    MetricValidationException.class,
+                    () -> codec.parse(realtimeCountDefinition(input.getKey(), "")));
+
+            Assertions.assertEquals(MetricErrorCode.DSL_FIELD_TYPE_INVALID, exception.errorCode());
+            Assertions.assertEquals(input.getValue(), exception.fieldPath());
+        }
     }
 
     @Test
@@ -156,6 +194,7 @@ class MetricDefinitionDslCodecTests {
     }
 
     @Test
+    @DisplayName("DSL-T004 filter literal 类型必须唯一")
     void testRejectMixedSetLiteralTypes() {
         String source = """
                 {
@@ -178,12 +217,43 @@ class MetricDefinitionDslCodecTests {
                 }
                 """;
 
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> codec.parse(source));
 
-        Assertions.assertEquals(MetricDslErrorCode.DSL_FIELD_TYPE_INVALID, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.DSL_FIELD_TYPE_INVALID, exception.errorCode());
         Assertions.assertEquals("/metric/value/measure/filter/in/status/1", exception.fieldPath());
+    }
+
+    @Test
+    void testRejectInvalidSetLiteralAtExactArrayPath() {
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
+                () -> codec.parse(realtimeCountDefinition(
+                        "",
+                        ", \"filter\": {\"in\": {\"status\": [\"APPROVED\", null]}}")));
+
+        Assertions.assertEquals(MetricErrorCode.DSL_FIELD_TYPE_INVALID, exception.errorCode());
+        Assertions.assertEquals("/metric/value/measure/filter/in/status/1", exception.fieldPath());
+    }
+
+    @Test
+    void testRejectInvalidLogicalOperandAtExactArrayPath() {
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
+                () -> codec.parse(realtimeCountDefinition(
+                        "",
+                        ", \"filter\": {\"and\": [{\"isNull\": \"status\"}, null]}")));
+
+        Assertions.assertEquals(MetricErrorCode.DSL_FIELD_TYPE_INVALID, exception.errorCode());
+        Assertions.assertEquals("/metric/value/measure/filter/and/1", exception.fieldPath());
+    }
+
+    @Test
+    void testAllowJsonSyntaxCharactersInsideStringLiteral() {
+        Assertions.assertDoesNotThrow(() -> codec.parse(realtimeCountDefinition(
+                "",
+                ", \"filter\": {\"eq\": {\"resource\": \"https://example.test/a,}\"}}")));
     }
 
     @Test
@@ -195,21 +265,21 @@ class MetricDefinitionDslCodecTests {
 
     @Test
     void testRejectNonIntegralLongOrElseValue() {
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> codec.parse(derivedDefinitionWithOrElse("LONG", "1.5")));
 
-        Assertions.assertEquals(MetricDslErrorCode.DSL_FIELD_TYPE_INVALID, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.DSL_FIELD_TYPE_INVALID, exception.errorCode());
         Assertions.assertEquals("/metric/value/orElse/value", exception.fieldPath());
     }
 
     @Test
     void testRejectOverflowingIntegerOrElseValue() {
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> codec.parse(derivedDefinitionWithOrElse("INTEGER", "2147483648")));
 
-        Assertions.assertEquals(MetricDslErrorCode.DSL_FIELD_TYPE_INVALID, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.DSL_FIELD_TYPE_INVALID, exception.errorCode());
         Assertions.assertEquals("/metric/value/orElse/value", exception.fieldPath());
     }
 
@@ -236,11 +306,11 @@ class MetricDefinitionDslCodecTests {
                         invalidValue,
                         Map.of()));
 
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> codec.canonicalize(definition));
 
-        Assertions.assertEquals(MetricDslErrorCode.DSL_FIELD_REQUIRED, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.DSL_FIELD_REQUIRED, exception.errorCode());
         Assertions.assertEquals("/metric/value/scale", exception.fieldPath());
     }
 
@@ -277,15 +347,16 @@ class MetricDefinitionDslCodecTests {
                 }
                 """;
 
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> codec.parse(source));
 
-        Assertions.assertEquals(MetricDslErrorCode.DSL_VALUE_INVALID, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.DSL_VALUE_INVALID, exception.errorCode());
         Assertions.assertEquals("/metric/joins/1/alias", exception.fieldPath());
     }
 
     @Test
+    @DisplayName("DSL-T002 SCALAR 与 FIELD_SET 分支无歧义")
     void testParseFieldSetRatioAndDerivedOnlyDefinitions() {
         String fieldSet = """
                 {
@@ -344,6 +415,7 @@ class MetricDefinitionDslCodecTests {
     }
 
     @Test
+    @DisplayName("DSL-T003 DECIMAL 精度与计算分支严格校验")
     void testRejectInvalidScaleAndCalculationUnion() {
         String invalidScale = """
                 {
@@ -383,13 +455,13 @@ class MetricDefinitionDslCodecTests {
                 }
                 """;
 
-        MetricDslValidationException scaleException = Assertions.assertThrows(
-                MetricDslValidationException.class, () -> codec.parse(invalidScale));
-        MetricDslValidationException unionException = Assertions.assertThrows(
-                MetricDslValidationException.class, () -> codec.parse(calculationUnion));
+        MetricValidationException scaleException = Assertions.assertThrows(
+                MetricValidationException.class, () -> codec.parse(invalidScale));
+        MetricValidationException unionException = Assertions.assertThrows(
+                MetricValidationException.class, () -> codec.parse(calculationUnion));
 
         Assertions.assertEquals("/metric/value/scale", scaleException.fieldPath());
-        Assertions.assertEquals(MetricDslErrorCode.DSL_VALUE_BRANCH_INVALID, unionException.errorCode());
+        Assertions.assertEquals(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, unionException.errorCode());
         Assertions.assertEquals("/metric/value", unionException.fieldPath());
     }
 
@@ -416,21 +488,21 @@ class MetricDefinitionDslCodecTests {
                 }
                 """;
 
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> codec.parse(source));
 
-        Assertions.assertEquals(MetricDslErrorCode.DSL_VALUE_INVALID, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.DSL_VALUE_INVALID, exception.errorCode());
         Assertions.assertEquals("/metric/fields/approvedTotal", exception.fieldPath());
     }
 
     @Test
     void testRejectUnsupportedSchemaVersion() {
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> codec.parse("{\"schemaVersion\":2,\"metric\":{},\"futureField\":true}"));
 
-        Assertions.assertEquals(MetricDslErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, exception.errorCode());
         Assertions.assertEquals("/schemaVersion", exception.fieldPath());
     }
 
@@ -490,12 +562,12 @@ class MetricDefinitionDslCodecTests {
                 }
                 """;
 
-        MetricDslValidationException fieldException = Assertions.assertThrows(
-                MetricDslValidationException.class, () -> codec.parse(nestedSubjectField));
-        MetricDslValidationException joinException = Assertions.assertThrows(
-                MetricDslValidationException.class, () -> codec.parse(factAliasConflict));
-        MetricDslValidationException referenceException = Assertions.assertThrows(
-                MetricDslValidationException.class, () -> codec.parse(scalarValueAliasConflict));
+        MetricValidationException fieldException = Assertions.assertThrows(
+                MetricValidationException.class, () -> codec.parse(nestedSubjectField));
+        MetricValidationException joinException = Assertions.assertThrows(
+                MetricValidationException.class, () -> codec.parse(factAliasConflict));
+        MetricValidationException referenceException = Assertions.assertThrows(
+                MetricValidationException.class, () -> codec.parse(scalarValueAliasConflict));
 
         Assertions.assertEquals("/metric/subject/field", fieldException.fieldPath());
         Assertions.assertEquals("/metric/joins/0/alias", joinException.fieldPath());
@@ -522,5 +594,26 @@ class MetricDefinitionDslCodecTests {
                   }
                 }
                 """.formatted(valueType, value);
+    }
+
+    private String realtimeCountDefinition(String additionalMetricField, String additionalMeasureField) {
+        return """
+                {
+                  "schemaVersion": 1,
+                  "metric": {
+                    "code": "VCC_APPROVED_TOTAL",
+                    "valueShape": "SCALAR",
+                    "fact": "VccTransaction",
+                    %s
+                    "subject": {"type": "GLOBAL"},
+                    "time": {"field": "authTime"},
+                    "dimensions": [],
+                    "value": {
+                      "valueType": "LONG",
+                      "measure": {"aggregation": "COUNT"%s}
+                    }
+                  }
+                }
+                """.formatted(additionalMetricField, additionalMeasureField);
     }
 }

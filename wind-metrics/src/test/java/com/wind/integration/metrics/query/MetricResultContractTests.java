@@ -1,12 +1,12 @@
 package com.wind.integration.metrics.query;
 
-import com.wind.integration.metrics.dsl.MetricDslErrorCode;
-import com.wind.integration.metrics.dsl.MetricDslValidationException;
-import com.wind.integration.metrics.dsl.MetricExecutionMode;
-import com.wind.integration.metrics.dsl.MetricSegmentSourceType;
-import com.wind.integration.metrics.dsl.MetricValueShape;
-import com.wind.integration.metrics.dsl.MetricValueType;
-import com.wind.integration.metrics.dsl.SnapshotGranularity;
+import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.enums.MetricErrorCode;
+import com.wind.integration.metrics.enums.MetricExecutionMode;
+import com.wind.integration.metrics.enums.MetricSegmentSourceType;
+import com.wind.integration.metrics.enums.MetricValueShape;
+import com.wind.integration.metrics.enums.MetricValueType;
+import com.wind.integration.metrics.enums.SnapshotGranularity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -19,6 +19,9 @@ import java.util.Map;
 
 /**
  * 指标结果模型的公共合同测试。
+ *
+ * @author wuxp
+ * @date 2026-07-21 17:51
  */
 class MetricResultContractTests {
 
@@ -88,18 +91,18 @@ class MetricResultContractTests {
 
     @Test
     void testRejectDoubleMetricValue() {
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> new MetricFieldValue(MetricValueType.DECIMAL, 0.75D));
 
-        Assertions.assertEquals(MetricDslErrorCode.RESULT_INVALID, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.RESULT_INVALID, exception.errorCode());
         Assertions.assertEquals("/value", exception.fieldPath());
     }
 
     @Test
     void testSnapshotSegmentRequiresCoverage() {
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> new MetricSegmentResult(
                         "archive",
                         MetricSegmentSourceType.SNAPSHOT,
@@ -110,7 +113,7 @@ class MetricResultContractTests {
                         END_TIME,
                         null));
 
-        Assertions.assertEquals(MetricDslErrorCode.RESULT_INVALID, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.RESULT_INVALID, exception.errorCode());
         Assertions.assertEquals("/queryableStartTime", exception.fieldPath());
     }
 
@@ -137,8 +140,8 @@ class MetricResultContractTests {
                         null,
                         CALCULATED_TIME));
 
-        MetricDslValidationException exception = Assertions.assertThrows(
-                MetricDslValidationException.class,
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
                 () -> new MetricResult(
                         "VCC_AUTH_SUMMARY",
                         1,
@@ -160,7 +163,7 @@ class MetricResultContractTests {
                         null,
                         segments));
 
-        Assertions.assertEquals(MetricDslErrorCode.RESULT_INVALID, exception.errorCode());
+        Assertions.assertEquals(MetricErrorCode.RESULT_INVALID, exception.errorCode());
         Assertions.assertEquals("/segments/1/startTime", exception.fieldPath());
     }
 
@@ -209,7 +212,9 @@ class MetricResultContractTests {
         MetricResult doubleSnapshotResult = newSegmentedResult(List.of(archive, snapshotRecent));
 
         Assertions.assertEquals(1, singleRecentResult.segments().size());
-        Assertions.assertEquals(MetricSegmentSourceType.REALTIME, snapshotRealtimeResult.segments().get(1).sourceType());
+        Assertions.assertEquals(
+                MetricSegmentSourceType.REALTIME,
+                snapshotRealtimeResult.segments().get(1).sourceType());
         Assertions.assertEquals(MetricSegmentSourceType.SNAPSHOT, doubleSnapshotResult.segments().get(1).sourceType());
     }
 

@@ -25,7 +25,22 @@ public enum OperationActorType implements DescriptiveEnum {
 
     RISK_ENGINE("风控引擎"),
 
-    SYSTEM("系统进程");
+    SYSTEM("系统进程"),
+
+    @Deprecated(forRemoval = true)
+    OPERATIONS("平台用户"),
+
+    @Deprecated(forRemoval = true)
+    TENANT_OPERATIONS("Sass 租户用户"),
+
+    @Deprecated(forRemoval = true)
+    TENANT_API("Sass 租户 API"),
+
+    @Deprecated(forRemoval = true)
+    USER("C 端用户"),
+
+    @Deprecated(forRemoval = true)
+    RISK_CONTROL("风控"),;
 
     private final String desc;
 

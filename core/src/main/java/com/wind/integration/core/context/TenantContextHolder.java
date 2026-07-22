@@ -4,6 +4,8 @@ import com.wind.common.exception.AssertUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import java.util.concurrent.Callable;
+
 /**
  * 基于上下文的租户 ID 持有者
  *
@@ -18,8 +20,37 @@ public final class TenantContextHolder {
         throw new AssertionError();
     }
 
+    /**
+     * 设置租户 ID
+     *
+     * @param tenantId 租户 ID
+     */
     public static void setTenantId(@NonNull Long tenantId) {
         TENANT_ID.set(tenantId);
+    }
+
+    /**
+     * 运行时指定租户 ID
+     *
+     * @param tenantId 租户 ID
+     * @param action   执行方法
+     */
+    public static void runWithTenantId(@NonNull Long tenantId, @NonNull Runnable action) {
+        setTenantId(tenantId);
+        action.run();
+    }
+
+    /**
+     * 运行时指定租户 ID
+     *
+     * @param tenantId 租户 ID
+     * @param action   执行方法
+     * @param <T>      返回值类型
+     * @return 返回值
+     */
+    public static <T> T callWithTenantId(@NonNull Long tenantId, @NonNull Callable<T> action) throws Exception {
+        setTenantId(tenantId);
+        return action.call();
     }
 
     @Nullable

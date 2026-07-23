@@ -54,6 +54,48 @@ public final class WindOperatorFactory {
     }
 
     /**
+     * 使用当前应用作为来源创建平台运营操作者。
+     *
+     * @param operatorId 操作者标识
+     * @return 平台运营操作者
+     */
+    public static WindOperator platformOperator(@NonNull Serializable operatorId) {
+        return current(operatorId, OperationActorType.PLATFORM_OPERATOR);
+    }
+
+    /**
+     * 使用当前应用作为来源创建平台运营操作者。
+     *
+     * @param operatorId   操作者标识
+     * @param operatorName 操作者名称
+     * @return 平台运营操作者
+     */
+    public static WindOperator platformOperator(@NonNull Serializable operatorId, @NonNull String operatorName) {
+        return current(operatorId, operatorName, OperationActorType.PLATFORM_OPERATOR);
+    }
+
+    /**
+     * 使用当前应用作为来源创建终端用户操作者。
+     *
+     * @param operatorId 操作者标识
+     * @return 终端用户操作者
+     */
+    public static WindOperator endUser(@NonNull Serializable operatorId) {
+        return current(operatorId, OperationActorType.END_USER);
+    }
+
+    /**
+     * 使用当前应用作为来源创建终端用户操作者。
+     *
+     * @param operatorId   操作者标识
+     * @param operatorName 操作者名称
+     * @return 终端用户操作者
+     */
+    public static WindOperator endUser(@NonNull Serializable operatorId, @NonNull String operatorName) {
+        return current(operatorId, operatorName, OperationActorType.END_USER);
+    }
+
+    /**
      * 使用指定来源应用创建操作者。
      *
      * @param operatorId        操作者标识

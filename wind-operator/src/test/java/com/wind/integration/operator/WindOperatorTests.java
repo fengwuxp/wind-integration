@@ -45,6 +45,32 @@ class WindOperatorTests {
     }
 
     @Test
+    void testCreatePlatformOperator() {
+        WindOperator unnamedOperator = WindOperatorFactory.platformOperator(1L);
+        WindOperator namedOperator = WindOperatorFactory.platformOperator(2L, "平台运营人员");
+
+        Assertions.assertEquals(OperationActorType.PLATFORM_OPERATOR, unnamedOperator.getActorType());
+        Assertions.assertEquals("1", unnamedOperator.getOperatorName());
+        Assertions.assertEquals("current-app", unnamedOperator.getAppName());
+        Assertions.assertEquals(OperationActorType.PLATFORM_OPERATOR, namedOperator.getActorType());
+        Assertions.assertEquals("平台运营人员", namedOperator.getOperatorName());
+        Assertions.assertEquals("current-app", namedOperator.getAppName());
+    }
+
+    @Test
+    void testCreateEndUser() {
+        WindOperator unnamedOperator = WindOperatorFactory.endUser(1L);
+        WindOperator namedOperator = WindOperatorFactory.endUser(2L, "终端用户");
+
+        Assertions.assertEquals(OperationActorType.END_USER, unnamedOperator.getActorType());
+        Assertions.assertEquals("1", unnamedOperator.getOperatorName());
+        Assertions.assertEquals("current-app", unnamedOperator.getAppName());
+        Assertions.assertEquals(OperationActorType.END_USER, namedOperator.getActorType());
+        Assertions.assertEquals("终端用户", namedOperator.getOperatorName());
+        Assertions.assertEquals("current-app", namedOperator.getAppName());
+    }
+
+    @Test
     void testCreateOperatorFromSourceApplication() {
         WindOperator operator = WindOperatorFactory.fromApplication(
                 1L, "测试用户", "openapi-app", OperationActorType.PLATFORM_OPERATOR);

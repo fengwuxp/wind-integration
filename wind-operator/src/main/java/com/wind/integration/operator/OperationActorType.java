@@ -40,7 +40,8 @@ public enum OperationActorType implements DescriptiveEnum {
     USER("C 端用户"),
 
     @Deprecated(forRemoval = true)
-    RISK_CONTROL("风控"),;
+    RISK_CONTROL("风控"),
+    ;
 
     private final String desc;
 
@@ -50,6 +51,6 @@ public enum OperationActorType implements DescriptiveEnum {
      * @return 是否为系统主体
      */
     public boolean isSystem() {
-        return this == SYSTEM;
+        return this == SYSTEM || this == RISK_ENGINE || this == RISK_CONTROL;
     }
 }

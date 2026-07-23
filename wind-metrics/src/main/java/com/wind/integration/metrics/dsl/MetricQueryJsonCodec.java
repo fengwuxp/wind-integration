@@ -7,6 +7,7 @@ import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.query.MetricBatchQuery;
 import com.wind.integration.metrics.query.MetricQuery;
 
+import java.math.BigInteger;
 import java.util.Map;
 import java.util.Set;
 
@@ -16,13 +17,13 @@ import java.util.Set;
  * <p>本类型只约束公开查询字段并映射 Wind 查询模型；维度值的事实字段类型绑定由消费方完成。</p>
  *
  * @author wuxp
- * @since 2026-07-22
+ * @date 2026-07-22 16:01
  */
 public final class MetricQueryJsonCodec {
 
     /** 单指标查询允许出现的顶层字段。 */
     private static final Set<String> QUERY_FIELDS = Set.of(
-            "metricCode", "subjectId", "startTime", "endTime", "dimensionValues");
+            "metricCode", "subjectId", "startTime", "endTime", "dimensionValues", "parameterValues");
 
     /** 批量指标查询允许出现的顶层字段。 */
     private static final Set<String> BATCH_QUERY_FIELDS = Set.of(
@@ -36,8 +37,14 @@ public final class MetricQueryJsonCodec {
      * @throws MetricValidationException JSON 或查询字段不符合公开合同时抛出
      */
     public MetricQuery parse(String json) {
-        rejectUnknownFields(MetricDslJsonSupport.parseRootObject(json), QUERY_FIELDS);
-        return deserialize(json, MetricQuery.class);
+        Map<String, Object> source = MetricDslJsonSupport.parseRootObject(json);
+        rejectUnknownFields(source, QUERY_FIELDS);
+        if (source.containsKey("parameterValues")) {
+            validateParameterValues(source.get("parameterValues"));
+        } else {
+            source.put("parameterValues", Map.of());
+        }
+        return deserialize(MetricDslJsonSupport.toJson(source), MetricQuery.class);
     }
 
     /**
@@ -61,6 +68,31 @@ public final class MetricQueryJsonCodec {
                         "Unknown query field");
             }
         }
+    }
+
+    private static void validateParameterValues(Object value) {
+        if (!(value instanceof Map<?, ?> parameters)) {
+            throw invalidParameter("/parameterValues");
+        }
+        parameters.forEach((name, parameter) -> {
+            String fieldName = name instanceof String text ? text : "";
+            String path = fieldName.isBlank()
+                    ? "/parameterValues"
+                    : MetricDslJsonSupport.child("/parameterValues", fieldName);
+            if (fieldName.isBlank()
+                    || !(parameter instanceof BigInteger integer)
+                    || integer.compareTo(BigInteger.valueOf(Integer.MIN_VALUE)) < 0
+                    || integer.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) > 0) {
+                throw invalidParameter(path);
+            }
+        });
+    }
+
+    private static MetricValidationException invalidParameter(String path) {
+        return new MetricValidationException(
+                MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH,
+                path,
+                "Query parameter must use a non-blank name and integer value");
     }
 
     private static <T> T deserialize(String json, Class<T> type) {

@@ -33,7 +33,7 @@ class MetricQueryContractTests {
         dimensions.put("amount", new BigDecimal("12.30"));
 
         MetricQuery query = new MetricQuery(
-                "VCC_APPROVED_TOTAL", "cust_001", START_TIME, END_TIME, dimensions);
+                "VCC_APPROVED_TOTAL", "cust_001", START_TIME, END_TIME, dimensions, Map.of());
         dimensions.put("currency", "EUR");
 
         Assertions.assertEquals("USD", query.dimensionValues().get("currency"));
@@ -47,10 +47,26 @@ class MetricQueryContractTests {
         MetricValidationException exception = Assertions.assertThrows(
                 MetricValidationException.class,
                 () -> new MetricQuery(
-                        "VCC_APPROVED_TOTAL", "cust_001", START_TIME, END_TIME, Map.of("ratio", 0.5D)));
+                        "VCC_APPROVED_TOTAL",
+                        "cust_001",
+                        START_TIME,
+                        END_TIME,
+                        Map.of("ratio", 0.5D),
+                        Map.of()));
 
         Assertions.assertEquals(MetricErrorCode.QUERY_INVALID, exception.errorCode());
         Assertions.assertEquals("/dimensionValues/ratio", exception.fieldPath());
+    }
+
+    @Test
+    void testRejectNullParameterValues() {
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
+                () -> new MetricQuery(
+                        "VCC_APPROVED_TOTAL", "cust_001", START_TIME, END_TIME, Map.of(), null));
+
+        Assertions.assertEquals(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, exception.errorCode());
+        Assertions.assertEquals("/parameterValues", exception.fieldPath());
     }
 
     @Test
@@ -75,7 +91,8 @@ class MetricQueryContractTests {
                 "cust_001",
                 START_TIME,
                 END_TIME,
-                Map.of("requestedDate", requestedDate, "requestedTimestamp", requestedTimestamp));
+                Map.of("requestedDate", requestedDate, "requestedTimestamp", requestedTimestamp),
+                Map.of());
 
         requestedDate.setTime(0L);
         requestedTimestamp.setTime(0L);

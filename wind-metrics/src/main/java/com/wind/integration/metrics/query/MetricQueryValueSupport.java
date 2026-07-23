@@ -53,6 +53,27 @@ final class MetricQueryValueSupport {
         return Collections.unmodifiableMap(result);
     }
 
+    static Map<String, Object> immutableParameters(Map<String, Object> source) {
+        if (source == null) {
+            throw error(
+                    MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH,
+                    "/parameterValues",
+                    "parameterValues must not be null");
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        source.forEach((key, value) -> {
+            String path = key == null || key.isBlank() ? "/parameterValues" : "/parameterValues/" + escape(key);
+            if (key == null || key.isBlank() || !(value instanceof Integer)) {
+                throw error(
+                        MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH,
+                        path,
+                        "Query parameter must use a non-blank name and integer value");
+            }
+            result.put(key, value);
+        });
+        return Collections.unmodifiableMap(result);
+    }
+
     static void validateWindow(LocalDateTime startTime, LocalDateTime endTime, MetricErrorCode code) {
         if (startTime == null) {
             throw error(code, "/startTime", "startTime must not be null");

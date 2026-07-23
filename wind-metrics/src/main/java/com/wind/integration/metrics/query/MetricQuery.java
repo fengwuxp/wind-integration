@@ -16,6 +16,7 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  * @param startTime 查询开始时间，包含
  * @param endTime 查询结束时间，不包含
  * @param dimensionValues DSL 已声明维度的查询值
+ * @param parameterValues DSL 已声明整数参数的查询值
  *
  * @author wuxp
  * @date 2026-07-21 17:51
@@ -24,7 +25,8 @@ public record MetricQuery(String metricCode,
                           @Nullable String subjectId,
                           LocalDateTime startTime,
                           LocalDateTime endTime,
-                          Map<String, Object> dimensionValues) {
+                          Map<String, Object> dimensionValues,
+                          Map<String, Object> parameterValues) {
 
     public MetricQuery {
         if (metricCode == null || metricCode.isBlank()) {
@@ -35,6 +37,7 @@ public record MetricQuery(String metricCode,
         }
         MetricQueryValueSupport.validateWindow(startTime, endTime, QUERY_INVALID);
         dimensionValues = MetricQueryValueSupport.immutableDimensions(dimensionValues);
+        parameterValues = MetricQueryValueSupport.immutableParameters(parameterValues);
     }
 
     /**
@@ -45,5 +48,15 @@ public record MetricQuery(String metricCode,
     @Override
     public Map<String, Object> dimensionValues() {
         return MetricQueryValueSupport.copyDimensions(dimensionValues);
+    }
+
+    /**
+     * 返回只读的 DSL 查询参数。
+     *
+     * @return 不允许修改的查询参数
+     */
+    @Override
+    public Map<String, Object> parameterValues() {
+        return parameterValues;
     }
 }

@@ -25,6 +25,14 @@ public enum MetricErrorCode implements DescriptiveEnum {
     DSL_VALUE_BRANCH_INVALID("DSL 指标值分支无效"),
     DSL_VALUE_INVALID("DSL 指标值无效"),
     DSL_PLAN_INVALID("DSL 物化计划无效"),
+    METRIC_PARAMETER_MISSING("指标查询参数缺失"),
+    METRIC_PARAMETER_UNEXPECTED("指标查询参数未声明"),
+    METRIC_PARAMETER_TYPE_MISMATCH("指标查询参数类型不匹配"),
+    METRIC_PARAMETER_OUT_OF_RANGE("指标查询参数超出范围"),
+    METRIC_PARAMETER_UNUSED("指标定义参数未使用"),
+    METRIC_ROW_SELECTION_INVALID("指标行选择定义无效"),
+    METRIC_ORDER_NOT_DETERMINISTIC("指标排序无法证明确定性"),
+    METRIC_EXECUTION_MODE_UNSUPPORTED("指标执行模式不受支持"),
     QUERY_INVALID("指标查询条件无效"),
     RESULT_INVALID("指标查询结果无效");
 

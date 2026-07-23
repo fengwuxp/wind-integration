@@ -8,10 +8,13 @@ import com.wind.integration.metrics.dsl.definition.MetricJoinDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinOnDsl;
 import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
 import com.wind.integration.metrics.dsl.definition.MetricOrElseDsl;
-import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
+import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDefinitionDsl;
 import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
 import com.wind.integration.metrics.dsl.definition.MetricTimeDsl;
 import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
+import com.wind.integration.metrics.dsl.definition.selection.MetricLimitDsl;
+import com.wind.integration.metrics.dsl.definition.selection.MetricOrderByDsl;
+import com.wind.integration.metrics.dsl.definition.selection.MetricRowSelectionDsl;
 import com.wind.integration.metrics.dsl.filter.BooleanMetricLiteralDsl;
 import com.wind.integration.metrics.dsl.filter.ComparisonMetricFilterDsl;
 import com.wind.integration.metrics.dsl.filter.DecimalMetricLiteralDsl;
@@ -30,6 +33,7 @@ import com.wind.integration.metrics.enums.MetricFilterOperator;
 import com.wind.integration.metrics.enums.MetricJoinCardinality;
 import com.wind.integration.metrics.enums.MetricJoinType;
 import com.wind.integration.metrics.enums.MetricOrElseMode;
+import com.wind.integration.metrics.enums.MetricSortDirection;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
 import org.jspecify.annotations.Nullable;
@@ -53,7 +57,7 @@ import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.required;
 import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.string;
 
 /**
- * 指标 Definition DSL v1 的关闭世界解析、基础校验与确定性规范化入口。
+ * 指标 Definition DSL 的关闭世界解析、基础校验与确定性规范化入口。
  *
  * <p>只接受白名单字段和封闭 AST，不执行表达式，也不解析物理表或数据源。</p>
  *
@@ -77,9 +81,10 @@ public final class MetricDefinitionDslCodec {
 
     /** 指标定义节点允许出现的字段。 */
     private static final Set<String> METRIC_FIELDS = Set.of(
-            "code", "valueShape", "fact", "joins", "subject", "time", "dimensions", "metricRefs", "value", "fields");
+            "code", "valueShape", "fact", "joins", "subject", "time", "dimensions", "parameters",
+            "rowSelection", "value", "fields");
 
-    /** 不允许用作指标引用别名或多值字段名的 SpEL 保留名称。 */
+    /** 不允许用作多值字段名的 SpEL 保留名称。 */
     private static final Set<String> RESERVED_NAMES = Set.of(
             "metric", "T", "new", "true", "false", "null", "root", "this", "and", "or", "not", "div", "mod",
             "eq", "ne", "lt", "le", "gt", "ge", "between", "matches", "instanceof");
@@ -141,13 +146,8 @@ public final class MetricDefinitionDslCodec {
             if (metric.time() != null || !metric.joins().isEmpty() || metric.subject().field() != null) {
                 throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, "/metric", "Derived metric contains fact fields");
             }
-            if (metric.metricRefs().isEmpty()) {
-                throw error(
-                        MetricErrorCode.DSL_FIELD_REQUIRED,
-                        "/metric/metricRefs",
-                        "Derived metric requires metricRefs");
-            }
         }
+        validateParametersAndRowSelection(metric, factBased);
         validateValueShape(metric, factBased);
         if (metric.value() != null) {
             validateValue(metric.value(), "/metric/value");
@@ -171,21 +171,9 @@ public final class MetricDefinitionDslCodec {
                     child("/metric/dimensions", Integer.toString(index)));
         }
         validateJoins(metric.fact(), metric.joins());
-        metric.metricRefs().forEach((alias, reference) -> {
-            String path = child("/metric/metricRefs", alias);
-            validateIdentifier(alias, 64, path);
-            if (metric.valueShape() == MetricValueShape.SCALAR && "value".equals(alias)) {
-                throw error(MetricErrorCode.DSL_VALUE_INVALID, path, "Alias conflicts with SCALAR value field");
-            }
-            validateIdentifier(reference.metricCode(), 100, child(path, "metricCode"));
-            validateIdentifier(reference.valueField(), 64, child(path, "valueField"));
-        });
-        metric.fields().forEach((fieldName, value) -> {
+        metric.fields().keySet().forEach(fieldName -> {
             String path = child("/metric/fields", fieldName);
             validateIdentifier(fieldName, 64, path);
-            if (metric.metricRefs().containsKey(fieldName)) {
-                throw error(MetricErrorCode.DSL_VALUE_INVALID, path, "Field conflicts with metric reference alias");
-            }
         });
     }
 
@@ -248,15 +236,96 @@ public final class MetricDefinitionDslCodec {
         List<String> dimensions = parseStringList(
                 required(source, "dimensions", "/metric"), "/metric/dimensions", false);
         dimensions = dimensions.stream().sorted().toList();
-        Map<String, MetricReferenceDsl> metricRefs = parseMetricRefs(
-                MetricDslJsonSupport.optionalValue(source, "metricRefs", "/metric/metricRefs"));
+        Map<String, MetricQueryParameterDefinitionDsl> parameters = parseParameters(
+                MetricDslJsonSupport.optionalValue(source, "parameters", "/metric/parameters"));
+        MetricRowSelectionDsl rowSelection = source.containsKey("rowSelection")
+                ? parseRowSelection(MetricDslJsonSupport.object(source.get("rowSelection"), "/metric/rowSelection"))
+                : null;
         MetricValueDsl value = source.containsKey("value")
                 ? parseValue(MetricDslJsonSupport.object(source.get("value"), "/metric/value"), "/metric/value")
                 : null;
         Map<String, MetricValueDsl> fields = parseFields(
                 MetricDslJsonSupport.optionalValue(source, "fields", "/metric/fields"));
         return new MetricDefinitionSpec(
-                code, valueShape, fact, joins, subject, time, dimensions, metricRefs, value, fields);
+                code, valueShape, fact, joins, subject, time, dimensions, parameters, rowSelection, value, fields);
+    }
+
+    private Map<String, MetricQueryParameterDefinitionDsl> parseParameters(@Nullable Object value) {
+        if (value == null) {
+            return Map.of();
+        }
+        Map<String, Object> source = MetricDslJsonSupport.object(value, "/metric/parameters");
+        if (source.isEmpty()) {
+            throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/parameters", "Parameters must not be empty");
+        }
+        Map<String, MetricQueryParameterDefinitionDsl> result = new LinkedHashMap<>();
+        source.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
+            String path = child("/metric/parameters", entry.getKey());
+            validateIdentifier(entry.getKey(), 64, path);
+            Map<String, Object> parameter = MetricDslJsonSupport.object(entry.getValue(), path);
+            MetricDslJsonSupport.rejectUnknown(parameter, path, Set.of("valueType", "minimum", "maximum"));
+            result.put(entry.getKey(), new MetricQueryParameterDefinitionDsl(
+                    MetricDslJsonSupport.enumValue(
+                            required(parameter, "valueType", path),
+                            MetricValueType.class,
+                            child(path, "valueType")),
+                    MetricDslJsonSupport.integer(required(parameter, "minimum", path), child(path, "minimum")),
+                    MetricDslJsonSupport.integer(required(parameter, "maximum", path), child(path, "maximum"))));
+        });
+        return result;
+    }
+
+    private MetricRowSelectionDsl parseRowSelection(Map<String, Object> source) {
+        String path = "/metric/rowSelection";
+        MetricDslJsonSupport.rejectUnknown(source, path, Set.of("filter", "orderBy", "limit"));
+        MetricFilterDsl filter = source.containsKey("filter")
+                ? parseFilter(MetricDslJsonSupport.object(source.get("filter"), child(path, "filter")), child(path, "filter"))
+                : null;
+        List<MetricOrderByDsl> orderBy = parseOrderBy(
+                MetricDslJsonSupport.array(required(source, "orderBy", path), child(path, "orderBy")),
+                child(path, "orderBy"));
+        MetricLimitDsl limit = parseLimit(
+                MetricDslJsonSupport.object(required(source, "limit", path), child(path, "limit")),
+                child(path, "limit"));
+        return new MetricRowSelectionDsl(filter, orderBy, limit);
+    }
+
+    private List<MetricOrderByDsl> parseOrderBy(List<Object> source, String path) {
+        if (source.isEmpty()) {
+            throw error(MetricErrorCode.METRIC_ROW_SELECTION_INVALID, path, "orderBy must not be empty");
+        }
+        List<MetricOrderByDsl> result = new ArrayList<>(source.size());
+        Set<String> fields = new LinkedHashSet<>();
+        for (int index = 0; index < source.size(); index++) {
+            String itemPath = child(path, Integer.toString(index));
+            Map<String, Object> item = MetricDslJsonSupport.object(source.get(index), itemPath);
+            MetricDslJsonSupport.rejectUnknown(item, itemPath, Set.of("field", "direction"));
+            String field = string(required(item, "field", itemPath), child(itemPath, "field"));
+            if (!fields.add(field)) {
+                throw error(MetricErrorCode.METRIC_ROW_SELECTION_INVALID, path, "orderBy fields must be unique");
+            }
+            result.add(new MetricOrderByDsl(
+                    field,
+                    MetricDslJsonSupport.enumValue(
+                            required(item, "direction", itemPath),
+                            MetricSortDirection.class,
+                            child(itemPath, "direction"))));
+        }
+        return result;
+    }
+
+    private MetricLimitDsl parseLimit(Map<String, Object> source, String path) {
+        MetricDslJsonSupport.rejectUnknown(source, path, Set.of("value", "parameter"));
+        boolean hasValue = source.containsKey("value");
+        boolean hasParameter = source.containsKey("parameter");
+        if (hasValue == hasParameter) {
+            throw error(MetricErrorCode.METRIC_ROW_SELECTION_INVALID, path, "Limit requires exactly one branch");
+        }
+        if (hasValue) {
+            return new MetricLimitDsl(
+                    MetricDslJsonSupport.integer(source.get("value"), child(path, "value")), null);
+        }
+        return new MetricLimitDsl(null, string(source.get("parameter"), child(path, "parameter")));
     }
 
     private MetricSubjectDsl parseSubject(Map<String, Object> source) {
@@ -311,27 +380,6 @@ public final class MetricDefinitionDslCodec {
         return result.stream().sorted(Comparator.comparing(MetricJoinDsl::alias)).toList();
     }
 
-    private Map<String, MetricReferenceDsl> parseMetricRefs(@Nullable Object value) {
-        if (value == null) {
-            return Map.of();
-        }
-        Map<String, Object> source = MetricDslJsonSupport.object(value, "/metric/metricRefs");
-        if (source.isEmpty()) {
-            throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/metricRefs", "metricRefs must not be empty");
-        }
-        Map<String, MetricReferenceDsl> result = new LinkedHashMap<>();
-        source.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
-            String path = child("/metric/metricRefs", entry.getKey());
-            validateIdentifier(entry.getKey(), 64, path);
-            Map<String, Object> reference = MetricDslJsonSupport.object(entry.getValue(), path);
-            MetricDslJsonSupport.rejectUnknown(reference, path, Set.of("metricCode", "valueField"));
-            result.put(entry.getKey(), new MetricReferenceDsl(
-                    string(required(reference, "metricCode", path), child(path, "metricCode")),
-                    string(required(reference, "valueField", path), child(path, "valueField"))));
-        });
-        return result;
-    }
-
     private Map<String, MetricValueDsl> parseFields(@Nullable Object value) {
         if (value == null) {
             return Map.of();
@@ -382,8 +430,9 @@ public final class MetricDefinitionDslCodec {
             throw error(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, path, "Exactly one calculation branch is required");
         }
         MetricMeasureDsl measure = hasMeasure
-                ? parseMeasure(MetricDslJsonSupport.object(
-                        source.get("measure"), child(path, "measure")), child(path, "measure"))
+                ? parseMeasure(
+                        MetricDslJsonSupport.object(source.get("measure"), child(path, "measure")),
+                        child(path, "measure"))
                 : null;
         MetricExpressionDsl expression = hasExpression
                 ? parseExpression(MetricDslJsonSupport.object(
@@ -408,8 +457,9 @@ public final class MetricDefinitionDslCodec {
             throw error(MetricErrorCode.DSL_FIELD_REQUIRED, child(path, "field"), "Aggregation field is required");
         }
         MetricFilterDsl filter = source.containsKey("filter")
-                ? parseFilter(MetricDslJsonSupport.object(
-                        source.get("filter"), child(path, "filter")), child(path, "filter"))
+                ? parseFilter(
+                        MetricDslJsonSupport.object(source.get("filter"), child(path, "filter")),
+                        child(path, "filter"))
                 : null;
         return new MetricMeasureDsl(aggregation, field, filter);
     }
@@ -526,6 +576,91 @@ public final class MetricDefinitionDslCodec {
             return new DecimalMetricLiteralDsl(decimal);
         }
         throw error(MetricErrorCode.DSL_FIELD_TYPE_INVALID, path, "Expected numeric literal");
+    }
+
+    private void validateParametersAndRowSelection(MetricDefinitionSpec metric, boolean factBased) {
+        if (!factBased && !metric.parameters().isEmpty()) {
+            throw error(
+                    MetricErrorCode.DSL_VALUE_BRANCH_INVALID,
+                    "/metric/parameters",
+                    "Derived metric forbids parameters");
+        }
+        if (!factBased && metric.rowSelection() != null) {
+            throw error(
+                    MetricErrorCode.DSL_VALUE_BRANCH_INVALID,
+                    "/metric/rowSelection",
+                    "Derived metric forbids rowSelection");
+        }
+        metric.parameters().forEach((name, parameter) -> {
+            String path = child("/metric/parameters", name);
+            validateIdentifier(name, 64, path);
+            if (parameter.valueType() != MetricValueType.INTEGER) {
+                throw error(
+                        MetricErrorCode.DSL_VALUE_INVALID,
+                        child(path, "valueType"),
+                        "Only INTEGER parameters are supported");
+            }
+            if (parameter.maximum() < parameter.minimum()) {
+                throw error(MetricErrorCode.DSL_VALUE_INVALID, path, "Invalid parameter range");
+            }
+        });
+
+        Set<String> referencedParameters = new LinkedHashSet<>();
+        if (metric.rowSelection() != null) {
+            validateRowSelection(metric.rowSelection(), metric.parameters(), referencedParameters);
+        }
+        metric.parameters().keySet().stream()
+                .filter(name -> !referencedParameters.contains(name))
+                .findFirst()
+                .ifPresent(name -> {
+                    throw error(
+                            MetricErrorCode.METRIC_PARAMETER_UNUSED,
+                            child("/metric/parameters", name),
+                            "Declared parameter is not referenced");
+                });
+    }
+
+    private void validateRowSelection(MetricRowSelectionDsl rowSelection,
+                                      Map<String, MetricQueryParameterDefinitionDsl> parameters,
+                                      Set<String> referencedParameters) {
+        String path = "/metric/rowSelection";
+        if (rowSelection.filter() != null) {
+            validateFilter(rowSelection.filter(), child(path, "filter"));
+        }
+        String orderByPath = child(path, "orderBy");
+        if (rowSelection.orderBy().isEmpty()) {
+            throw error(MetricErrorCode.METRIC_ROW_SELECTION_INVALID, orderByPath, "orderBy must not be empty");
+        }
+        Set<String> orderFields = new LinkedHashSet<>();
+        for (int index = 0; index < rowSelection.orderBy().size(); index++) {
+            MetricOrderByDsl order = rowSelection.orderBy().get(index);
+            validateFieldName(order.field(), child(child(orderByPath, Integer.toString(index)), "field"));
+            if (!orderFields.add(order.field())) {
+                throw error(
+                        MetricErrorCode.METRIC_ROW_SELECTION_INVALID,
+                        orderByPath,
+                        "orderBy fields must be unique");
+            }
+        }
+
+        MetricLimitDsl limit = rowSelection.limit();
+        String limitPath = child(path, "limit");
+        if (limit.value() != null && limit.value() < 1) {
+            throw error(
+                    MetricErrorCode.METRIC_ROW_SELECTION_INVALID,
+                    child(limitPath, "value"),
+                    "Limit must be positive");
+        }
+        if (limit.parameter() != null) {
+            validateIdentifier(limit.parameter(), 64, child(limitPath, "parameter"));
+            if (!parameters.containsKey(limit.parameter())) {
+                throw error(
+                        MetricErrorCode.METRIC_ROW_SELECTION_INVALID,
+                        child(limitPath, "parameter"),
+                        "Limit parameter is not declared");
+            }
+            referencedParameters.add(limit.parameter());
+        }
     }
 
     private void validateValueShape(MetricDefinitionSpec metric, boolean factBased) {
@@ -733,16 +868,15 @@ public final class MetricDefinitionDslCodec {
             result.put("time", Map.of("field", metric.time().field()));
         }
         result.put("dimensions", metric.dimensions().stream().sorted().toList());
-        if (!metric.metricRefs().isEmpty()) {
-            Map<String, Object> references = new LinkedHashMap<>();
-            metric.metricRefs().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> references.put(
+        if (!metric.parameters().isEmpty()) {
+            Map<String, Object> parameters = new LinkedHashMap<>();
+            metric.parameters().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> parameters.put(
                     entry.getKey(),
-                    orderedMap(
-                            "metricCode",
-                            entry.getValue().metricCode(),
-                            "valueField",
-                            entry.getValue().valueField())));
-            result.put("metricRefs", references);
+                    toCanonicalParameter(entry.getValue())));
+            result.put("parameters", parameters);
+        }
+        if (metric.rowSelection() != null) {
+            result.put("rowSelection", toCanonicalRowSelection(metric.rowSelection()));
         }
         if (metric.value() != null) {
             result.put("value", toCanonicalValue(metric.value()));
@@ -753,6 +887,14 @@ public final class MetricDefinitionDslCodec {
                     .forEach(entry -> fields.put(entry.getKey(), toCanonicalValue(entry.getValue())));
             result.put("fields", fields);
         }
+        return result;
+    }
+
+    private Map<String, Object> toCanonicalParameter(MetricQueryParameterDefinitionDsl parameter) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("valueType", parameter.valueType().name());
+        result.put("minimum", parameter.minimum());
+        result.put("maximum", parameter.maximum());
         return result;
     }
 
@@ -805,6 +947,21 @@ public final class MetricDefinitionDslCodec {
         if (measure.filter() != null) {
             result.put("filter", toCanonicalFilter(measure.filter()));
         }
+        return result;
+    }
+
+    private Map<String, Object> toCanonicalRowSelection(MetricRowSelectionDsl rowSelection) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        if (rowSelection.filter() != null) {
+            result.put("filter", toCanonicalFilter(rowSelection.filter()));
+        }
+        result.put("orderBy", rowSelection.orderBy().stream()
+                .map(order -> orderedMap("field", order.field(), "direction", order.direction().name()))
+                .toList());
+        MetricLimitDsl limit = rowSelection.limit();
+        result.put("limit", limit.value() != null
+                ? Map.of("value", limit.value())
+                : Map.of("parameter", limit.parameter()));
         return result;
     }
 

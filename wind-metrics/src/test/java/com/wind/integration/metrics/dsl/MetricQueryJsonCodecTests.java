@@ -9,12 +9,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 指标正式查询 JSON 关闭世界合同测试。
  *
  * @author wuxp
- * @since 2026-07-22
+ * @date 2026-07-22 16:01
  */
 class MetricQueryJsonCodecTests {
 
@@ -89,8 +90,56 @@ class MetricQueryJsonCodecTests {
         Assertions.assertEquals("/executionMode", exception.fieldPath());
     }
 
+    @Test
+    @DisplayName("DSL-T106 单查接受整数 parameterValues，批查仍拒绝")
+    void testDslT106ParseSingleQueryParametersAndRejectBatchParameters() {
+        MetricQuery query = codec.parse(withExtraField(QUERY_JSON, "parameterValues", "{\"entryLimit\": 2}"));
+        Map<String, Object> parameterValues = query.parameterValues();
+        MetricValidationException batchException = Assertions.assertThrows(
+                MetricValidationException.class,
+                () -> codec.parseBatch(withExtraField(
+                        BATCH_QUERY_JSON, "parameterValues", "{\"entryLimit\": 2}")));
+
+        Assertions.assertEquals(Map.of("entryLimit", 2), parameterValues);
+        Assertions.assertThrows(UnsupportedOperationException.class, () -> parameterValues.put("entryLimit", 3));
+        Assertions.assertEquals(MetricErrorCode.QUERY_INVALID, batchException.errorCode());
+        Assertions.assertEquals("/parameterValues", batchException.fieldPath());
+    }
+
+    @Test
+    @DisplayName("DSL-T105 parameterValues 只允许非空整数值")
+    void testDslT105RejectInvalidQueryParameterValues() {
+        for (String invalidValue : List.of(
+                "null", "\"2\"", "2.0", "2147483648", "-2147483649", "{}", "[]")) {
+            MetricValidationException exception = Assertions.assertThrows(
+                    MetricValidationException.class,
+                    () -> codec.parse(withExtraField(
+                            QUERY_JSON, "parameterValues", "{\"entryLimit\": " + invalidValue + "}")),
+                    invalidValue);
+
+            Assertions.assertEquals("METRIC_PARAMETER_TYPE_MISMATCH", exception.errorCode().name());
+            Assertions.assertEquals("/parameterValues/entryLimit", exception.fieldPath());
+        }
+
+        MetricValidationException blankName = Assertions.assertThrows(
+                MetricValidationException.class,
+                () -> codec.parse(withExtraField(QUERY_JSON, "parameterValues", "{\"\": 2}")));
+        Assertions.assertEquals(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, blankName.errorCode());
+        Assertions.assertEquals("/parameterValues", blankName.fieldPath());
+
+        MetricValidationException nullParameters = Assertions.assertThrows(
+                MetricValidationException.class,
+                () -> codec.parse(withExtraField(QUERY_JSON, "parameterValues", "null")));
+        Assertions.assertEquals(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, nullParameters.errorCode());
+        Assertions.assertEquals("/parameterValues", nullParameters.fieldPath());
+    }
+
     private static String withExtraField(String source, String field) {
+        return withExtraField(source, field, "\"forbidden\"");
+    }
+
+    private static String withExtraField(String source, String field, String value) {
         int objectEnd = source.lastIndexOf('}');
-        return source.substring(0, objectEnd) + ",\n\"" + field + "\": \"forbidden\"\n}";
+        return source.substring(0, objectEnd) + ",\n\"" + field + "\": " + value + "\n}";
     }
 }

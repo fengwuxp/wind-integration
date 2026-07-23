@@ -119,7 +119,6 @@ class MetricDefinitionDslCodecTests {
     void testRejectExplicitNullOptionalCollections() {
         for (Map.Entry<String, String> input : Map.of(
                 "\"joins\": null,", "/metric/joins",
-                "\"metricRefs\": null,", "/metric/metricRefs",
                 "\"fields\": null,", "/metric/fields").entrySet()) {
             MetricValidationException exception = Assertions.assertThrows(
                     MetricValidationException.class,
@@ -184,6 +183,7 @@ class MetricDefinitionDslCodecTests {
                         new MetricTimeDsl("authTime"),
                         List.of(),
                         Map.of(),
+                        null,
                         value,
                         Map.of()));
 
@@ -303,6 +303,7 @@ class MetricDefinitionDslCodecTests {
                         new MetricTimeDsl("authTime"),
                         List.of(),
                         Map.of(),
+                        null,
                         invalidValue,
                         Map.of()));
 
@@ -388,14 +389,14 @@ class MetricDefinitionDslCodecTests {
                     "valueShape": "SCALAR",
                     "subject": {"type": "CUSTOMER"},
                     "dimensions": ["currency"],
-                    "metricRefs": {
-                      "approvedTotal": {"metricCode": "VCC_APPROVED_TOTAL", "valueField": "value"}
-                    },
                     "value": {
                       "valueType": "DECIMAL",
                       "scale": 4,
                       "roundingMode": "HALF_UP",
-                      "expression": {"type": "SPEL", "value": "metric('approvedTotal')"}
+                      "expression": {
+                        "type": "SPEL",
+                        "value": "metric('VCC_APPROVED_TOTAL', 'value')"
+                      }
                     }
                   }
                 }
@@ -466,7 +467,7 @@ class MetricDefinitionDslCodecTests {
     }
 
     @Test
-    void testRejectMetricReferenceAliasConflictingWithOutputField() {
+    void testRejectMetricRefsAsUnknownField() {
         String source = """
                 {
                   "schemaVersion": 1,
@@ -481,7 +482,10 @@ class MetricDefinitionDslCodecTests {
                     "fields": {
                       "approvedTotal": {
                         "valueType": "LONG",
-                        "expression": {"type": "SPEL", "value": "metric('approvedTotal')"}
+                        "expression": {
+                          "type": "SPEL",
+                          "value": "metric('VCC_APPROVED_TOTAL', 'value')"
+                        }
                       }
                     }
                   }
@@ -492,8 +496,8 @@ class MetricDefinitionDslCodecTests {
                 MetricValidationException.class,
                 () -> codec.parse(source));
 
-        Assertions.assertEquals(MetricErrorCode.DSL_VALUE_INVALID, exception.errorCode());
-        Assertions.assertEquals("/metric/fields/approvedTotal", exception.fieldPath());
+        Assertions.assertEquals(MetricErrorCode.DSL_FIELD_UNKNOWN, exception.errorCode());
+        Assertions.assertEquals("/metric/metricRefs", exception.fieldPath());
     }
 
     @Test
@@ -543,35 +547,13 @@ class MetricDefinitionDslCodecTests {
                   }
                 }
                 """;
-        String scalarValueAliasConflict = """
-                {
-                  "schemaVersion": 1,
-                  "metric": {
-                    "code": "VCC_APPROVAL_RATE",
-                    "valueShape": "SCALAR",
-                    "subject": {"type": "CUSTOMER"},
-                    "dimensions": [],
-                    "metricRefs": {
-                      "value": {"metricCode": "VCC_APPROVED_TOTAL", "valueField": "value"}
-                    },
-                    "value": {
-                      "valueType": "LONG",
-                      "expression": {"type": "SPEL", "value": "metric('value')"}
-                    }
-                  }
-                }
-                """;
-
         MetricValidationException fieldException = Assertions.assertThrows(
                 MetricValidationException.class, () -> codec.parse(nestedSubjectField));
         MetricValidationException joinException = Assertions.assertThrows(
                 MetricValidationException.class, () -> codec.parse(factAliasConflict));
-        MetricValidationException referenceException = Assertions.assertThrows(
-                MetricValidationException.class, () -> codec.parse(scalarValueAliasConflict));
 
         Assertions.assertEquals("/metric/subject/field", fieldException.fieldPath());
         Assertions.assertEquals("/metric/joins/0/alias", joinException.fieldPath());
-        Assertions.assertEquals("/metric/metricRefs/value", referenceException.fieldPath());
     }
 
     private String derivedDefinitionWithOrElse(String valueType, String value) {
@@ -583,12 +565,12 @@ class MetricDefinitionDslCodecTests {
                     "valueShape": "SCALAR",
                     "subject": {"type": "CUSTOMER"},
                     "dimensions": [],
-                    "metricRefs": {
-                      "baseTotal": {"metricCode": "VCC_BASE_TOTAL", "valueField": "value"}
-                    },
                     "value": {
                       "valueType": "%s",
-                      "expression": {"type": "SPEL", "value": "metric('baseTotal')"},
+                      "expression": {
+                        "type": "SPEL",
+                        "value": "metric('VCC_BASE_TOTAL', 'value')"
+                      },
                       "orElse": {"mode": "VALUE", "value": %s}
                     }
                   }

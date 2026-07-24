@@ -137,7 +137,7 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     UAH("980", "UAH", "乌克兰赫夫纳", "₴"),
 
-    AMD("51", "AMD", "亚美尼亚德拉姆", "Դ"),
+    AMD("051", "AMD", "亚美尼亚德拉姆", "Դ"),
 
     ANG("532", "ANG", "荷屬安的列斯盾", "NAƒ"),
 
@@ -147,33 +147,33 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     BAM("977", "BAM", "波斯尼亚和黑塞哥维那可兑换马克", "KM"),
 
-    BBD("52", "BBD", "巴貝多元", "BBD"),
+    BBD("052", "BBD", "巴貝多元", "BBD"),
 
     BGN("975", "BGN", "保加利亞列弗", "лв"),
 
-    BHD("48", "BHD", "巴林第納爾", ".د.ب"),
+    BHD("048", "BHD", "巴林第納爾", ".د.ب"),
 
     BIF("108", "BIF", "蒲隆地法郎", "FBu"),
 
-    BMD("60", "BMD", "百慕達元", "BD$"),
+    BMD("060", "BMD", "百慕達元", "BD$"),
 
-    BND("96", "BND", "汶萊元", "B$"),
+    BND("096", "BND", "汶萊元", "B$"),
 
-    BOB("68", "BOB", "玻利維亞諾", "Bs"),
+    BOB("068", "BOB", "玻利維亞諾", "Bs"),
 
     BOV("984", "BOV", "BOV", ""),
 
-    BSD("44", "BSD", "巴哈馬元", "B$"),
+    BSD("044", "BSD", "巴哈馬元", "B$"),
 
-    BTN("64", "BTN", "不丹努尔特鲁姆", "Nu."),
+    BTN("064", "BTN", "不丹努尔特鲁姆", "Nu."),
 
-    BWP("72", "BWP", "波札那普拉", "P"),
+    BWP("072", "BWP", "波札那普拉", "P"),
 
     BYN("933", "BYN", "白俄羅斯盧布", "р"),
 
     BYR("974", "BYR", "白俄羅斯盧布", "Br"),
 
-    BZD("84", "BZD", "貝里斯元", "BZ$"),
+    BZD("084", "BZD", "貝里斯元", "BZ$"),
 
     CDF("976", "CDF", "剛果法郎", "₣"),
 
@@ -302,7 +302,7 @@ public enum CurrencyIsoCode implements DescriptiveEnum {
 
     RWF("646", "RWF", "卢旺达法郎", "RF"),
 
-    SBD("90", "SBD", "所罗门群岛元", "SI$"),
+    SBD("090", "SBD", "所罗门群岛元", "SI$"),
 
     SCR("690", "SCR", "塞席爾盧比", "SR"),
 

@@ -28,5 +28,6 @@ class CurrencyIsoCodeTests {
         Assertions.assertEquals(CurrencyIsoCode.BRL, CurrencyIsoCode.of("986"));
         Assertions.assertEquals(CurrencyIsoCode.BRR, CurrencyIsoCode.of("987"));
         Assertions.assertEquals(CurrencyIsoCode.PLN, CurrencyIsoCode.requireOf("616"));
+        Assertions.assertEquals(CurrencyIsoCode.BOB, CurrencyIsoCode.requireOf("068"));
     }
 }

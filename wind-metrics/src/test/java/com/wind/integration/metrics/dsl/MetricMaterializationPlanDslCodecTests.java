@@ -269,6 +269,255 @@ class MetricMaterializationPlanDslCodecTests {
         Assertions.assertEquals("/segments", exception.fieldPath());
     }
 
+    @Test
+    void testParseAndCanonicalizeJointDependencies() {
+        String source = """
+                {
+                  "schemaVersion": 1,
+                  "executionMode": "SEGMENTED",
+                  "snapshotKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
+                  "dependencies": [
+                    {
+                      "metricCode": "VCC_REFUND_COUNT",
+                      "definitionRevision": 3,
+                      "measures": [
+                        {"valueField": "latestAt", "mergeState": "MAX"},
+                        {"valueField": "value", "mergeState": "SUM"}
+                      ]
+                    },
+                    {
+                      "metricCode": "VCC_REFUND_AMOUNT",
+                      "definitionRevision": 2,
+                      "measures": [
+                        {"valueField": "minimum", "mergeState": "MIN"},
+                        {"valueField": "value", "mergeState": "SUM"}
+                      ]
+                    }
+                  ],
+                  "recentWindow": "P90D",
+                  "segments": [
+                    {
+                      "segmentCode": "archive",
+                      "sourceType": "SNAPSHOT",
+                      "snapshotGranularity": "DAY",
+                      "snapshotTargetCode": "refundRatioArchive"
+                    },
+                    {"segmentCode": "recent", "sourceType": "REALTIME"}
+                  ]
+                }
+                """;
+
+        MetricMaterializationPlanDsl plan = codec.parse(source);
+        String canonical = codec.canonicalize(plan);
+
+        Assertions.assertEquals(2, plan.dependencies().size());
+        Assertions.assertTrue(canonical.indexOf("VCC_REFUND_AMOUNT") < canonical.indexOf("VCC_REFUND_COUNT"));
+        Assertions.assertTrue(canonical.indexOf("\"valueField\":\"minimum\"")
+                < canonical.indexOf("\"valueField\":\"value\""));
+        Assertions.assertEquals(canonical, codec.canonicalize(codec.parse(canonical)));
+    }
+
+    @Test
+    void testRejectExplicitNullDependencies() {
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
+                () -> codec.parse("""
+                        {
+                          "schemaVersion": 1,
+                          "executionMode": "SNAPSHOT",
+                          "snapshotKeyProviderCode": "VCC_KEYS",
+                          "dependencies": null,
+                          "snapshotGranularity": "DAY",
+                          "snapshotTargetCode": "authValue"
+                        }
+                        """));
+
+        Assertions.assertEquals(MetricErrorCode.DSL_FIELD_TYPE_INVALID, exception.errorCode());
+        Assertions.assertEquals("/dependencies", exception.fieldPath());
+
+        assertInvalidPlan("""
+                {
+                  "schemaVersion": 1,
+                  "executionMode": "SNAPSHOT",
+                  "snapshotKeyProviderCode": "VCC_KEYS",
+                  "dependencies": [],
+                  "snapshotGranularity": "DAY",
+                  "snapshotTargetCode": "authValue"
+                }
+                """, "/dependencies");
+    }
+
+    @Test
+    void testRejectExplicitEmptyDependencies() {
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
+                () -> codec.parse("""
+                        {
+                          "schemaVersion": 1,
+                          "executionMode": "SNAPSHOT",
+                          "snapshotKeyProviderCode": "VCC_KEYS",
+                          "dependencies": [],
+                          "snapshotGranularity": "DAY",
+                          "snapshotTargetCode": "authValue"
+                        }
+                        """));
+
+        Assertions.assertEquals(MetricErrorCode.DSL_PLAN_INVALID, exception.errorCode());
+        Assertions.assertEquals("/dependencies", exception.fieldPath());
+    }
+
+    @Test
+    void testCanonicalizeSingleDependency() {
+        String source = snapshotPlanWithDependencies("""
+                {
+                  "metricCode": "VCC_REFUND_AMOUNT",
+                  "definitionRevision": 1,
+                  "measures": [{"valueField": "value", "mergeState": "SUM"}]
+                }
+                """);
+
+        String canonical = codec.canonicalize(codec.parse(source));
+
+        Assertions.assertEquals(canonical, codec.canonicalize(codec.parse(canonical)));
+    }
+
+    @Test
+    void testRejectInvalidDependencies() {
+        assertInvalidPlan(
+                snapshotPlanWithDependencies("""
+                        {
+                          "metricCode": "VCC_REFUND_AMOUNT",
+                          "definitionRevision": 0,
+                          "measures": [{"valueField": "value", "mergeState": "SUM"}]
+                        }
+                        """),
+                "/dependencies/0/definitionRevision");
+        assertInvalidPlan(
+                snapshotPlanWithDependencies("""
+                        {
+                          "metricCode": "VCC_REFUND_AMOUNT",
+                          "definitionRevision": 1,
+                          "measures": []
+                        }
+                        """),
+                "/dependencies/0/measures");
+        assertInvalidPlan(
+                snapshotPlanWithDependencies("""
+                        {
+                          "metricCode": "VCC_REFUND_AMOUNT",
+                          "definitionRevision": 1,
+                          "measures": [{"valueField": "value", "mergeState": "SUM"}]
+                        },
+                        {
+                          "metricCode": "VCC_REFUND_AMOUNT",
+                          "definitionRevision": 2,
+                          "measures": [{"valueField": "value", "mergeState": "SUM"}]
+                        }
+                        """),
+                "/dependencies/1/metricCode");
+        assertInvalidPlan(
+                snapshotPlanWithDependencies("""
+                        {
+                          "metricCode": "VCC_REFUND_AMOUNT",
+                          "definitionRevision": 1,
+                          "measures": [
+                            {"valueField": "value", "mergeState": "SUM"},
+                            {"valueField": "value", "mergeState": "MAX"}
+                          ]
+                        },
+                        {
+                          "metricCode": "VCC_REFUND_COUNT",
+                          "definitionRevision": 1,
+                          "measures": [{"valueField": "value", "mergeState": "SUM"}]
+                        }
+                        """),
+                "/dependencies/0/measures/1/valueField");
+    }
+
+    @Test
+    void testRejectUnsupportedJointMergeState() {
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
+                () -> codec.parse(snapshotPlanWithDependencies("""
+                        {
+                          "metricCode": "VCC_REFUND_AMOUNT",
+                          "definitionRevision": 1,
+                          "measures": [{"valueField": "value", "mergeState": "AVG"}]
+                        },
+                        {
+                          "metricCode": "VCC_REFUND_COUNT",
+                          "definitionRevision": 1,
+                          "measures": [{"valueField": "value", "mergeState": "SUM"}]
+                        }
+                        """)));
+
+        Assertions.assertEquals(MetricErrorCode.DSL_VALUE_INVALID, exception.errorCode());
+        Assertions.assertEquals("/dependencies/0/measures/0/mergeState", exception.fieldPath());
+    }
+
+    @Test
+    void testRejectLegacyJointFieldsAndSegmentedRootGranularity() {
+        for (String field : new String[]{
+                "dependencyClosure", "materializationScope", "watermarkPolicy",
+                "sourceReadinessPolicy", "recentReadConsistency"}) {
+            MetricValidationException exception = Assertions.assertThrows(
+                    MetricValidationException.class,
+                    () -> codec.parse("""
+                            {
+                              "schemaVersion": 1,
+                              "executionMode": "SNAPSHOT",
+                              "snapshotKeyProviderCode": "VCC_KEYS",
+                              "snapshotGranularity": "DAY",
+                              "snapshotTargetCode": "authValue",
+                              "%s": {}
+                            }
+                            """.formatted(field)));
+            Assertions.assertEquals(MetricErrorCode.DSL_FIELD_UNKNOWN, exception.errorCode());
+            Assertions.assertEquals("/" + field, exception.fieldPath());
+        }
+
+        assertInvalidPlan("""
+                {
+                  "schemaVersion": 1,
+                  "executionMode": "SEGMENTED",
+                  "snapshotKeyProviderCode": "VCC_KEYS",
+                  "snapshotGranularity": "DAY",
+                  "recentWindow": "P90D",
+                  "segments": [
+                    {
+                      "segmentCode": "archive",
+                      "sourceType": "SNAPSHOT",
+                      "snapshotGranularity": "DAY",
+                      "snapshotTargetCode": "archiveValue"
+                    },
+                    {"segmentCode": "recent", "sourceType": "REALTIME"}
+                  ]
+                }
+                """, "");
+    }
+
+    private String snapshotPlanWithDependencies(String dependencies) {
+        return """
+                {
+                  "schemaVersion": 1,
+                  "executionMode": "SNAPSHOT",
+                  "snapshotKeyProviderCode": "VCC_KEYS",
+                  "dependencies": [%s],
+                  "snapshotGranularity": "DAY",
+                  "snapshotTargetCode": "refundValue"
+                }
+                """.formatted(dependencies);
+    }
+
+    private void assertInvalidPlan(String source, String fieldPath) {
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
+                () -> codec.parse(source));
+
+        Assertions.assertEquals(MetricErrorCode.DSL_PLAN_INVALID, exception.errorCode());
+        Assertions.assertEquals(fieldPath, exception.fieldPath());
+    }
+
     private void assertInvalidJson(String source) {
         MetricValidationException exception = Assertions.assertThrows(
                 MetricValidationException.class,

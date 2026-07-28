@@ -1,10 +1,13 @@
 package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.dsl.materialization.MetricMaterializationDependencyDsl;
+import com.wind.integration.metrics.dsl.materialization.MetricMaterializationMeasureDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricMaterializationPlanDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricSegmentDsl;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricExecutionMode;
+import com.wind.integration.metrics.enums.MetricMergeState;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
@@ -12,6 +15,8 @@ import org.jspecify.annotations.Nullable;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +32,7 @@ import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.string;
 /**
  * 指标逻辑物化计划 v1 的关闭世界解析、基础校验与确定性规范化入口。
  *
- * <p>该入口只描述快照和分段拓扑，不解析物理表、数据源或运行时水位。</p>
+ * <p>该入口只描述快照、分段拓扑和冻结的叶子物化依赖，不解析物理表、数据源或运行时水位。</p>
  *
  * @author wuxp
  * @date 2026-07-21 17:51
@@ -46,7 +51,7 @@ public final class MetricMaterializationPlanDslCodec {
     /** Plan DSL 根节点允许出现的字段。 */
     private static final Set<String> ROOT_FIELDS = Set.of(
             "schemaVersion", "executionMode", "snapshotKeyProviderCode", "snapshotGranularity",
-            "snapshotTargetCode", "recentWindow", "segments");
+            "snapshotTargetCode", "recentWindow", "segments", "dependencies");
 
     /**
      * 解析并校验指标物化 Plan DSL JSON。
@@ -66,6 +71,8 @@ public final class MetricMaterializationPlanDslCodec {
                 required(root, "executionMode", ""), MetricExecutionMode.class, "/executionMode");
         String keyProviderCode = string(
                 required(root, "snapshotKeyProviderCode", ""), "/snapshotKeyProviderCode");
+        List<MetricMaterializationDependencyDsl> dependencies = parseDependencies(
+                MetricDslJsonSupport.optionalValue(root, "dependencies", "/dependencies"));
         SnapshotGranularity granularity = root.containsKey("snapshotGranularity")
                 ? MetricDslJsonSupport.enumValue(
                         root.get("snapshotGranularity"), SnapshotGranularity.class, "/snapshotGranularity")
@@ -77,7 +84,8 @@ public final class MetricMaterializationPlanDslCodec {
         List<MetricSegmentDsl> segments = parseSegments(
                 MetricDslJsonSupport.optionalValue(root, "segments", "/segments"));
         MetricMaterializationPlanDsl plan = new MetricMaterializationPlanDsl(
-                schemaVersion, executionMode, keyProviderCode, granularity, targetCode, recentWindow, segments);
+                schemaVersion, executionMode, keyProviderCode, dependencies,
+                granularity, targetCode, recentWindow, segments);
         validateBasic(plan);
         return plan;
     }
@@ -93,6 +101,7 @@ public final class MetricMaterializationPlanDslCodec {
             throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
         validateIdentifier(plan.snapshotKeyProviderCode(), "/snapshotKeyProviderCode");
+        validateDependencies(plan.dependencies());
         if (plan.executionMode() == MetricExecutionMode.REALTIME) {
             throw error(MetricErrorCode.DSL_PLAN_INVALID, "/executionMode", "REALTIME does not use a plan");
         }
@@ -135,6 +144,12 @@ public final class MetricMaterializationPlanDslCodec {
         result.put("schemaVersion", plan.schemaVersion());
         result.put("executionMode", plan.executionMode().name());
         result.put("snapshotKeyProviderCode", plan.snapshotKeyProviderCode());
+        if (!plan.dependencies().isEmpty()) {
+            result.put("dependencies", plan.dependencies().stream()
+                    .sorted(Comparator.comparing(MetricMaterializationDependencyDsl::metricCode))
+                    .map(this::toCanonicalDependency)
+                    .toList());
+        }
         if (plan.executionMode() == MetricExecutionMode.SNAPSHOT) {
             result.put("snapshotGranularity", plan.snapshotGranularity().name());
             result.put("snapshotTargetCode", plan.snapshotTargetCode());
@@ -143,6 +158,104 @@ public final class MetricMaterializationPlanDslCodec {
             result.put("segments", plan.segments().stream().map(this::toCanonicalSegment).toList());
         }
         return MetricDslJsonSupport.toJson(result);
+    }
+
+    private List<MetricMaterializationDependencyDsl> parseDependencies(@Nullable Object value) {
+        if (value == null) {
+            return List.of();
+        }
+        List<Object> source = MetricDslJsonSupport.array(value, "/dependencies");
+        if (source.isEmpty()) {
+            throw error(MetricErrorCode.DSL_PLAN_INVALID, "/dependencies", "dependencies must not be empty");
+        }
+        List<MetricMaterializationDependencyDsl> result = new ArrayList<>(source.size());
+        for (int index = 0; index < source.size(); index++) {
+            String path = child("/dependencies", Integer.toString(index));
+            Map<String, Object> dependency = MetricDslJsonSupport.object(source.get(index), path);
+            MetricDslJsonSupport.rejectUnknown(
+                    dependency, path, Set.of("metricCode", "definitionRevision", "measures"));
+            result.add(new MetricMaterializationDependencyDsl(
+                    string(required(dependency, "metricCode", path), child(path, "metricCode")),
+                    MetricDslJsonSupport.integer(
+                            required(dependency, "definitionRevision", path), child(path, "definitionRevision")),
+                    parseMeasures(required(dependency, "measures", path), child(path, "measures"))));
+        }
+        return result;
+    }
+
+    private List<MetricMaterializationMeasureDsl> parseMeasures(Object value, String path) {
+        List<Object> source = MetricDslJsonSupport.array(value, path);
+        List<MetricMaterializationMeasureDsl> result = new ArrayList<>(source.size());
+        for (int index = 0; index < source.size(); index++) {
+            String measurePath = child(path, Integer.toString(index));
+            Map<String, Object> measure = MetricDslJsonSupport.object(source.get(index), measurePath);
+            MetricDslJsonSupport.rejectUnknown(measure, measurePath, Set.of("valueField", "mergeState"));
+            result.add(new MetricMaterializationMeasureDsl(
+                    string(required(measure, "valueField", measurePath), child(measurePath, "valueField")),
+                    MetricDslJsonSupport.enumValue(
+                            required(measure, "mergeState", measurePath),
+                            MetricMergeState.class,
+                            child(measurePath, "mergeState"))));
+        }
+        return result;
+    }
+
+    private void validateDependencies(List<MetricMaterializationDependencyDsl> dependencies) {
+        if (dependencies.isEmpty()) {
+            return;
+        }
+        Set<String> metricCodes = new HashSet<>();
+        for (int index = 0; index < dependencies.size(); index++) {
+            MetricMaterializationDependencyDsl dependency = dependencies.get(index);
+            String path = child("/dependencies", Integer.toString(index));
+            validateIdentifier(dependency.metricCode(), child(path, "metricCode"), 100);
+            if (!metricCodes.add(dependency.metricCode())) {
+                throw error(
+                        MetricErrorCode.DSL_PLAN_INVALID,
+                        child(path, "metricCode"),
+                        "Duplicate dependency metricCode");
+            }
+            if (dependency.definitionRevision() <= 0) {
+                throw error(
+                        MetricErrorCode.DSL_PLAN_INVALID,
+                        child(path, "definitionRevision"),
+                        "definitionRevision must be positive");
+            }
+            validateMeasures(dependency.measures(), child(path, "measures"));
+        }
+    }
+
+    private void validateMeasures(List<MetricMaterializationMeasureDsl> measures, String path) {
+        if (measures.isEmpty()) {
+            throw error(MetricErrorCode.DSL_PLAN_INVALID, path, "Dependency measures must not be empty");
+        }
+        Set<String> valueFields = new HashSet<>();
+        for (int index = 0; index < measures.size(); index++) {
+            MetricMaterializationMeasureDsl measure = measures.get(index);
+            String valueFieldPath = child(child(path, Integer.toString(index)), "valueField");
+            validateIdentifier(measure.valueField(), valueFieldPath, 64);
+            if (!valueFields.add(measure.valueField())) {
+                throw error(MetricErrorCode.DSL_PLAN_INVALID, valueFieldPath, "Duplicate dependency valueField");
+            }
+        }
+    }
+
+    private Map<String, Object> toCanonicalDependency(MetricMaterializationDependencyDsl dependency) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("metricCode", dependency.metricCode());
+        result.put("definitionRevision", dependency.definitionRevision());
+        result.put("measures", dependency.measures().stream()
+                .sorted(Comparator.comparing(MetricMaterializationMeasureDsl::valueField))
+                .map(this::toCanonicalMeasure)
+                .toList());
+        return result;
+    }
+
+    private Map<String, Object> toCanonicalMeasure(MetricMaterializationMeasureDsl measure) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("valueField", measure.valueField());
+        result.put("mergeState", measure.mergeState().name());
+        return result;
     }
 
     private List<MetricSegmentDsl> parseSegments(@Nullable Object value) {
@@ -238,7 +351,11 @@ public final class MetricMaterializationPlanDslCodec {
     }
 
     private void validateIdentifier(String value, String path) {
-        if (value.length() > 64 || !IDENTIFIER.matcher(value).matches()) {
+        validateIdentifier(value, path, 64);
+    }
+
+    private void validateIdentifier(String value, String path, int maxLength) {
+        if (value.length() > maxLength || !IDENTIFIER.matcher(value).matches()) {
             throw error(MetricErrorCode.DSL_IDENTIFIER_INVALID, path, "Invalid identifier");
         }
     }

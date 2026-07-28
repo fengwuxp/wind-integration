@@ -16,6 +16,7 @@ import java.util.Objects;
  * @param schemaVersion Plan DSL 结构版本，当前只支持 {@code 1}
  * @param executionMode 物化执行模式，只允许 {@code SNAPSHOT} 或 {@code SEGMENTED}
  * @param snapshotKeyProviderCode 快照主体与维度键枚举器编码
+ * @param dependencies 服务端展开并冻结的叶子物化依赖；单事实计划为空列表
  * @param snapshotGranularity 全量快照桶粒度；分段模式为空
  * @param snapshotTargetCode 全量快照逻辑目标编码；分段模式为空
  * @param recentWindow 分段模式近期窗口，只支持正数天或小时的 ISO-8601 Duration
@@ -27,6 +28,7 @@ import java.util.Objects;
 public record MetricMaterializationPlanDsl(Integer schemaVersion,
                                            MetricExecutionMode executionMode,
                                            String snapshotKeyProviderCode,
+                                           List<MetricMaterializationDependencyDsl> dependencies,
                                            @Nullable SnapshotGranularity snapshotGranularity,
                                            @Nullable String snapshotTargetCode,
                                            @Nullable String recentWindow,
@@ -36,6 +38,7 @@ public record MetricMaterializationPlanDsl(Integer schemaVersion,
         Objects.requireNonNull(schemaVersion, "schemaVersion must not be null");
         Objects.requireNonNull(executionMode, "executionMode must not be null");
         Objects.requireNonNull(snapshotKeyProviderCode, "snapshotKeyProviderCode must not be null");
+        dependencies = List.copyOf(dependencies);
         segments = List.copyOf(segments);
     }
 }

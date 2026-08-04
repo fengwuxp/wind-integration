@@ -28,7 +28,7 @@ class SpringExpressionExportExcelTaskTests {
         SpringExpressionExportExcelTask task = createExportTask("test.xlsx");
         task.run();
         Assertions.assertEquals(OfficeTaskState.COMPLETED, task.getState());
-        Assertions.assertEquals(3000, task.getRowSize());
+        Assertions.assertEquals(5000, task.getRowSize());
         Assertions.assertEquals(0, task.getFailedRowSize());
     }
 
@@ -37,7 +37,7 @@ class SpringExpressionExportExcelTaskTests {
         SpringExpressionExportExcelTask task = createExportTask("test.csv");
         task.run();
         Assertions.assertEquals(OfficeTaskState.COMPLETED, task.getState());
-        Assertions.assertEquals(3000, task.getRowSize());
+        Assertions.assertEquals(5000, task.getRowSize());
         Assertions.assertEquals(0, task.getFailedRowSize());
     }
 

@@ -239,6 +239,11 @@ class MetricMaterializationPlanDslCodecTests {
     }
 
     @Test
+    void testRejectTruncatedJson() {
+        assertInvalidJson("{\"schemaVersion\":");
+    }
+
+    @Test
     void testRejectNonStandardJsonNumbers() {
         for (String schemaVersion : new String[]{"+1", "0x1", "1."}) {
             assertInvalidJson("""

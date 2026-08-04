@@ -1,6 +1,5 @@
 package com.wind.integration.message.dingtalk;
 
-import com.alibaba.fastjson2.annotation.JSONField;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.core.message.MessageDefinition;
@@ -113,7 +112,6 @@ public class DingTalkRobotMessage implements MessageDefinition<DingTalkRobotMess
 
         private Collection<String> atUserIds;
 
-        @JSONField(name = "isAtAll")
         @JsonProperty("isAtAll")
         private Boolean atAll;
     }

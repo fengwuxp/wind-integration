@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -55,6 +56,13 @@ class MetricQueryJsonCodecTests {
         Assertions.assertEquals("USD", query.dimensionValues().get("currency"));
         Assertions.assertEquals(
                 List.of("VCC_APPROVED_TOTAL", "VCC_TOTAL_AMOUNT"), batchQuery.metricCodes());
+    }
+
+    @Test
+    void testParseSpaceSeparatedDateTime() {
+        MetricQuery query = codec.parse(QUERY_JSON.replace("T00:00:00", " 00:00:00"));
+
+        Assertions.assertEquals(LocalDateTime.of(2026, 3, 1, 0, 0), query.startTime());
     }
 
     @Test

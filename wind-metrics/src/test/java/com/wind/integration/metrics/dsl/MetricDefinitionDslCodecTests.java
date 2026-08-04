@@ -194,6 +194,30 @@ class MetricDefinitionDslCodecTests {
     }
 
     @Test
+    void testCanonicalizeDecimalWithoutScientificNotation() {
+        String source = realtimeCountDefinition(
+                "",
+                ", \"filter\": {\"eq\": {\"amount\": 1000.0}}");
+
+        String canonical = codec.canonicalize(codec.parse(source));
+
+        Assertions.assertTrue(canonical.contains("\"amount\":1000"));
+        Assertions.assertFalse(canonical.contains("1E+3"));
+    }
+
+    @Test
+    void testRejectScientificNotation() {
+        MetricValidationException exception = Assertions.assertThrows(
+                MetricValidationException.class,
+                () -> codec.parse(realtimeCountDefinition(
+                        "",
+                        ", \"filter\": {\"eq\": {\"amount\": 1e3}}")));
+
+        Assertions.assertEquals(MetricErrorCode.DSL_JSON_INVALID, exception.errorCode());
+        Assertions.assertEquals("/metric/value/measure/filter/eq/amount", exception.fieldPath());
+    }
+
+    @Test
     @DisplayName("DSL-T004 filter literal 类型必须唯一")
     void testRejectMixedSetLiteralTypes() {
         String source = """

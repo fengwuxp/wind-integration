@@ -1,10 +1,10 @@
 package com.wind.integration.metrics;
 
-import com.alibaba.fastjson2.JSON;
 import com.wind.common.util.WindReflectUtils;
 import com.wind.integration.metrics.fields.SingleValueMetricsField;
 import com.wind.integration.tag.EntityTag;
 import com.wind.integration.tag.TagSource;
+import com.wind.jackson.WindJson;
 import lombok.Data;
 import lombok.experimental.FieldNameConstants;
 import org.junit.jupiter.api.Assertions;
@@ -33,8 +33,8 @@ class WindWindMetricsAggregatorFactoryTests {
 
     @Test
     void testEntityTagJson(){
-        String json = JSON.toJSONString(new EntityTag("example", "vv", TagSource.MANUAL, "mock"));
-        EntityTag entityTag = JSON.parseObject(json, EntityTag.class);
+        String json = WindJson.toJsonString(new EntityTag("example", "vv", TagSource.MANUAL, "mock"));
+        EntityTag entityTag = WindJson.parseObject(json, EntityTag.class);
         Assertions.assertEquals("example", entityTag.name());
     }
 

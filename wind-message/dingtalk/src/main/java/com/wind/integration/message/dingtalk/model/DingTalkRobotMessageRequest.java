@@ -1,6 +1,6 @@
 package com.wind.integration.message.dingtalk.model;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.signature.SignatureAlgorithm;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -53,7 +53,7 @@ public class DingTalkRobotMessageRequest {
         if (data instanceof String text) {
             result.setData(text);
         } else {
-            result.setData(JSON.toJSONString(data));
+            result.setData(WindJson.toJsonString(data));
         }
         result.setTimestamp(System.currentTimeMillis());
         return result;

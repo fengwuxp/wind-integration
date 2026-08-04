@@ -1,8 +1,8 @@
 package com.wind.integration.metrics.fields;
 
-import com.alibaba.fastjson2.JSON;
 import com.wind.integration.metrics.WindMetricsEvaluator;
 import com.wind.integration.metrics.WindMetricsValue;
+import com.wind.jackson.WindJson;
 
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -37,7 +37,7 @@ public interface MultipleValueMetricsField<M> extends WindMetricsValue<M> , Wind
         if (value instanceof Map) {
             return (Map<String, Object>) value;
         }
-        return (Map<String, Object>) JSON.toJSON(value);
+        return (Map<String, Object>) WindJson.convertValue(value, Map.class);
     }
 
     /**

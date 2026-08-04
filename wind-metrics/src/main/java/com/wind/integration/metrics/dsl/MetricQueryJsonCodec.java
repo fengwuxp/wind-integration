@@ -1,13 +1,19 @@
 package com.wind.integration.metrics.dsl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONException;
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.query.MetricBatchQuery;
 import com.wind.integration.metrics.query.MetricQuery;
+import com.wind.jackson.WindJson;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ext.javatime.deser.LocalDateTimeDeserializer;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.module.SimpleModule;
 
 import java.math.BigInteger;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.Map;
 import java.util.Set;
 
@@ -28,6 +34,8 @@ public final class MetricQueryJsonCodec {
     /** 批量指标查询允许出现的顶层字段。 */
     private static final Set<String> BATCH_QUERY_FIELDS = Set.of(
             "metricCodes", "subjectId", "startTime", "endTime", "dimensionValues");
+
+    private static final JsonMapper QUERY_JSON_MAPPER = createQueryJsonMapper();
 
     /**
      * 解析单指标正式查询。
@@ -55,8 +63,9 @@ public final class MetricQueryJsonCodec {
      * @throws MetricValidationException JSON 或查询字段不符合公开合同时抛出
      */
     public MetricBatchQuery parseBatch(String json) {
-        rejectUnknownFields(MetricDslJsonSupport.parseRootObject(json), BATCH_QUERY_FIELDS);
-        return deserialize(json, MetricBatchQuery.class);
+        Map<String, Object> source = MetricDslJsonSupport.parseRootObject(json);
+        rejectUnknownFields(source, BATCH_QUERY_FIELDS);
+        return deserialize(MetricDslJsonSupport.toJson(source), MetricBatchQuery.class);
     }
 
     private static void rejectUnknownFields(Map<String, Object> source, Set<String> allowedFields) {
@@ -97,10 +106,10 @@ public final class MetricQueryJsonCodec {
 
     private static <T> T deserialize(String json, Class<T> type) {
         try {
-            return JSON.parseObject(json, type);
+            return QUERY_JSON_MAPPER.readValue(json, type);
         } catch (MetricValidationException exception) {
             throw exception;
-        } catch (JSONException exception) {
+        } catch (JacksonException exception) {
             Throwable cause = exception.getCause();
             if (cause instanceof MetricValidationException validationException) {
                 throw validationException;
@@ -108,5 +117,20 @@ public final class MetricQueryJsonCodec {
             throw new MetricValidationException(
                     MetricErrorCode.QUERY_INVALID, "", "Invalid query JSON", exception);
         }
+    }
+
+    private static JsonMapper createQueryJsonMapper() {
+        DateTimeFormatter spaceSeparatedDateTime = new DateTimeFormatterBuilder()
+                .append(DateTimeFormatter.ISO_LOCAL_DATE)
+                .appendLiteral(' ')
+                .append(DateTimeFormatter.ISO_LOCAL_TIME)
+                .toFormatter();
+        DateTimeFormatter queryDateTime = new DateTimeFormatterBuilder()
+                .appendOptional(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                .appendOptional(spaceSeparatedDateTime)
+                .toFormatter();
+        SimpleModule module = new SimpleModule("MetricQueryJavaTimeModule");
+        module.addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(queryDateTime));
+        return WindJson.getJsonMapper().rebuild().addModule(module).build();
     }
 }

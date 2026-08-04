@@ -1,16 +1,15 @@
 package com.wind.integration.metrics.dsl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONFactory;
-import com.alibaba.fastjson2.JSONException;
-import com.alibaba.fastjson2.JSONReader;
-import com.alibaba.fastjson2.JSONWriter;
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.enums.MetricErrorCode;
+import com.wind.jackson.WindJson;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
+import tools.jackson.core.StreamWriteFeature;
 import tools.jackson.core.json.JsonFactory;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -30,6 +29,11 @@ final class MetricDslJsonSupport {
 
     private static final JsonFactory STRICT_JSON_FACTORY = new JsonFactory();
 
+    private static final JsonMapper JSON_MAPPER = WindJson.getJsonMapper()
+            .rebuild()
+            .enable(StreamWriteFeature.WRITE_BIGDECIMAL_AS_PLAIN)
+            .build();
+
     private MetricDslJsonSupport() {
     }
 
@@ -37,11 +41,10 @@ final class MetricDslJsonSupport {
         if (json == null || json.isBlank()) {
             throw error(MetricErrorCode.DSL_JSON_INVALID, "", "JSON must not be blank");
         }
-        validateStrictJson(json);
-        JSONReader.Context context = JSONFactory.createReadContext(JSONReader.Feature.DisableSingleQuote);
-        try (JSONReader reader = JSONReader.of(json, context)) {
-            Object value = readValue(reader, "");
-            if (!reader.isEnd()) {
+        try (JsonParser parser = STRICT_JSON_FACTORY.createParser(json)) {
+            parser.nextToken();
+            Object value = readValue(parser, "");
+            if (parser.nextToken() != null) {
                 throw error(MetricErrorCode.DSL_JSON_INVALID, "", "Unexpected trailing JSON content");
             }
             if (!(value instanceof Map<?, ?> map)) {
@@ -50,14 +53,14 @@ final class MetricDslJsonSupport {
             return castMap(map);
         } catch (MetricValidationException exception) {
             throw exception;
-        } catch (JSONException exception) {
+        } catch (JacksonException exception) {
             throw new MetricValidationException(
                     MetricErrorCode.DSL_JSON_INVALID, "", "Invalid JSON", exception);
         }
     }
 
     static String toJson(Object value) {
-        return JSON.toJSONString(value, JSONWriter.Feature.WriteBigDecimalAsPlain);
+        return JSON_MAPPER.writeValueAsString(value);
     }
 
     static void rejectUnknown(Map<String, Object> object, String path, Set<String> allowedFields) {
@@ -137,64 +140,52 @@ final class MetricDslJsonSupport {
         return new MetricValidationException(code, path, message);
     }
 
-    private static Object readValue(JSONReader reader, String path) {
-        if (reader.nextIfObjectStart()) {
-            Map<String, Object> result = new LinkedHashMap<>();
-            while (!reader.nextIfObjectEnd()) {
-                String field = reader.readFieldName();
-                if (field == null) {
-                    throw error(MetricErrorCode.DSL_JSON_INVALID, path, "Expected quoted field name");
-                }
-                String fieldPath = child(path, field);
-                if (result.containsKey(field)) {
-                    throw error(MetricErrorCode.DSL_FIELD_DUPLICATED, fieldPath, "Duplicate field");
-                }
-                result.put(field, readValue(reader, fieldPath));
-            }
-            return result;
-        }
-        if (reader.nextIfArrayStart()) {
-            List<Object> result = new ArrayList<>();
-            int index = 0;
-            while (!reader.nextIfArrayEnd()) {
-                result.add(readValue(reader, child(path, Integer.toString(index++))));
-            }
-            return result;
-        }
-        if (reader.nextIfNull()) {
-            return null;
-        }
-        if (reader.isString()) {
-            return reader.readString();
-        }
-        if (reader.isNumber()) {
-            Number number = reader.readNumber();
-            if (number instanceof BigInteger integer) {
-                return integer;
-            }
-            if (number instanceof BigDecimal decimal) {
-                return decimal;
-            }
-            if (number instanceof Byte
-                    || number instanceof Short
-                    || number instanceof Integer
-                    || number instanceof Long) {
-                return BigInteger.valueOf(number.longValue());
-            }
-            throw error(MetricErrorCode.DSL_JSON_INVALID, path, "Unsupported numeric literal");
-        }
-        return reader.readBool();
+    private static Object readValue(JsonParser parser, String path) {
+        return switch (parser.currentToken()) {
+            case START_OBJECT -> readObject(parser, path);
+            case START_ARRAY -> readArray(parser, path);
+            case VALUE_NULL -> null;
+            case VALUE_STRING -> parser.getText();
+            case VALUE_NUMBER_INT -> parser.getBigIntegerValue();
+            case VALUE_NUMBER_FLOAT -> readDecimal(parser, path);
+            case VALUE_TRUE -> true;
+            case VALUE_FALSE -> false;
+            default -> throw error(MetricErrorCode.DSL_JSON_INVALID, path, "Unsupported JSON token");
+        };
     }
 
-    private static void validateStrictJson(String json) {
-        try (JsonParser parser = STRICT_JSON_FACTORY.createParser(json)) {
-            while (parser.nextToken() != null) {
-                parser.finishToken();
+    private static Map<String, Object> readObject(JsonParser parser, String path) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        while (parser.nextToken() != JsonToken.END_OBJECT) {
+            if (parser.currentToken() != JsonToken.PROPERTY_NAME) {
+                throw error(MetricErrorCode.DSL_JSON_INVALID, path, "Expected quoted field name");
             }
-        } catch (JacksonException exception) {
-            throw new MetricValidationException(
-                    MetricErrorCode.DSL_JSON_INVALID, "", "Invalid JSON", exception);
+            String field = parser.currentName();
+            String fieldPath = child(path, field);
+            if (result.containsKey(field)) {
+                throw error(MetricErrorCode.DSL_FIELD_DUPLICATED, fieldPath, "Duplicate field");
+            }
+            parser.nextToken();
+            result.put(field, readValue(parser, fieldPath));
         }
+        return result;
+    }
+
+    private static List<Object> readArray(JsonParser parser, String path) {
+        List<Object> result = new ArrayList<>();
+        int index = 0;
+        while (parser.nextToken() != JsonToken.END_ARRAY) {
+            result.add(readValue(parser, child(path, Integer.toString(index++))));
+        }
+        return result;
+    }
+
+    private static BigDecimal readDecimal(JsonParser parser, String path) {
+        String literal = parser.getText();
+        if (literal.indexOf('e') >= 0 || literal.indexOf('E') >= 0) {
+            throw error(MetricErrorCode.DSL_JSON_INVALID, path, "Unsupported numeric literal");
+        }
+        return parser.getDecimalValue();
     }
 
     @SuppressWarnings("unchecked")

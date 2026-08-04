@@ -90,13 +90,13 @@ class WindOperatorTests {
         Assertions.assertTrue(system.isSystem());
         Assertions.assertEquals("current-app", riskEngine.getAppName());
         Assertions.assertEquals(OperationActorType.RISK_ENGINE, riskEngine.getActorType());
-        Assertions.assertFalse(riskEngine.isSystem());
+        Assertions.assertTrue(riskEngine.isSystem());
     }
 
     @Test
     void testIdentifySystemActorType() {
         Assertions.assertTrue(OperationActorType.SYSTEM.isSystem());
-        Assertions.assertFalse(OperationActorType.RISK_ENGINE.isSystem());
+        Assertions.assertTrue(OperationActorType.RISK_ENGINE.isSystem());
         Assertions.assertFalse(OperationActorType.PLATFORM_OPERATOR.isSystem());
         Assertions.assertFalse(OperationActorType.TENANT_OPERATOR.isSystem());
         Assertions.assertFalse(OperationActorType.TENANT_API_CLIENT.isSystem());

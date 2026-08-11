@@ -80,7 +80,7 @@ public record DefaultEasyExcelDocumentReader(ExcelRowToObjectConverter<?> conver
             try {
                 caches.add(converter.convert(rowCellValues));
             } catch (Exception exception) {
-                log.error("excel row convert exception, row = {}", rowCellValues, exception);
+                log.error("excel row convert exception, columnCount = {}", rowCellValues.size(), exception);
                 listener.onException(rowCellValues, exception);
                 return;
             }

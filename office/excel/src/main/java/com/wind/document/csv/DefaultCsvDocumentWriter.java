@@ -32,9 +32,12 @@ public class DefaultCsvDocumentWriter implements ExcelDocumentWriter {
 
     private final SpringExpressionObjectToRowConverter rowConverter;
 
-    private DefaultCsvDocumentWriter(CSVPrinter csvPrinter, List<ExcelCellDescriptor> descriptors) {
+    private final boolean escapeFormulas;
+
+    private DefaultCsvDocumentWriter(CSVPrinter csvPrinter, List<ExcelCellDescriptor> descriptors, boolean escapeFormulas) {
         this.csvPrinter = csvPrinter;
         this.rowConverter = new SpringExpressionObjectToRowConverter(descriptors);
+        this.escapeFormulas = escapeFormulas;
     }
 
     public static DefaultCsvDocumentWriter of(OutputStream output, Class<?> objectType) {
@@ -43,14 +46,40 @@ public class DefaultCsvDocumentWriter implements ExcelDocumentWriter {
 
     public static DefaultCsvDocumentWriter of(OutputStream output, List<ExcelCellDescriptor> descriptors) {
         CSVPrinter printer = buildCsvPrinter(output, descriptors);
-        return new DefaultCsvDocumentWriter(printer, descriptors);
+        return new DefaultCsvDocumentWriter(printer, descriptors, false);
+    }
+
+    /**
+     * 创建转义公式型单元格值的 CSV writer
+     *
+     * @param output     输出流
+     * @param objectType 导出对象类型
+     * @return CSV writer
+     */
+    public static DefaultCsvDocumentWriter ofEscapingFormulas(OutputStream output, Class<?> objectType) {
+        return ofEscapingFormulas(output, ExcelCellQuickBuilder.forClass(objectType));
+    }
+
+    /**
+     * 创建转义公式型单元格值的 CSV writer
+     *
+     * @param output      输出流
+     * @param descriptors 单元格描述
+     * @return CSV writer
+     */
+    public static DefaultCsvDocumentWriter ofEscapingFormulas(OutputStream output, List<ExcelCellDescriptor> descriptors) {
+        CSVPrinter printer = buildCsvPrinter(output, descriptors);
+        return new DefaultCsvDocumentWriter(printer, descriptors, true);
     }
 
     @Override
     public void write(Collection<?> rows) {
         try {
             for (Object row : rows) {
-                csvPrinter.printRecord(rowConverter.convert(row));
+                List<String> values = rowConverter.convert(row);
+                csvPrinter.printRecord(escapeFormulas
+                        ? values.stream().map(DefaultCsvDocumentWriter::neutralizeFormula).toList()
+                        : values);
             }
             csvPrinter.flush();
         } catch (IOException exception) {
@@ -79,5 +108,14 @@ public class DefaultCsvDocumentWriter implements ExcelDocumentWriter {
             throw new BaseException(DefaultExceptionCode.COMMON_FRIENDLY_ERROR, "create csv printer exception", exception);
         }
     }
-}
 
+    private static String neutralizeFormula(String value) {
+        if (value.isEmpty()) {
+            return value;
+        }
+        return switch (value.charAt(0)) {
+            case '=', '+', '-', '@', '\t', '\r', '\n' -> "'" + value;
+            default -> value;
+        };
+    }
+}

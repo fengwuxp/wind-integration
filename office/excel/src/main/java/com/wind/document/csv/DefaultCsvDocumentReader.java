@@ -97,7 +97,7 @@ public record DefaultCsvDocumentReader(ExcelRowToObjectConverter<?> converter, E
             try {
                 caches.add(converter.convert(data));
             } catch (Exception exception) {
-                log.error("CSV row convert exception, row = {}", data, exception);
+                log.error("CSV row convert exception, columnCount = {}", data.size(), exception);
                 listener.onException(data, exception);
                 return;
             }

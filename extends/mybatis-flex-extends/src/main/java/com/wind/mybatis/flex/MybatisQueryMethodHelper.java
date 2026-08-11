@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 /**
  * MySql 数据库函数支持
@@ -26,6 +27,8 @@ public final class MybatisQueryMethodHelper {
     private static final Set<Character> BOOLEAN_MODE_OPERATORS = ImmutableSet.of(
             '+', '-', '*', '>', '<', '~', '"', '(', ')', '@'
     );
+
+    private static final Pattern FIND_IN_SET_TEXT_PATTERN = Pattern.compile("[\\p{L}\\p{N} _.:/@-]*");
 
 
     private MybatisQueryMethodHelper() {
@@ -88,16 +91,35 @@ public final class MybatisQueryMethodHelper {
      *               </code>
      *               <p/>
      * @return String sql
+     * @deprecated 使用 {@link #findInSetCondition(QueryColumn, Set)} 参数化构建查询条件
      */
+    @Deprecated(since = "4.1.0", forRemoval = true)
     public static String findInSet(QueryColumn column, @NotEmpty Set<String> texts) {
         StringBuilder conditions = new StringBuilder();
-        for (String name : texts) {
+        for (String text : texts) {
+            if (text == null || !FIND_IN_SET_TEXT_PATTERN.matcher(text).matches()) {
+                throw new IllegalArgumentException("findInSet text contains unsupported characters");
+            }
             if (!conditions.isEmpty()) {
                 conditions.append(" OR ");
             }
-            conditions.append(String.format("FIND_IN_SET ('%s', %s) > 0", name, buildField(column)));
+            conditions.append(String.format("FIND_IN_SET ('%s', %s) > 0", text, buildField(column)));
         }
         return String.format("( %s )", conditions);
+    }
+
+    /**
+     * 使用参数绑定构建 FIND_IN_SET 集合查询条件
+     *
+     * @param column 查询的字段
+     * @param texts  查找的文本
+     * @return QueryCondition
+     */
+    public static QueryCondition findInSetCondition(QueryColumn column, @NotEmpty Set<String> texts) {
+        return texts.stream()
+                .map(text -> findInSet(column, text))
+                .reduce(QueryCondition::or)
+                .orElseGet(QueryCondition::createEmpty);
     }
 
     /**

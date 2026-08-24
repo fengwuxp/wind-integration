@@ -2,7 +2,7 @@ package com.wind.integration.metrics.query;
 
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.enums.MetricErrorCode;
-import com.wind.integration.metrics.enums.MetricExecutionMode;
+import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
@@ -36,7 +36,7 @@ class MetricResultContractTests {
         MetricResult result = new MetricResult(
                 "VCC_APPROVED_TOTAL",
                 1,
-                MetricExecutionMode.REALTIME,
+                MetricQueryMode.REALTIME,
                 null,
                 null,
                 MetricValueShape.SCALAR,
@@ -66,7 +66,7 @@ class MetricResultContractTests {
         MetricResult result = new MetricResult(
                 "VCC_AUTH_SUMMARY",
                 1,
-                MetricExecutionMode.REALTIME,
+                MetricQueryMode.REALTIME,
                 null,
                 null,
                 MetricValueShape.FIELD_SET,
@@ -145,7 +145,7 @@ class MetricResultContractTests {
                 () -> new MetricResult(
                         "VCC_AUTH_SUMMARY",
                         1,
-                        MetricExecutionMode.SEGMENTED,
+                        MetricQueryMode.SEGMENTED,
                         null,
                         null,
                         MetricValueShape.FIELD_SET,
@@ -222,7 +222,7 @@ class MetricResultContractTests {
         return new MetricResult(
                 "VCC_AUTH_SUMMARY",
                 1,
-                MetricExecutionMode.SEGMENTED,
+                MetricQueryMode.SEGMENTED,
                 null,
                 null,
                 MetricValueShape.FIELD_SET,

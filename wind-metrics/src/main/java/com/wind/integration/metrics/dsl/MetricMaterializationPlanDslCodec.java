@@ -6,8 +6,8 @@ import com.wind.integration.metrics.dsl.materialization.MetricMaterializationMea
 import com.wind.integration.metrics.dsl.materialization.MetricMaterializationPlanDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricSegmentDsl;
 import com.wind.integration.metrics.enums.MetricErrorCode;
-import com.wind.integration.metrics.enums.MetricExecutionMode;
 import com.wind.integration.metrics.enums.MetricMergeState;
+import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
@@ -67,8 +67,8 @@ public final class MetricMaterializationPlanDslCodec {
             throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
         MetricDslJsonSupport.rejectUnknown(root, "", ROOT_FIELDS);
-        MetricExecutionMode executionMode = MetricDslJsonSupport.enumValue(
-                required(root, "executionMode", ""), MetricExecutionMode.class, "/executionMode");
+        MetricQueryMode executionMode = MetricDslJsonSupport.enumValue(
+                required(root, "executionMode", ""), MetricQueryMode.class, "/executionMode");
         String keyProviderCode = string(
                 required(root, "snapshotKeyProviderCode", ""), "/snapshotKeyProviderCode");
         List<MetricMaterializationDependencyDsl> dependencies = parseDependencies(
@@ -102,10 +102,10 @@ public final class MetricMaterializationPlanDslCodec {
         }
         validateIdentifier(plan.snapshotKeyProviderCode(), "/snapshotKeyProviderCode");
         validateDependencies(plan.dependencies());
-        if (plan.executionMode() == MetricExecutionMode.REALTIME) {
+        if (plan.executionMode() == MetricQueryMode.REALTIME) {
             throw error(MetricErrorCode.DSL_PLAN_INVALID, "/executionMode", "REALTIME does not use a plan");
         }
-        if (plan.executionMode() == MetricExecutionMode.SNAPSHOT) {
+        if (plan.executionMode() == MetricQueryMode.SNAPSHOT) {
             if (plan.snapshotGranularity() == null) {
                 throw error(
                         MetricErrorCode.DSL_FIELD_REQUIRED,
@@ -150,7 +150,7 @@ public final class MetricMaterializationPlanDslCodec {
                     .map(this::toCanonicalDependency)
                     .toList());
         }
-        if (plan.executionMode() == MetricExecutionMode.SNAPSHOT) {
+        if (plan.executionMode() == MetricQueryMode.SNAPSHOT) {
             result.put("snapshotGranularity", plan.snapshotGranularity().name());
             result.put("snapshotTargetCode", plan.snapshotTargetCode());
         } else {

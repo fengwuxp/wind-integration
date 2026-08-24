@@ -3,7 +3,7 @@ package com.wind.integration.metrics.dsl;
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.dsl.materialization.MetricMaterializationPlanDsl;
 import com.wind.integration.metrics.enums.MetricErrorCode;
-import com.wind.integration.metrics.enums.MetricExecutionMode;
+import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
@@ -36,7 +36,7 @@ class MetricMaterializationPlanDslCodecTests {
 
         MetricMaterializationPlanDsl plan = codec.parse(source);
 
-        Assertions.assertEquals(MetricExecutionMode.SNAPSHOT, plan.executionMode());
+        Assertions.assertEquals(MetricQueryMode.SNAPSHOT, plan.executionMode());
         Assertions.assertEquals(
                 "{\"schemaVersion\":1,\"executionMode\":\"SNAPSHOT\","
                         + "\"snapshotKeyProviderCode\":\"VCC_CUSTOMER_CURRENCY_KEYS\","

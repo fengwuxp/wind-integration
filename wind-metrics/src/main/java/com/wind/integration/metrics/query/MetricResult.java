@@ -1,7 +1,7 @@
 package com.wind.integration.metrics.query;
 
-import com.wind.integration.metrics.enums.MetricExecutionMode;
 import com.wind.integration.metrics.enums.MetricErrorCode;
+import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
@@ -18,7 +18,7 @@ import java.util.Map;
 import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
 
 /**
- * 指标查询结果及本次实际数据来源摘要。
+ * 指标查询结果及本次顶层查询模式与实际数据来源摘要。
  *
  * <p>{@code SCALAR} 使用 {@code valueType/value} 且 {@code fields} 为空；
  * {@code FIELD_SET} 只使用 {@code fields}。全量快照在根级返回覆盖范围，分段查询只在
@@ -26,7 +26,7 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  *
  * @param metricCode 对外查询的指标编码
  * @param definitionRevision 实际生效的指标定义修订号
- * @param executionMode 本次查询实际使用的数据来源模式
+ * @param executionMode 本次查询采用的顶层查询模式
  * @param routeMetricCode 单指标派生结果实际继承路由的指标编码；未继承时为空
  * @param routeDefinitionRevision 路由指标实际修订号；与 routeMetricCode 同时存在或同时为空
  * @param valueShape 指标值结构
@@ -49,7 +49,7 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  */
 public record MetricResult(String metricCode,
                            Integer definitionRevision,
-                           MetricExecutionMode executionMode,
+                           MetricQueryMode executionMode,
                            @Nullable String routeMetricCode,
                            @Nullable Integer routeDefinitionRevision,
                            MetricValueShape valueShape,
@@ -147,7 +147,7 @@ public record MetricResult(String metricCode,
         }
     }
 
-    private static void validateExecutionBranch(MetricExecutionMode executionMode,
+    private static void validateExecutionBranch(MetricQueryMode executionMode,
                                                 @Nullable SnapshotGranularity snapshotGranularity,
                                                 @Nullable LocalDateTime queryableStartTime,
                                                 @Nullable LocalDateTime watermarkTime,
@@ -155,14 +155,14 @@ public record MetricResult(String metricCode,
                                                 List<MetricSegmentResult> segments,
                                                 LocalDateTime startTime,
                                                 LocalDateTime endTime) {
-        if (executionMode == MetricExecutionMode.REALTIME) {
+        if (executionMode == MetricQueryMode.REALTIME) {
             if (snapshotGranularity != null || queryableStartTime != null || watermarkTime != null
                     || planCode != null || !segments.isEmpty()) {
                 throw error(MetricErrorCode.RESULT_INVALID, "", "REALTIME contains snapshot route fields");
             }
             return;
         }
-        if (executionMode == MetricExecutionMode.SNAPSHOT) {
+        if (executionMode == MetricQueryMode.SNAPSHOT) {
             if (snapshotGranularity == null || queryableStartTime == null || watermarkTime == null
                     || planCode == null || planCode.isBlank()) {
                 throw error(MetricErrorCode.RESULT_INVALID, "", "SNAPSHOT route fields are incomplete");

@@ -5,7 +5,7 @@ import org.jspecify.annotations.NonNull;
 import java.io.Serializable;
 
 /**
- * 支持租户隔离的对象
+ * 支持租户隔离的对象，多租户 SASS 系统
  *
  * @param <I> id 类型
  * @author wuxp

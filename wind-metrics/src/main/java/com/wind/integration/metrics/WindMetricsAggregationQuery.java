@@ -3,6 +3,7 @@ package com.wind.integration.metrics;
 import com.wind.common.enums.DescriptiveEnum;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.tag.WindTag;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -25,38 +26,45 @@ import java.util.Map;
 @Getter
 @EqualsAndHashCode
 @ToString
+@Schema(description = "指标聚合查询参数")
 public final class WindMetricsAggregationQuery {
 
     /**
      * 聚合维度 (业务对象)
      */
+    @Schema(description = "聚合维度（业务对象）")
     @NotNull
     private final String dimensions;
 
     /**
      * 聚合维度的标识
      */
+    @Schema(description = "聚合维度标识")
     @NotNull
     private final Object dimensionsId;
 
     /**
      * 查询标签
      */
+    @Schema(description = "查询标签")
     private final Collection<WindTag> searchTags;
 
     /**
      * 查询变量
      */
+    @Schema(description = "查询变量")
     private final Map<String, Object> queryVariables;
 
     /**
      * 搜索到最小创建时间
      */
+    @Schema(description = "创建时间下界")
     private final LocalDateTime minGmtCreate;
 
     /**
      * 搜索到最大创建时间
      */
+    @Schema(description = "创建时间上界")
     private final LocalDateTime maxGmtCreate;
 
     public static MetricsAggregationQueryBuilder newBuilder(@NotNull String dimensions, @NotNull Object dimensionsId) {

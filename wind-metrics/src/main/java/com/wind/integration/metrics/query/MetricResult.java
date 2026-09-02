@@ -6,6 +6,7 @@ import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
@@ -47,25 +48,27 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-public record MetricResult(String metricCode,
-                           Integer definitionRevision,
-                           MetricQueryMode executionMode,
-                           @Nullable String routeMetricCode,
-                           @Nullable Integer routeDefinitionRevision,
-                           MetricValueShape valueShape,
-                           @Nullable MetricValueType valueType,
-                           @Nullable Number value,
-                           Map<String, MetricFieldValue> fields,
-                           @Nullable String subjectId,
-                           LocalDateTime startTime,
-                           LocalDateTime endTime,
-                           LocalDateTime calculatedTime,
-                           ZoneId timeZone,
-                           @Nullable SnapshotGranularity snapshotGranularity,
-                           @Nullable LocalDateTime queryableStartTime,
-                           @Nullable LocalDateTime watermarkTime,
-                           @Nullable String planCode,
-                           List<MetricSegmentResult> segments) {
+@Schema(description = "指标查询结果及实际执行摘要")
+public record MetricResult(
+        @Schema(description = "对外查询的指标编码") String metricCode,
+        @Schema(description = "实际生效的指标定义修订号") Integer definitionRevision,
+        @Schema(description = "本次查询采用的顶层查询模式") MetricQueryMode executionMode,
+        @Nullable @Schema(description = "派生结果实际继承的指标编码") String routeMetricCode,
+        @Nullable @Schema(description = "路由指标实际修订号") Integer routeDefinitionRevision,
+        @Schema(description = "指标值结构") MetricValueShape valueShape,
+        @Nullable @Schema(description = "单值指标的数值类型；多字段指标为空") MetricValueType valueType,
+        @Nullable @Schema(description = "单值指标结果；SQL 正常空结果可以为空") Number value,
+        @Schema(description = "多字段指标结果；单值指标为空映射") Map<String, MetricFieldValue> fields,
+        @Nullable @Schema(description = "主体标识；全局指标为空") String subjectId,
+        @Schema(description = "查询开始时间，包含") LocalDateTime startTime,
+        @Schema(description = "查询结束时间，不包含") LocalDateTime endTime,
+        @Schema(description = "本次结果的计算完成时间") LocalDateTime calculatedTime,
+        @Schema(description = "时间字段解释所使用的时区") ZoneId timeZone,
+        @Nullable @Schema(description = "全量快照桶粒度；其他模式为空") SnapshotGranularity snapshotGranularity,
+        @Nullable @Schema(description = "全量快照连续可读区间下界；其他模式为空") LocalDateTime queryableStartTime,
+        @Nullable @Schema(description = "全量快照连续覆盖上界；其他模式为空") LocalDateTime watermarkTime,
+        @Nullable @Schema(description = "实际使用的物化计划编码；实时模式为空") String planCode,
+        @Schema(description = "分段模式实际执行的连续分段；其他模式为空列表") List<MetricSegmentResult> segments) {
 
     public MetricResult {
         if (metricCode == null || metricCode.isBlank()) {

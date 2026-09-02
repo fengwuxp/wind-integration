@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.dsl.materialization;
 
 import com.wind.integration.metrics.enums.MetricMergeState;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.Objects;
 
@@ -13,7 +14,10 @@ import java.util.Objects;
  * @author wuxp
  * @since 2026-07-28
  */
-public record MetricMaterializationMeasureDsl(String valueField, MetricMergeState mergeState) {
+@Schema(description = "联合物化依赖需要冻结的单个叶子度量")
+public record MetricMaterializationMeasureDsl(
+        @Schema(description = "依赖指标的值字段") String valueField,
+        @Schema(description = "跨分段合并状态") MetricMergeState mergeState) {
 
     public MetricMaterializationMeasureDsl {
         Objects.requireNonNull(valueField, "valueField must not be null");

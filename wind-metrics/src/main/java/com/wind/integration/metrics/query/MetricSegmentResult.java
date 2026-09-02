@@ -3,6 +3,7 @@ package com.wind.integration.metrics.query;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
@@ -26,14 +27,16 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-public record MetricSegmentResult(String segmentCode,
-                                  MetricSegmentSourceType sourceType,
-                                  LocalDateTime startTime,
-                                  LocalDateTime endTime,
-                                  @Nullable SnapshotGranularity snapshotGranularity,
-                                  @Nullable LocalDateTime queryableStartTime,
-                                  @Nullable LocalDateTime watermarkTime,
-                                  @Nullable LocalDateTime calculatedTime) {
+@Schema(description = "指标查询结果的连续时间分段摘要")
+public record MetricSegmentResult(
+        @Schema(description = "实际分段编码") String segmentCode,
+        @Schema(description = "分段实际数据来源") MetricSegmentSourceType sourceType,
+        @Schema(description = "分段开始时间，包含") LocalDateTime startTime,
+        @Schema(description = "分段结束时间，不包含") LocalDateTime endTime,
+        @Nullable @Schema(description = "快照桶粒度；实时分段为空") SnapshotGranularity snapshotGranularity,
+        @Nullable @Schema(description = "快照连续可读区间下界；实时分段为空") LocalDateTime queryableStartTime,
+        @Nullable @Schema(description = "快照连续覆盖上界；实时分段为空") LocalDateTime watermarkTime,
+        @Nullable @Schema(description = "实时计算完成时间；快照分段为空") LocalDateTime calculatedTime) {
 
     public MetricSegmentResult {
         if (segmentCode == null || segmentCode.isBlank()) {

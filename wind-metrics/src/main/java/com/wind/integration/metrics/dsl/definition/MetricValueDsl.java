@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.dsl.definition;
 
 import com.wind.integration.metrics.enums.MetricValueType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
 import java.math.RoundingMode;
@@ -23,12 +24,14 @@ import java.util.Objects;
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-public record MetricValueDsl(MetricValueType valueType,
-                             @Nullable Integer scale,
-                             @Nullable RoundingMode roundingMode,
-                             @Nullable MetricMeasureDsl measure,
-                             @Nullable MetricExpressionDsl expression,
-                             MetricOrElseDsl orElse) {
+@Schema(description = "单个指标值字段的类型、精度、计算来源和空结果规则")
+public record MetricValueDsl(
+        @Schema(description = "指标值类型") MetricValueType valueType,
+        @Nullable @Schema(description = "十进制结果保留位数；非十进制类型为空") Integer scale,
+        @Nullable @Schema(description = "十进制舍入方式；非十进制类型为空") RoundingMode roundingMode,
+        @Nullable @Schema(description = "事实聚合定义；派生计算时为空") MetricMeasureDsl measure,
+        @Nullable @Schema(description = "派生表达式；事实聚合时为空") MetricExpressionDsl expression,
+        @Schema(description = "SQL 正常空结果处理规则") MetricOrElseDsl orElse) {
 
     public MetricValueDsl {
         Objects.requireNonNull(valueType, "valueType must not be null");

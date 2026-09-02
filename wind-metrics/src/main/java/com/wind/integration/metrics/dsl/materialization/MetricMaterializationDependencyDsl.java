@@ -1,5 +1,7 @@
 package com.wind.integration.metrics.dsl.materialization;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.util.List;
 import java.util.Objects;
 
@@ -13,9 +15,11 @@ import java.util.Objects;
  * @author wuxp
  * @since 2026-07-28
  */
-public record MetricMaterializationDependencyDsl(String metricCode,
-                                                 Integer definitionRevision,
-                                                 List<MetricMaterializationMeasureDsl> measures) {
+@Schema(description = "服务端展开并冻结的叶子物化依赖")
+public record MetricMaterializationDependencyDsl(
+        @Schema(description = "叶子指标编码") String metricCode,
+        @Schema(description = "叶子指标定义修订号") Integer definitionRevision,
+        @Schema(description = "需要物化的值字段及合并状态") List<MetricMaterializationMeasureDsl> measures) {
 
     public MetricMaterializationDependencyDsl {
         Objects.requireNonNull(metricCode, "metricCode must not be null");

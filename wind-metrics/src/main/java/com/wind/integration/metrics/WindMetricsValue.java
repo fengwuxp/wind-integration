@@ -1,5 +1,6 @@
 package com.wind.integration.metrics;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -10,6 +11,7 @@ import jakarta.validation.constraints.NotNull;
  * @author wuxp
  * @date 2025-06-17 14:27
  **/
+@Schema(description = "指标名称和值的描述对象")
 public interface WindMetricsValue<V> {
 
     /**

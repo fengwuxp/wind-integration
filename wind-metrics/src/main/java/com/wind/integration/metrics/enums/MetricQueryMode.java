@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -15,10 +16,14 @@ import lombok.Getter;
  */
 @Getter
 @AllArgsConstructor
+@Schema(description = "指标由系统选定的顶层查询模式")
 public enum MetricQueryMode implements DescriptiveEnum {
 
+    @Schema(description = "实时查询")
     REALTIME("实时查询"),
+    @Schema(description = "快照查询")
     SNAPSHOT("快照查询"),
+    @Schema(description = "分段查询")
     SEGMENTED("分段查询");
 
     /** 枚举描述。 */

@@ -1,5 +1,6 @@
 package com.wind.integration.metrics.query;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
@@ -21,12 +22,14 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-public record MetricQuery(String metricCode,
-                          @Nullable String subjectId,
-                          LocalDateTime startTime,
-                          LocalDateTime endTime,
-                          Map<String, Object> dimensionValues,
-                          Map<String, Object> parameterValues) {
+@Schema(description = "单个指标的查询条件")
+public record MetricQuery(
+        @Schema(description = "指标编码") String metricCode,
+        @Nullable @Schema(description = "主体标识；全局指标查询为空") String subjectId,
+        @Schema(description = "查询开始时间，包含") LocalDateTime startTime,
+        @Schema(description = "查询结束时间，不包含") LocalDateTime endTime,
+        @Schema(description = "DSL 已声明维度的查询值") Map<String, Object> dimensionValues,
+        @Schema(description = "DSL 已声明整数参数的查询值") Map<String, Object> parameterValues) {
 
     public MetricQuery {
         if (metricCode == null || metricCode.isBlank()) {

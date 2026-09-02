@@ -1,5 +1,7 @@
 package com.wind.integration.metrics.dsl.filter;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 /**
  * 指标过滤条件中的布尔字面量。
  *
@@ -8,5 +10,7 @@ package com.wind.integration.metrics.dsl.filter;
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-public record BooleanMetricLiteralDsl(boolean value) implements MetricLiteralDsl {
+@Schema(description = "指标过滤条件中的布尔字面量")
+public record BooleanMetricLiteralDsl(
+        @Schema(description = "布尔值") boolean value) implements MetricLiteralDsl {
 }

@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.dsl.definition;
 
 import com.wind.integration.metrics.enums.MetricExpressionType;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.Objects;
 
@@ -15,7 +16,10 @@ import java.util.Objects;
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-public record MetricExpressionDsl(MetricExpressionType type, String value) {
+@Schema(description = "指标派生计算表达式")
+public record MetricExpressionDsl(
+        @Schema(description = "表达式语言类型") MetricExpressionType type,
+        @Schema(description = "表达式文本") String value) {
 
     public MetricExpressionDsl {
         Objects.requireNonNull(type, "type must not be null");

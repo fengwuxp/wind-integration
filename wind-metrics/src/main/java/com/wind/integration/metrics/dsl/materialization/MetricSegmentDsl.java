@@ -3,6 +3,7 @@ package com.wind.integration.metrics.dsl.materialization;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
@@ -18,10 +19,12 @@ import java.util.Objects;
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-public record MetricSegmentDsl(MetricSegmentCode segmentCode,
-                               MetricSegmentSourceType sourceType,
-                               @Nullable SnapshotGranularity snapshotGranularity,
-                               @Nullable String snapshotTargetCode) {
+@Schema(description = "逻辑物化计划中的单个时间分段")
+public record MetricSegmentDsl(
+        @Schema(description = "固定的 archive 或 recent 分段") MetricSegmentCode segmentCode,
+        @Schema(description = "分段数据来源") MetricSegmentSourceType sourceType,
+        @Nullable @Schema(description = "快照分段的桶粒度；实时分段为空") SnapshotGranularity snapshotGranularity,
+        @Nullable @Schema(description = "快照分段的逻辑目标编码；实时分段为空") String snapshotTargetCode) {
 
     public MetricSegmentDsl {
         Objects.requireNonNull(segmentCode, "segmentCode must not be null");

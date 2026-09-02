@@ -2,6 +2,7 @@ package com.wind.integration.metrics.dsl.definition;
 
 import com.wind.integration.metrics.dsl.filter.MetricNumericLiteralDsl;
 import com.wind.integration.metrics.enums.MetricOrElseMode;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
@@ -17,7 +18,10 @@ import java.util.Objects;
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-public record MetricOrElseDsl(MetricOrElseMode mode, @Nullable MetricNumericLiteralDsl value) {
+@Schema(description = "SQL 正常返回空结果时的显式取值规则")
+public record MetricOrElseDsl(
+        @Schema(description = "空结果处理方式") MetricOrElseMode mode,
+        @Nullable @Schema(description = "VALUE 模式的回退数值") MetricNumericLiteralDsl value) {
 
     public MetricOrElseDsl {
         Objects.requireNonNull(mode, "mode must not be null");

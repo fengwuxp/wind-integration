@@ -2,6 +2,7 @@ package com.wind.integration.metrics.dsl.materialization;
 
 import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
@@ -25,14 +26,16 @@ import java.util.Objects;
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-public record MetricMaterializationPlanDsl(Integer schemaVersion,
-                                           MetricQueryMode executionMode,
-                                           String snapshotKeyProviderCode,
-                                           List<MetricMaterializationDependencyDsl> dependencies,
-                                           @Nullable SnapshotGranularity snapshotGranularity,
-                                           @Nullable String snapshotTargetCode,
-                                           @Nullable String recentWindow,
-                                           List<MetricSegmentDsl> segments) {
+@Schema(description = "指标逻辑物化计划，不包含物理表或数据源绑定")
+public record MetricMaterializationPlanDsl(
+        @Schema(description = "Plan DSL 结构版本，当前只支持 1") Integer schemaVersion,
+        @Schema(description = "计划对应的顶层查询模式") MetricQueryMode executionMode,
+        @Schema(description = "快照主体与维度键枚举器编码") String snapshotKeyProviderCode,
+        @Schema(description = "服务端展开并冻结的叶子物化依赖") List<MetricMaterializationDependencyDsl> dependencies,
+        @Nullable @Schema(description = "全量快照桶粒度；分段模式为空") SnapshotGranularity snapshotGranularity,
+        @Nullable @Schema(description = "全量快照逻辑目标编码；分段模式为空") String snapshotTargetCode,
+        @Nullable @Schema(description = "分段模式近期窗口") String recentWindow,
+        @Schema(description = "分段模式固定的 archive、recent 两段") List<MetricSegmentDsl> segments) {
 
     public MetricMaterializationPlanDsl {
         Objects.requireNonNull(schemaVersion, "schemaVersion must not be null");

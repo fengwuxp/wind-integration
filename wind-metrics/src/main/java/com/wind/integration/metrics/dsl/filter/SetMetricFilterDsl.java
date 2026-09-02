@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.dsl.filter;
 
 import com.wind.integration.metrics.enums.MetricFilterOperator;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 import java.util.Objects;
@@ -15,9 +16,11 @@ import java.util.Objects;
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-public record SetMetricFilterDsl(MetricFilterOperator operator,
-                                 String fieldRef,
-                                 List<MetricLiteralDsl> values) implements MetricFilterDsl {
+@Schema(description = "单字段与一组字面量的集合比较过滤条件")
+public record SetMetricFilterDsl(
+        @Schema(description = "IN 或 NOT_IN 操作符") MetricFilterOperator operator,
+        @Schema(description = "事实字段引用") String fieldRef,
+        @Schema(description = "比较字面量集合") List<MetricLiteralDsl> values) implements MetricFilterDsl {
 
     public SetMetricFilterDsl {
         Objects.requireNonNull(operator, "operator must not be null");

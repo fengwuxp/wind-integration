@@ -40,16 +40,24 @@ import static com.wind.integration.metrics.dsl.MetricDslJson.string;
  */
 public final class MetricMaterializationPlanDslCodec {
 
-    /** 当前支持的 Plan DSL 结构版本。 */
+    /**
+     * 当前支持的 Plan DSL 结构版本。
+     */
     private static final int SCHEMA_VERSION = 1;
 
-    /** 快照键提供者和逻辑目标编码允许使用的格式。 */
+    /**
+     * 快照键提供者和逻辑目标编码允许使用的格式。
+     */
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z][A-Za-z0-9_]*");
 
-    /** 分段近期窗口支持的正数天或小时格式。 */
+    /**
+     * 分段近期窗口支持的正数天或小时格式。
+     */
     private static final Pattern RECENT_WINDOW = Pattern.compile("(?:P([0-9]+)D|PT([0-9]+)H)");
 
-    /** Plan DSL 根节点允许出现的字段。 */
+    /**
+     * Plan DSL 根节点允许出现的字段。
+     */
     private static final Set<String> ROOT_FIELDS = Set.of(
             "schemaVersion", "executionMode", "snapshotKeyProviderCode", "snapshotGranularity",
             "snapshotTargetCode", "recentWindow", "segments", "dependencies");
@@ -83,7 +91,7 @@ public final class MetricMaterializationPlanDslCodec {
                 MetricDslJson.optionalValue(root, "dependencies", "/dependencies"));
         SnapshotGranularity granularity = root.containsKey("snapshotGranularity")
                 ? MetricDslJson.enumValue(
-                        root.get("snapshotGranularity"), SnapshotGranularity.class, "/snapshotGranularity")
+                root.get("snapshotGranularity"), SnapshotGranularity.class, "/snapshotGranularity")
                 : null;
         String targetCode = optionalString(root, "snapshotTargetCode", "/snapshotTargetCode");
         String recentWindow = root.containsKey("recentWindow")
@@ -173,9 +181,6 @@ public final class MetricMaterializationPlanDslCodec {
             return List.of();
         }
         List<Object> source = MetricDslJson.array(value, "/dependencies");
-        if (source.isEmpty()) {
-            throw error(MetricErrorCode.DSL_PLAN_INVALID, "/dependencies", "dependencies must not be empty");
-        }
         List<MetricMaterializationDependencyDsl> result = new ArrayList<>(source.size());
         for (int index = 0; index < source.size(); index++) {
             String path = child("/dependencies", Integer.toString(index));
@@ -284,8 +289,8 @@ public final class MetricMaterializationPlanDslCodec {
                     required(segment, "sourceType", path), MetricSegmentSourceType.class, child(path, "sourceType"));
             SnapshotGranularity granularity = segment.containsKey("snapshotGranularity")
                     ? MetricDslJson.enumValue(
-                            segment.get("snapshotGranularity"), SnapshotGranularity.class,
-                            child(path, "snapshotGranularity"))
+                    segment.get("snapshotGranularity"), SnapshotGranularity.class,
+                    child(path, "snapshotGranularity"))
                     : null;
             String targetCode = optionalString(segment, "snapshotTargetCode", child(path, "snapshotTargetCode"));
             result.add(new MetricSegmentDsl(segmentCode, sourceType, granularity, targetCode));

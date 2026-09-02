@@ -339,8 +339,11 @@ class MetricMaterializationPlanDslCodecTests {
 
         Assertions.assertEquals(MetricErrorCode.DSL_FIELD_TYPE_INVALID, exception.errorCode());
         Assertions.assertEquals("/dependencies", exception.fieldPath());
+    }
 
-        assertInvalidPlan("""
+    @Test
+    void testNormalizeExplicitEmptyDependencies() {
+        MetricMaterializationPlanDsl plan = codec.parse("""
                 {
                   "schemaVersion": 1,
                   "executionMode": "SNAPSHOT",
@@ -349,26 +352,12 @@ class MetricMaterializationPlanDslCodecTests {
                   "snapshotGranularity": "DAY",
                   "snapshotTargetCode": "authValue"
                 }
-                """, "/dependencies");
-    }
+                """);
 
-    @Test
-    void testRejectExplicitEmptyDependencies() {
-        MetricValidationException exception = Assertions.assertThrows(
-                MetricValidationException.class,
-                () -> codec.parse("""
-                        {
-                          "schemaVersion": 1,
-                          "executionMode": "SNAPSHOT",
-                          "snapshotKeyProviderCode": "VCC_KEYS",
-                          "dependencies": [],
-                          "snapshotGranularity": "DAY",
-                          "snapshotTargetCode": "authValue"
-                        }
-                        """));
-
-        Assertions.assertEquals(MetricErrorCode.DSL_PLAN_INVALID, exception.errorCode());
-        Assertions.assertEquals("/dependencies", exception.fieldPath());
+        String canonical = codec.canonicalize(plan);
+        Assertions.assertTrue(plan.dependencies().isEmpty());
+        Assertions.assertFalse(canonical.contains("\"dependencies\""));
+        Assertions.assertEquals(plan, codec.parse(canonical));
     }
 
     @Test

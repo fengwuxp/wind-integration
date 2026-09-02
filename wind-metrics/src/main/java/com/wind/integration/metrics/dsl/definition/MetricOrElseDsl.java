@@ -1,6 +1,6 @@
 package com.wind.integration.metrics.dsl.definition;
 
-import com.wind.integration.metrics.dsl.filter.MetricNumericLiteralDsl;
+import com.wind.integration.metrics.dsl.literal.MetricNumericLiteralDsl;
 import com.wind.integration.metrics.enums.MetricOrElseMode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;

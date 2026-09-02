@@ -2,6 +2,7 @@ package com.wind.integration.metrics.query;
 
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricQueryMode;
+import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
@@ -206,15 +207,12 @@ public record MetricResult(
             if (!segment.startTime().equals(expectedStartTime)) {
                 throw error(MetricErrorCode.RESULT_INVALID, path + "/startTime", "Segment coverage is not continuous");
             }
-            if (!"archive".equals(segment.segmentCode()) && !"recent".equals(segment.segmentCode())) {
-                throw error(MetricErrorCode.RESULT_INVALID, path + "/segmentCode", "Unsupported segment code");
-            }
-            if ("archive".equals(segment.segmentCode())
+            if (segment.segmentCode() == MetricSegmentCode.ARCHIVE
                     && segment.sourceType() != MetricSegmentSourceType.SNAPSHOT) {
                 throw error(MetricErrorCode.RESULT_INVALID, path + "/sourceType", "Archive segment must use snapshot");
             }
-            if (index == 1 && (!"archive".equals(segments.getFirst().segmentCode())
-                    || !"recent".equals(segment.segmentCode()))) {
+            if (index == 1 && (segments.getFirst().segmentCode() != MetricSegmentCode.ARCHIVE
+                    || segment.segmentCode() != MetricSegmentCode.RECENT)) {
                 throw error(MetricErrorCode.RESULT_INVALID, "/segments", "Expected archive followed by recent");
             }
             expectedStartTime = segment.endTime();

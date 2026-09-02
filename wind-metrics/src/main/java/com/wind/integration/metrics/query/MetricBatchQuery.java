@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.query;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
@@ -25,7 +26,7 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  */
 @Schema(description = "批量指标查询条件")
 public record MetricBatchQuery(
-        @Schema(description = "指标编码列表，不能为空且不能重复") List<String> metricCodes,
+        @NonNull @Schema(description = "指标编码列表，不能为空且不能重复") List<String> metricCodes,
         @Nullable @Schema(description = "主体标识；全局指标查询为空") String subjectId,
         @Schema(description = "查询开始时间，包含") LocalDateTime startTime,
         @Schema(description = "查询结束时间，不包含") LocalDateTime endTime,

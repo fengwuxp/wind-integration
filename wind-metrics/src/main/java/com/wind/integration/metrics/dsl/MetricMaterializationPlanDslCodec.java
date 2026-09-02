@@ -12,6 +12,7 @@ import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.core.JsonParser;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -24,10 +25,10 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.child;
-import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.error;
-import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.required;
-import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.string;
+import static com.wind.integration.metrics.dsl.MetricDslJson.child;
+import static com.wind.integration.metrics.dsl.MetricDslJson.error;
+import static com.wind.integration.metrics.dsl.MetricDslJson.required;
+import static com.wind.integration.metrics.dsl.MetricDslJson.string;
 
 /**
  * 指标逻辑物化计划 v1 的关闭世界解析、基础校验与确定性规范化入口。
@@ -61,20 +62,27 @@ public final class MetricMaterializationPlanDslCodec {
      * @throws MetricValidationException JSON、字段或计划结构不符合 v1 契约时抛出
      */
     public MetricMaterializationPlanDsl parse(String json) {
-        Map<String, Object> root = MetricDslJsonSupport.parseRootObject(json);
-        int schemaVersion = MetricDslJsonSupport.integer(required(root, "schemaVersion", ""), "/schemaVersion");
+        return parse(MetricDslJson.parseRootObject(json));
+    }
+
+    MetricMaterializationPlanDsl parse(JsonParser parser) {
+        return parse(MetricDslJson.parseRootObject(parser));
+    }
+
+    private MetricMaterializationPlanDsl parse(Map<String, Object> root) {
+        int schemaVersion = MetricDslJson.integer(required(root, "schemaVersion", ""), "/schemaVersion");
         if (schemaVersion != SCHEMA_VERSION) {
             throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
-        MetricDslJsonSupport.rejectUnknown(root, "", ROOT_FIELDS);
-        MetricQueryMode executionMode = MetricDslJsonSupport.enumValue(
+        MetricDslJson.rejectUnknown(root, "", ROOT_FIELDS);
+        MetricQueryMode executionMode = MetricDslJson.enumValue(
                 required(root, "executionMode", ""), MetricQueryMode.class, "/executionMode");
         String keyProviderCode = string(
                 required(root, "snapshotKeyProviderCode", ""), "/snapshotKeyProviderCode");
         List<MetricMaterializationDependencyDsl> dependencies = parseDependencies(
-                MetricDslJsonSupport.optionalValue(root, "dependencies", "/dependencies"));
+                MetricDslJson.optionalValue(root, "dependencies", "/dependencies"));
         SnapshotGranularity granularity = root.containsKey("snapshotGranularity")
-                ? MetricDslJsonSupport.enumValue(
+                ? MetricDslJson.enumValue(
                         root.get("snapshotGranularity"), SnapshotGranularity.class, "/snapshotGranularity")
                 : null;
         String targetCode = optionalString(root, "snapshotTargetCode", "/snapshotTargetCode");
@@ -82,7 +90,7 @@ public final class MetricMaterializationPlanDslCodec {
                 ? normalizeRecentWindow(string(root.get("recentWindow"), "/recentWindow"))
                 : null;
         List<MetricSegmentDsl> segments = parseSegments(
-                MetricDslJsonSupport.optionalValue(root, "segments", "/segments"));
+                MetricDslJson.optionalValue(root, "segments", "/segments"));
         MetricMaterializationPlanDsl plan = new MetricMaterializationPlanDsl(
                 schemaVersion, executionMode, keyProviderCode, dependencies,
                 granularity, targetCode, recentWindow, segments);
@@ -157,26 +165,26 @@ public final class MetricMaterializationPlanDslCodec {
             result.put("recentWindow", normalizeRecentWindow(plan.recentWindow()));
             result.put("segments", plan.segments().stream().map(this::toCanonicalSegment).toList());
         }
-        return MetricDslJsonSupport.toJson(result);
+        return MetricDslJson.toJson(result);
     }
 
     private List<MetricMaterializationDependencyDsl> parseDependencies(@Nullable Object value) {
         if (value == null) {
             return List.of();
         }
-        List<Object> source = MetricDslJsonSupport.array(value, "/dependencies");
+        List<Object> source = MetricDslJson.array(value, "/dependencies");
         if (source.isEmpty()) {
             throw error(MetricErrorCode.DSL_PLAN_INVALID, "/dependencies", "dependencies must not be empty");
         }
         List<MetricMaterializationDependencyDsl> result = new ArrayList<>(source.size());
         for (int index = 0; index < source.size(); index++) {
             String path = child("/dependencies", Integer.toString(index));
-            Map<String, Object> dependency = MetricDslJsonSupport.object(source.get(index), path);
-            MetricDslJsonSupport.rejectUnknown(
+            Map<String, Object> dependency = MetricDslJson.object(source.get(index), path);
+            MetricDslJson.rejectUnknown(
                     dependency, path, Set.of("metricCode", "definitionRevision", "measures"));
             result.add(new MetricMaterializationDependencyDsl(
                     string(required(dependency, "metricCode", path), child(path, "metricCode")),
-                    MetricDslJsonSupport.integer(
+                    MetricDslJson.integer(
                             required(dependency, "definitionRevision", path), child(path, "definitionRevision")),
                     parseMeasures(required(dependency, "measures", path), child(path, "measures"))));
         }
@@ -184,15 +192,15 @@ public final class MetricMaterializationPlanDslCodec {
     }
 
     private List<MetricMaterializationMeasureDsl> parseMeasures(Object value, String path) {
-        List<Object> source = MetricDslJsonSupport.array(value, path);
+        List<Object> source = MetricDslJson.array(value, path);
         List<MetricMaterializationMeasureDsl> result = new ArrayList<>(source.size());
         for (int index = 0; index < source.size(); index++) {
             String measurePath = child(path, Integer.toString(index));
-            Map<String, Object> measure = MetricDslJsonSupport.object(source.get(index), measurePath);
-            MetricDslJsonSupport.rejectUnknown(measure, measurePath, Set.of("valueField", "mergeState"));
+            Map<String, Object> measure = MetricDslJson.object(source.get(index), measurePath);
+            MetricDslJson.rejectUnknown(measure, measurePath, Set.of("valueField", "mergeState"));
             result.add(new MetricMaterializationMeasureDsl(
                     string(required(measure, "valueField", measurePath), child(measurePath, "valueField")),
-                    MetricDslJsonSupport.enumValue(
+                    MetricDslJson.enumValue(
                             required(measure, "mergeState", measurePath),
                             MetricMergeState.class,
                             child(measurePath, "mergeState"))));
@@ -262,20 +270,20 @@ public final class MetricMaterializationPlanDslCodec {
         if (value == null) {
             return List.of();
         }
-        List<Object> source = MetricDslJsonSupport.array(value, "/segments");
+        List<Object> source = MetricDslJson.array(value, "/segments");
         List<MetricSegmentDsl> result = new ArrayList<>(source.size());
         for (int index = 0; index < source.size(); index++) {
             String path = child("/segments", Integer.toString(index));
-            Map<String, Object> segment = MetricDslJsonSupport.object(source.get(index), path);
-            MetricDslJsonSupport.rejectUnknown(segment, path, Set.of(
+            Map<String, Object> segment = MetricDslJson.object(source.get(index), path);
+            MetricDslJson.rejectUnknown(segment, path, Set.of(
                     "segmentCode", "sourceType", "snapshotGranularity", "snapshotTargetCode"));
             MetricSegmentCode segmentCode = parseSegmentCode(
                     string(required(segment, "segmentCode", path), child(path, "segmentCode")),
                     child(path, "segmentCode"));
-            MetricSegmentSourceType sourceType = MetricDslJsonSupport.enumValue(
+            MetricSegmentSourceType sourceType = MetricDslJson.enumValue(
                     required(segment, "sourceType", path), MetricSegmentSourceType.class, child(path, "sourceType"));
             SnapshotGranularity granularity = segment.containsKey("snapshotGranularity")
-                    ? MetricDslJsonSupport.enumValue(
+                    ? MetricDslJson.enumValue(
                             segment.get("snapshotGranularity"), SnapshotGranularity.class,
                             child(path, "snapshotGranularity"))
                     : null;
@@ -310,7 +318,7 @@ public final class MetricMaterializationPlanDslCodec {
 
     private Map<String, Object> toCanonicalSegment(MetricSegmentDsl segment) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("segmentCode", segment.segmentCode().name().toLowerCase());
+        result.put("segmentCode", segment.segmentCode().getCode());
         result.put("sourceType", segment.sourceType().name());
         if (segment.sourceType() == MetricSegmentSourceType.SNAPSHOT) {
             result.put("snapshotGranularity", segment.snapshotGranularity().name());
@@ -333,11 +341,11 @@ public final class MetricMaterializationPlanDslCodec {
     }
 
     private MetricSegmentCode parseSegmentCode(String value, String path) {
-        return switch (value) {
-            case "archive" -> MetricSegmentCode.ARCHIVE;
-            case "recent" -> MetricSegmentCode.RECENT;
-            default -> throw error(MetricErrorCode.DSL_PLAN_INVALID, path, "Unsupported segmentCode");
-        };
+        try {
+            return MetricSegmentCode.fromCode(value);
+        } catch (IllegalArgumentException exception) {
+            throw error(MetricErrorCode.DSL_PLAN_INVALID, path, "Unsupported segmentCode");
+        }
     }
 
     private @Nullable String optionalString(Map<String, Object> source, String field, String path) {

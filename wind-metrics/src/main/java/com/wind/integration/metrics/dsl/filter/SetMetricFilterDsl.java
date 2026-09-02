@@ -1,5 +1,6 @@
 package com.wind.integration.metrics.dsl.filter;
 
+import com.wind.integration.metrics.dsl.literal.MetricLiteralDsl;
 import com.wind.integration.metrics.enums.MetricFilterOperator;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -26,5 +27,11 @@ public record SetMetricFilterDsl(
         Objects.requireNonNull(operator, "operator must not be null");
         Objects.requireNonNull(fieldRef, "fieldRef must not be null");
         values = List.copyOf(values);
+        if (operator != MetricFilterOperator.IN && operator != MetricFilterOperator.NOT_IN) {
+            throw new IllegalArgumentException("Unsupported set operator: " + operator);
+        }
+        if (values.isEmpty()) {
+            throw new IllegalArgumentException("values must not be empty");
+        }
     }
 }

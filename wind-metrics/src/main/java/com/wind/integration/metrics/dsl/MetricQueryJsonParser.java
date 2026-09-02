@@ -5,7 +5,11 @@ import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.query.MetricBatchQuery;
 import com.wind.integration.metrics.query.MetricQuery;
 import com.wind.jackson.WindJson;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.deser.std.StdDeserializer;
 import tools.jackson.databind.ext.javatime.deser.LocalDateTimeDeserializer;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.module.SimpleModule;
@@ -14,6 +18,7 @@ import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -25,7 +30,7 @@ import java.util.Set;
  * @author wuxp
  * @date 2026-07-22 16:01
  */
-public final class MetricQueryJsonCodec {
+public final class MetricQueryJsonParser {
 
     /** 单指标查询允许出现的顶层字段。 */
     private static final Set<String> QUERY_FIELDS = Set.of(
@@ -35,7 +40,9 @@ public final class MetricQueryJsonCodec {
     private static final Set<String> BATCH_QUERY_FIELDS = Set.of(
             "metricCodes", "subjectId", "startTime", "endTime", "dimensionValues");
 
-    private static final JsonMapper QUERY_JSON_MAPPER = createQueryJsonMapper();
+    private static final JsonMapper QUERY_PAYLOAD_MAPPER = createQueryPayloadMapper();
+
+    private static final MetricQueryJsonParser INSTANCE = new MetricQueryJsonParser();
 
     /**
      * 解析单指标正式查询。
@@ -45,14 +52,28 @@ public final class MetricQueryJsonCodec {
      * @throws MetricValidationException JSON 或查询字段不符合公开合同时抛出
      */
     public MetricQuery parse(String json) {
-        Map<String, Object> source = MetricDslJsonSupport.parseRootObject(json);
+        return parse(MetricDslJson.parseRootObject(json));
+    }
+
+    private MetricQuery parse(JsonParser parser) {
+        return parse(MetricDslJson.parseRootObject(parser));
+    }
+
+    private MetricQuery parse(Map<String, Object> source) {
         rejectUnknownFields(source, QUERY_FIELDS);
         if (source.containsKey("parameterValues")) {
             validateParameterValues(source.get("parameterValues"));
         } else {
             source.put("parameterValues", Map.of());
         }
-        return deserialize(MetricDslJsonSupport.toJson(source), MetricQuery.class);
+        MetricQueryPayload payload = deserialize(MetricDslJson.toJson(source), MetricQueryPayload.class);
+        return new MetricQuery(
+                payload.metricCode(),
+                payload.subjectId(),
+                payload.startTime(),
+                payload.endTime(),
+                payload.dimensionValues(),
+                payload.parameterValues());
     }
 
     /**
@@ -63,9 +84,18 @@ public final class MetricQueryJsonCodec {
      * @throws MetricValidationException JSON 或查询字段不符合公开合同时抛出
      */
     public MetricBatchQuery parseBatch(String json) {
-        Map<String, Object> source = MetricDslJsonSupport.parseRootObject(json);
+        return parseBatch(MetricDslJson.parseRootObject(json));
+    }
+
+    private MetricBatchQuery parseBatch(Map<String, Object> source) {
         rejectUnknownFields(source, BATCH_QUERY_FIELDS);
-        return deserialize(MetricDslJsonSupport.toJson(source), MetricBatchQuery.class);
+        MetricBatchQueryPayload payload = deserialize(MetricDslJson.toJson(source), MetricBatchQueryPayload.class);
+        return new MetricBatchQuery(
+                payload.metricCodes(),
+                payload.subjectId(),
+                payload.startTime(),
+                payload.endTime(),
+                payload.dimensionValues());
     }
 
     private static void rejectUnknownFields(Map<String, Object> source, Set<String> allowedFields) {
@@ -73,7 +103,7 @@ public final class MetricQueryJsonCodec {
             if (!allowedFields.contains(field)) {
                 throw new MetricValidationException(
                         MetricErrorCode.QUERY_INVALID,
-                        MetricDslJsonSupport.child("", field),
+                        MetricDslJson.child("", field),
                         "Unknown query field");
             }
         }
@@ -87,7 +117,7 @@ public final class MetricQueryJsonCodec {
             String fieldName = name instanceof String text ? text : "";
             String path = fieldName.isBlank()
                     ? "/parameterValues"
-                    : MetricDslJsonSupport.child("/parameterValues", fieldName);
+                    : MetricDslJson.child("/parameterValues", fieldName);
             if (fieldName.isBlank()
                     || !(parameter instanceof BigInteger integer)
                     || integer.compareTo(BigInteger.valueOf(Integer.MIN_VALUE)) < 0
@@ -106,7 +136,7 @@ public final class MetricQueryJsonCodec {
 
     private static <T> T deserialize(String json, Class<T> type) {
         try {
-            return QUERY_JSON_MAPPER.readValue(json, type);
+            return QUERY_PAYLOAD_MAPPER.readValue(json, type);
         } catch (MetricValidationException exception) {
             throw exception;
         } catch (JacksonException exception) {
@@ -119,7 +149,7 @@ public final class MetricQueryJsonCodec {
         }
     }
 
-    private static JsonMapper createQueryJsonMapper() {
+    private static JsonMapper createQueryPayloadMapper() {
         DateTimeFormatter spaceSeparatedDateTime = new DateTimeFormatterBuilder()
                 .append(DateTimeFormatter.ISO_LOCAL_DATE)
                 .appendLiteral(' ')
@@ -132,5 +162,39 @@ public final class MetricQueryJsonCodec {
         SimpleModule module = new SimpleModule("MetricQueryJavaTimeModule");
         module.addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(queryDateTime));
         return WindJson.getJsonMapper().rebuild().addModule(module).build();
+    }
+
+    /** 单指标查询的 Jackson 反序列化器。 */
+    public static final class QueryDeserializer extends StdDeserializer<MetricQuery> {
+
+        /** 创建反序列化器。 */
+        public QueryDeserializer() {
+            super(MetricQuery.class);
+        }
+
+        @Override
+        public MetricQuery deserialize(JsonParser parser, DeserializationContext context) throws JacksonException {
+            return INSTANCE.parse(parser);
+        }
+
+        @Override
+        public MetricQuery getNullValue(DeserializationContext context) {
+            throw new MetricValidationException(MetricErrorCode.QUERY_INVALID, "", "Query JSON must not be null");
+        }
+    }
+
+    private record MetricQueryPayload(String metricCode,
+                                      @Nullable String subjectId,
+                                      LocalDateTime startTime,
+                                      LocalDateTime endTime,
+                                      Map<String, Object> dimensionValues,
+                                      Map<String, Object> parameterValues) {
+    }
+
+    private record MetricBatchQueryPayload(List<String> metricCodes,
+                                           @Nullable String subjectId,
+                                           LocalDateTime startTime,
+                                           LocalDateTime endTime,
+                                           Map<String, Object> dimensionValues) {
     }
 }

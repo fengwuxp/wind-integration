@@ -1,5 +1,6 @@
 package com.wind.integration.metrics.dsl.filter;
 
+import com.wind.integration.metrics.dsl.literal.MetricLiteralDsl;
 import com.wind.integration.metrics.enums.MetricFilterOperator;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -25,5 +26,10 @@ public record ComparisonMetricFilterDsl(
         Objects.requireNonNull(operator, "operator must not be null");
         Objects.requireNonNull(fieldRef, "fieldRef must not be null");
         Objects.requireNonNull(value, "value must not be null");
+        switch (operator) {
+            case EQ, NE, GT, GE, LT, LE -> {
+            }
+            default -> throw new IllegalArgumentException("Unsupported comparison operator: " + operator);
+        }
     }
 }

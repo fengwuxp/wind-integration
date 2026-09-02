@@ -23,5 +23,11 @@ public record LogicalMetricFilterDsl(
     public LogicalMetricFilterDsl {
         Objects.requireNonNull(operator, "operator must not be null");
         operands = List.copyOf(operands);
+        if (operator != MetricFilterOperator.AND && operator != MetricFilterOperator.OR) {
+            throw new IllegalArgumentException("Unsupported logical operator: " + operator);
+        }
+        if (operands.size() < 2) {
+            throw new IllegalArgumentException("operands must contain at least two filters");
+        }
     }
 }

@@ -22,5 +22,8 @@ public record NullMetricFilterDsl(
     public NullMetricFilterDsl {
         Objects.requireNonNull(operator, "operator must not be null");
         Objects.requireNonNull(fieldRef, "fieldRef must not be null");
+        if (operator != MetricFilterOperator.IS_NULL && operator != MetricFilterOperator.IS_NOT_NULL) {
+            throw new IllegalArgumentException("Unsupported null operator: " + operator);
+        }
     }
 }

@@ -15,17 +15,17 @@ import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
 import com.wind.integration.metrics.dsl.definition.selection.MetricLimitDsl;
 import com.wind.integration.metrics.dsl.definition.selection.MetricOrderByDsl;
 import com.wind.integration.metrics.dsl.definition.selection.MetricRowSelectionDsl;
-import com.wind.integration.metrics.dsl.filter.BooleanMetricLiteralDsl;
+import com.wind.integration.metrics.dsl.literal.BooleanMetricLiteralDsl;
 import com.wind.integration.metrics.dsl.filter.ComparisonMetricFilterDsl;
-import com.wind.integration.metrics.dsl.filter.DecimalMetricLiteralDsl;
-import com.wind.integration.metrics.dsl.filter.IntegralMetricLiteralDsl;
+import com.wind.integration.metrics.dsl.literal.DecimalMetricLiteralDsl;
+import com.wind.integration.metrics.dsl.literal.IntegralMetricLiteralDsl;
 import com.wind.integration.metrics.dsl.filter.LogicalMetricFilterDsl;
 import com.wind.integration.metrics.dsl.filter.MetricFilterDsl;
-import com.wind.integration.metrics.dsl.filter.MetricLiteralDsl;
-import com.wind.integration.metrics.dsl.filter.MetricNumericLiteralDsl;
+import com.wind.integration.metrics.dsl.literal.MetricLiteralDsl;
+import com.wind.integration.metrics.dsl.literal.MetricNumericLiteralDsl;
 import com.wind.integration.metrics.dsl.filter.NullMetricFilterDsl;
 import com.wind.integration.metrics.dsl.filter.SetMetricFilterDsl;
-import com.wind.integration.metrics.dsl.filter.StringMetricLiteralDsl;
+import com.wind.integration.metrics.dsl.literal.StringMetricLiteralDsl;
 import com.wind.integration.metrics.enums.MetricAggregation;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricExpressionType;
@@ -37,6 +37,7 @@ import com.wind.integration.metrics.enums.MetricSortDirection;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.core.JsonParser;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -51,10 +52,10 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
-import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.child;
-import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.error;
-import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.required;
-import static com.wind.integration.metrics.dsl.MetricDslJsonSupport.string;
+import static com.wind.integration.metrics.dsl.MetricDslJson.child;
+import static com.wind.integration.metrics.dsl.MetricDslJson.error;
+import static com.wind.integration.metrics.dsl.MetricDslJson.required;
+import static com.wind.integration.metrics.dsl.MetricDslJson.string;
 
 /**
  * 指标 Definition DSL 的关闭世界解析、基础校验与确定性规范化入口。
@@ -97,15 +98,22 @@ public final class MetricDefinitionDslCodec {
      * @throws MetricValidationException JSON、字段或指标结构不符合 v1 契约时抛出
      */
     public MetricDefinitionDsl parse(String json) {
-        Map<String, Object> root = MetricDslJsonSupport.parseRootObject(json);
-        int schemaVersion = MetricDslJsonSupport.integer(required(root, "schemaVersion", ""), "/schemaVersion");
+        return parse(MetricDslJson.parseRootObject(json));
+    }
+
+    MetricDefinitionDsl parse(JsonParser parser) {
+        return parse(MetricDslJson.parseRootObject(parser));
+    }
+
+    private MetricDefinitionDsl parse(Map<String, Object> root) {
+        int schemaVersion = MetricDslJson.integer(required(root, "schemaVersion", ""), "/schemaVersion");
         if (schemaVersion != SCHEMA_VERSION) {
             throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
-        MetricDslJsonSupport.rejectUnknown(root, "", ROOT_FIELDS);
+        MetricDslJson.rejectUnknown(root, "", ROOT_FIELDS);
         MetricDefinitionDsl definition = new MetricDefinitionDsl(
                 schemaVersion,
-                parseMetric(MetricDslJsonSupport.object(required(root, "metric", ""), "/metric")));
+                parseMetric(MetricDslJson.object(required(root, "metric", ""), "/metric")));
         validateBasic(definition);
         return definition;
     }
@@ -217,35 +225,35 @@ public final class MetricDefinitionDslCodec {
      */
     public String canonicalize(MetricDefinitionDsl definition) {
         validateBasic(definition);
-        return MetricDslJsonSupport.toJson(toCanonicalMap(definition));
+        return MetricDslJson.toJson(toCanonicalMap(definition));
     }
 
     private MetricDefinitionSpec parseMetric(Map<String, Object> source) {
-        MetricDslJsonSupport.rejectUnknown(source, "/metric", METRIC_FIELDS);
+        MetricDslJson.rejectUnknown(source, "/metric", METRIC_FIELDS);
         String code = string(required(source, "code", "/metric"), "/metric/code");
-        MetricValueShape valueShape = MetricDslJsonSupport.enumValue(
+        MetricValueShape valueShape = MetricDslJson.enumValue(
                 required(source, "valueShape", "/metric"), MetricValueShape.class, "/metric/valueShape");
         String fact = optionalString(source, "fact", "/metric/fact");
         List<MetricJoinDsl> joins = parseJoins(
-                MetricDslJsonSupport.optionalValue(source, "joins", "/metric/joins"));
-        MetricSubjectDsl subject = parseSubject(MetricDslJsonSupport.object(
+                MetricDslJson.optionalValue(source, "joins", "/metric/joins"));
+        MetricSubjectDsl subject = parseSubject(MetricDslJson.object(
                 required(source, "subject", "/metric"), "/metric/subject"));
         MetricTimeDsl time = source.containsKey("time")
-                ? parseTime(MetricDslJsonSupport.object(source.get("time"), "/metric/time"))
+                ? parseTime(MetricDslJson.object(source.get("time"), "/metric/time"))
                 : null;
         List<String> dimensions = parseStringList(
                 required(source, "dimensions", "/metric"), "/metric/dimensions", false);
         dimensions = dimensions.stream().sorted().toList();
         Map<String, MetricQueryParameterDefinitionDsl> parameters = parseParameters(
-                MetricDslJsonSupport.optionalValue(source, "parameters", "/metric/parameters"));
+                MetricDslJson.optionalValue(source, "parameters", "/metric/parameters"));
         MetricRowSelectionDsl rowSelection = source.containsKey("rowSelection")
-                ? parseRowSelection(MetricDslJsonSupport.object(source.get("rowSelection"), "/metric/rowSelection"))
+                ? parseRowSelection(MetricDslJson.object(source.get("rowSelection"), "/metric/rowSelection"))
                 : null;
         MetricValueDsl value = source.containsKey("value")
-                ? parseValue(MetricDslJsonSupport.object(source.get("value"), "/metric/value"), "/metric/value")
+                ? parseValue(MetricDslJson.object(source.get("value"), "/metric/value"), "/metric/value")
                 : null;
         Map<String, MetricValueDsl> fields = parseFields(
-                MetricDslJsonSupport.optionalValue(source, "fields", "/metric/fields"));
+                MetricDslJson.optionalValue(source, "fields", "/metric/fields"));
         return new MetricDefinitionSpec(
                 code, valueShape, fact, joins, subject, time, dimensions, parameters, rowSelection, value, fields);
     }
@@ -254,7 +262,7 @@ public final class MetricDefinitionDslCodec {
         if (value == null) {
             return Map.of();
         }
-        Map<String, Object> source = MetricDslJsonSupport.object(value, "/metric/parameters");
+        Map<String, Object> source = MetricDslJson.object(value, "/metric/parameters");
         if (source.isEmpty()) {
             throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/parameters", "Parameters must not be empty");
         }
@@ -262,30 +270,30 @@ public final class MetricDefinitionDslCodec {
         source.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
             String path = child("/metric/parameters", entry.getKey());
             validateIdentifier(entry.getKey(), 64, path);
-            Map<String, Object> parameter = MetricDslJsonSupport.object(entry.getValue(), path);
-            MetricDslJsonSupport.rejectUnknown(parameter, path, Set.of("valueType", "minimum", "maximum"));
+            Map<String, Object> parameter = MetricDslJson.object(entry.getValue(), path);
+            MetricDslJson.rejectUnknown(parameter, path, Set.of("valueType", "minimum", "maximum"));
             result.put(entry.getKey(), new MetricQueryParameterDefinitionDsl(
-                    MetricDslJsonSupport.enumValue(
+                    MetricDslJson.enumValue(
                             required(parameter, "valueType", path),
                             MetricValueType.class,
                             child(path, "valueType")),
-                    MetricDslJsonSupport.integer(required(parameter, "minimum", path), child(path, "minimum")),
-                    MetricDslJsonSupport.integer(required(parameter, "maximum", path), child(path, "maximum"))));
+                    MetricDslJson.integer(required(parameter, "minimum", path), child(path, "minimum")),
+                    MetricDslJson.integer(required(parameter, "maximum", path), child(path, "maximum"))));
         });
         return result;
     }
 
     private MetricRowSelectionDsl parseRowSelection(Map<String, Object> source) {
         String path = "/metric/rowSelection";
-        MetricDslJsonSupport.rejectUnknown(source, path, Set.of("filter", "orderBy", "limit"));
+        MetricDslJson.rejectUnknown(source, path, Set.of("filter", "orderBy", "limit"));
         MetricFilterDsl filter = source.containsKey("filter")
-                ? parseFilter(MetricDslJsonSupport.object(source.get("filter"), child(path, "filter")), child(path, "filter"))
+                ? parseFilter(MetricDslJson.object(source.get("filter"), child(path, "filter")), child(path, "filter"))
                 : null;
         List<MetricOrderByDsl> orderBy = parseOrderBy(
-                MetricDslJsonSupport.array(required(source, "orderBy", path), child(path, "orderBy")),
+                MetricDslJson.array(required(source, "orderBy", path), child(path, "orderBy")),
                 child(path, "orderBy"));
         MetricLimitDsl limit = parseLimit(
-                MetricDslJsonSupport.object(required(source, "limit", path), child(path, "limit")),
+                MetricDslJson.object(required(source, "limit", path), child(path, "limit")),
                 child(path, "limit"));
         return new MetricRowSelectionDsl(filter, orderBy, limit);
     }
@@ -298,15 +306,15 @@ public final class MetricDefinitionDslCodec {
         Set<String> fields = new LinkedHashSet<>();
         for (int index = 0; index < source.size(); index++) {
             String itemPath = child(path, Integer.toString(index));
-            Map<String, Object> item = MetricDslJsonSupport.object(source.get(index), itemPath);
-            MetricDslJsonSupport.rejectUnknown(item, itemPath, Set.of("field", "direction"));
+            Map<String, Object> item = MetricDslJson.object(source.get(index), itemPath);
+            MetricDslJson.rejectUnknown(item, itemPath, Set.of("field", "direction"));
             String field = string(required(item, "field", itemPath), child(itemPath, "field"));
             if (!fields.add(field)) {
                 throw error(MetricErrorCode.METRIC_ROW_SELECTION_INVALID, path, "orderBy fields must be unique");
             }
             result.add(new MetricOrderByDsl(
                     field,
-                    MetricDslJsonSupport.enumValue(
+                    MetricDslJson.enumValue(
                             required(item, "direction", itemPath),
                             MetricSortDirection.class,
                             child(itemPath, "direction"))));
@@ -315,7 +323,7 @@ public final class MetricDefinitionDslCodec {
     }
 
     private MetricLimitDsl parseLimit(Map<String, Object> source, String path) {
-        MetricDslJsonSupport.rejectUnknown(source, path, Set.of("value", "parameter"));
+        MetricDslJson.rejectUnknown(source, path, Set.of("value", "parameter"));
         boolean hasValue = source.containsKey("value");
         boolean hasParameter = source.containsKey("parameter");
         if (hasValue == hasParameter) {
@@ -323,20 +331,20 @@ public final class MetricDefinitionDslCodec {
         }
         if (hasValue) {
             return new MetricLimitDsl(
-                    MetricDslJsonSupport.integer(source.get("value"), child(path, "value")), null);
+                    MetricDslJson.integer(source.get("value"), child(path, "value")), null);
         }
         return new MetricLimitDsl(null, string(source.get("parameter"), child(path, "parameter")));
     }
 
     private MetricSubjectDsl parseSubject(Map<String, Object> source) {
-        MetricDslJsonSupport.rejectUnknown(source, "/metric/subject", Set.of("type", "field"));
+        MetricDslJson.rejectUnknown(source, "/metric/subject", Set.of("type", "field"));
         return new MetricSubjectDsl(
                 string(required(source, "type", "/metric/subject"), "/metric/subject/type"),
                 optionalString(source, "field", "/metric/subject/field"));
     }
 
     private MetricTimeDsl parseTime(Map<String, Object> source) {
-        MetricDslJsonSupport.rejectUnknown(source, "/metric/time", Set.of("field"));
+        MetricDslJson.rejectUnknown(source, "/metric/time", Set.of("field"));
         return new MetricTimeDsl(string(required(source, "field", "/metric/time"), "/metric/time/field"));
     }
 
@@ -344,24 +352,24 @@ public final class MetricDefinitionDslCodec {
         if (value == null) {
             return List.of();
         }
-        List<Object> source = MetricDslJsonSupport.array(value, "/metric/joins");
+        List<Object> source = MetricDslJson.array(value, "/metric/joins");
         if (source.isEmpty() || source.size() > 2) {
             throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/joins", "Joins must contain one or two items");
         }
         List<MetricJoinDsl> result = new ArrayList<>(source.size());
         for (int index = 0; index < source.size(); index++) {
             String path = child("/metric/joins", Integer.toString(index));
-            Map<String, Object> join = MetricDslJsonSupport.object(source.get(index), path);
-            MetricDslJsonSupport.rejectUnknown(join, path, Set.of("alias", "fact", "joinType", "cardinality", "on"));
-            List<Object> onSource = MetricDslJsonSupport.array(required(join, "on", path), child(path, "on"));
+            Map<String, Object> join = MetricDslJson.object(source.get(index), path);
+            MetricDslJson.rejectUnknown(join, path, Set.of("alias", "fact", "joinType", "cardinality", "on"));
+            List<Object> onSource = MetricDslJson.array(required(join, "on", path), child(path, "on"));
             if (onSource.isEmpty()) {
                 throw error(MetricErrorCode.DSL_VALUE_INVALID, child(path, "on"), "Join keys must not be empty");
             }
             List<MetricJoinOnDsl> on = new ArrayList<>(onSource.size());
             for (int onIndex = 0; onIndex < onSource.size(); onIndex++) {
                 String onPath = child(child(path, "on"), Integer.toString(onIndex));
-                Map<String, Object> item = MetricDslJsonSupport.object(onSource.get(onIndex), onPath);
-                MetricDslJsonSupport.rejectUnknown(item, onPath, Set.of("primaryField", "joinField"));
+                Map<String, Object> item = MetricDslJson.object(onSource.get(onIndex), onPath);
+                MetricDslJson.rejectUnknown(item, onPath, Set.of("primaryField", "joinField"));
                 on.add(new MetricJoinOnDsl(
                         string(required(item, "primaryField", onPath), child(onPath, "primaryField")),
                         string(required(item, "joinField", onPath), child(onPath, "joinField"))));
@@ -369,9 +377,9 @@ public final class MetricDefinitionDslCodec {
             result.add(new MetricJoinDsl(
                     string(required(join, "alias", path), child(path, "alias")),
                     string(required(join, "fact", path), child(path, "fact")),
-                    MetricDslJsonSupport.enumValue(
+                    MetricDslJson.enumValue(
                             required(join, "joinType", path), MetricJoinType.class, child(path, "joinType")),
-                    MetricDslJsonSupport.enumValue(
+                    MetricDslJson.enumValue(
                             required(join, "cardinality", path),
                             MetricJoinCardinality.class,
                             child(path, "cardinality")),
@@ -384,7 +392,7 @@ public final class MetricDefinitionDslCodec {
         if (value == null) {
             return Map.of();
         }
-        Map<String, Object> source = MetricDslJsonSupport.object(value, "/metric/fields");
+        Map<String, Object> source = MetricDslJson.object(value, "/metric/fields");
         if (source.isEmpty()) {
             throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/fields", "fields must not be empty");
         }
@@ -392,27 +400,27 @@ public final class MetricDefinitionDslCodec {
         source.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
             String path = child("/metric/fields", entry.getKey());
             validateIdentifier(entry.getKey(), 64, path);
-            result.put(entry.getKey(), parseValue(MetricDslJsonSupport.object(entry.getValue(), path), path));
+            result.put(entry.getKey(), parseValue(MetricDslJson.object(entry.getValue(), path), path));
         });
         return result;
     }
 
     private MetricValueDsl parseValue(Map<String, Object> source, String path) {
-        MetricDslJsonSupport.rejectUnknown(
+        MetricDslJson.rejectUnknown(
                 source, path, Set.of("valueType", "scale", "roundingMode", "measure", "expression", "orElse"));
-        MetricValueType valueType = MetricDslJsonSupport.enumValue(
+        MetricValueType valueType = MetricDslJson.enumValue(
                 required(source, "valueType", path), MetricValueType.class, child(path, "valueType"));
         Integer scale = null;
         RoundingMode roundingMode = null;
         if (valueType == MetricValueType.DECIMAL) {
             scale = source.containsKey("scale")
-                    ? MetricDslJsonSupport.integer(source.get("scale"), child(path, "scale"))
+                    ? MetricDslJson.integer(source.get("scale"), child(path, "scale"))
                     : 4;
             if (scale < 4 || scale > 6) {
                 throw error(MetricErrorCode.DSL_VALUE_INVALID, child(path, "scale"), "Scale must be between 4 and 6");
             }
             roundingMode = source.containsKey("roundingMode")
-                    ? MetricDslJsonSupport.enumValue(
+                    ? MetricDslJson.enumValue(
                             source.get("roundingMode"), RoundingMode.class, child(path, "roundingMode"))
                     : RoundingMode.HALF_UP;
             if (roundingMode != RoundingMode.HALF_UP) {
@@ -431,23 +439,23 @@ public final class MetricDefinitionDslCodec {
         }
         MetricMeasureDsl measure = hasMeasure
                 ? parseMeasure(
-                        MetricDslJsonSupport.object(source.get("measure"), child(path, "measure")),
+                        MetricDslJson.object(source.get("measure"), child(path, "measure")),
                         child(path, "measure"))
                 : null;
         MetricExpressionDsl expression = hasExpression
-                ? parseExpression(MetricDslJsonSupport.object(
+                ? parseExpression(MetricDslJson.object(
                         source.get("expression"), child(path, "expression")), child(path, "expression"))
                 : null;
         MetricOrElseDsl orElse = source.containsKey("orElse")
-                ? parseOrElse(MetricDslJsonSupport.object(
+                ? parseOrElse(MetricDslJson.object(
                         source.get("orElse"), child(path, "orElse")), child(path, "orElse"))
                 : new MetricOrElseDsl(MetricOrElseMode.NULL, null);
         return new MetricValueDsl(valueType, scale, roundingMode, measure, expression, orElse);
     }
 
     private MetricMeasureDsl parseMeasure(Map<String, Object> source, String path) {
-        MetricDslJsonSupport.rejectUnknown(source, path, Set.of("aggregation", "field", "filter"));
-        MetricAggregation aggregation = MetricDslJsonSupport.enumValue(
+        MetricDslJson.rejectUnknown(source, path, Set.of("aggregation", "field", "filter"));
+        MetricAggregation aggregation = MetricDslJson.enumValue(
                 required(source, "aggregation", path), MetricAggregation.class, child(path, "aggregation"));
         String field = optionalString(source, "field", child(path, "field"));
         if (aggregation == MetricAggregation.COUNT && field != null) {
@@ -458,23 +466,23 @@ public final class MetricDefinitionDslCodec {
         }
         MetricFilterDsl filter = source.containsKey("filter")
                 ? parseFilter(
-                        MetricDslJsonSupport.object(source.get("filter"), child(path, "filter")),
+                        MetricDslJson.object(source.get("filter"), child(path, "filter")),
                         child(path, "filter"))
                 : null;
         return new MetricMeasureDsl(aggregation, field, filter);
     }
 
     private MetricExpressionDsl parseExpression(Map<String, Object> source, String path) {
-        MetricDslJsonSupport.rejectUnknown(source, path, Set.of("type", "value"));
+        MetricDslJson.rejectUnknown(source, path, Set.of("type", "value"));
         return new MetricExpressionDsl(
-                MetricDslJsonSupport.enumValue(
+                MetricDslJson.enumValue(
                         required(source, "type", path), MetricExpressionType.class, child(path, "type")),
                 string(required(source, "value", path), child(path, "value")));
     }
 
     private MetricOrElseDsl parseOrElse(Map<String, Object> source, String path) {
-        MetricDslJsonSupport.rejectUnknown(source, path, Set.of("mode", "value"));
-        MetricOrElseMode mode = MetricDslJsonSupport.enumValue(
+        MetricDslJson.rejectUnknown(source, path, Set.of("mode", "value"));
+        MetricOrElseMode mode = MetricDslJson.enumValue(
                 required(source, "mode", path), MetricOrElseMode.class, child(path, "mode"));
         if (mode == MetricOrElseMode.VALUE) {
             return new MetricOrElseDsl(
@@ -516,7 +524,7 @@ public final class MetricDefinitionDslCodec {
 
     private ComparisonMetricFilterDsl parseComparison(MetricFilterOperator operator, Object value, String path) {
         String operatorPath = child(path, operatorName(operator));
-        Map.Entry<String, Object> entry = singleEntry(MetricDslJsonSupport.object(value, operatorPath), operatorPath);
+        Map.Entry<String, Object> entry = singleEntry(MetricDslJson.object(value, operatorPath), operatorPath);
         return new ComparisonMetricFilterDsl(
                 operator,
                 entry.getKey(),
@@ -525,8 +533,8 @@ public final class MetricDefinitionDslCodec {
 
     private SetMetricFilterDsl parseSet(MetricFilterOperator operator, Object value, String path) {
         String operatorPath = child(path, operatorName(operator));
-        Map.Entry<String, Object> entry = singleEntry(MetricDslJsonSupport.object(value, operatorPath), operatorPath);
-        List<Object> source = MetricDslJsonSupport.array(entry.getValue(), child(operatorPath, entry.getKey()));
+        Map.Entry<String, Object> entry = singleEntry(MetricDslJson.object(value, operatorPath), operatorPath);
+        List<Object> source = MetricDslJson.array(entry.getValue(), child(operatorPath, entry.getKey()));
         if (source.isEmpty()) {
             throw error(
                     MetricErrorCode.DSL_VALUE_INVALID,
@@ -543,7 +551,7 @@ public final class MetricDefinitionDslCodec {
 
     private LogicalMetricFilterDsl parseLogical(MetricFilterOperator operator, Object value, String path) {
         String operatorPath = child(path, operatorName(operator));
-        List<Object> source = MetricDslJsonSupport.array(value, operatorPath);
+        List<Object> source = MetricDslJson.array(value, operatorPath);
         if (source.size() < 2) {
             throw error(
                     MetricErrorCode.DSL_VALUE_INVALID,
@@ -553,7 +561,7 @@ public final class MetricDefinitionDslCodec {
         List<MetricFilterDsl> operands = new ArrayList<>(source.size());
         for (int index = 0; index < source.size(); index++) {
             String operandPath = child(operatorPath, Integer.toString(index));
-            operands.add(parseFilter(MetricDslJsonSupport.object(source.get(index), operandPath), operandPath));
+            operands.add(parseFilter(MetricDslJson.object(source.get(index), operandPath), operandPath));
         }
         return new LogicalMetricFilterDsl(operator, operands);
     }
@@ -984,7 +992,7 @@ public final class MetricDefinitionDslCodec {
             Map<String, Object> valuesByCanonicalJson = new TreeMap<>();
             set.values().forEach(literal -> {
                 Object value = literalValue(literal);
-                valuesByCanonicalJson.put(MetricDslJsonSupport.toJson(value), value);
+                valuesByCanonicalJson.put(MetricDslJson.toJson(value), value);
             });
             List<Object> values = List.copyOf(valuesByCanonicalJson.values());
             return Map.of(operatorName(set.operator()), Map.of(set.fieldRef(), values));
@@ -995,7 +1003,7 @@ public final class MetricDefinitionDslCodec {
         LogicalMetricFilterDsl logical = (LogicalMetricFilterDsl) filter;
         List<Map<String, Object>> operands = logical.operands().stream()
                 .map(this::toCanonicalFilter)
-                .sorted(Comparator.comparing(MetricDslJsonSupport::toJson))
+                .sorted(Comparator.comparing(MetricDslJson::toJson))
                 .toList();
         return Map.of(operatorName(logical.operator()), operands);
     }
@@ -1039,7 +1047,7 @@ public final class MetricDefinitionDslCodec {
     }
 
     private List<String> parseStringList(Object value, String path, boolean requireNonEmpty) {
-        List<Object> source = MetricDslJsonSupport.array(value, path);
+        List<Object> source = MetricDslJson.array(value, path);
         if (requireNonEmpty && source.isEmpty()) {
             throw error(MetricErrorCode.DSL_VALUE_INVALID, path, "Array must not be empty");
         }

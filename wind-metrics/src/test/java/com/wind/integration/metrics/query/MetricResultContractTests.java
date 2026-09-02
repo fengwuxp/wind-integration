@@ -3,6 +3,7 @@ package com.wind.integration.metrics.query;
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricQueryMode;
+import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
@@ -30,6 +31,11 @@ class MetricResultContractTests {
     private static final LocalDateTime END_TIME = LocalDateTime.of(2026, 7, 15, 0, 0);
 
     private static final LocalDateTime CALCULATED_TIME = LocalDateTime.of(2026, 7, 15, 0, 0, 0, 2_000_000);
+
+    @Test
+    void testSegmentResultUsesClosedSegmentCode() {
+        Assertions.assertEquals(MetricSegmentCode.class, MetricSegmentResult.class.getRecordComponents()[0].getType());
+    }
 
     @Test
     void testScalarResultAllowsNormalNull() {
@@ -104,7 +110,7 @@ class MetricResultContractTests {
         MetricValidationException exception = Assertions.assertThrows(
                 MetricValidationException.class,
                 () -> new MetricSegmentResult(
-                        "archive",
+                        MetricSegmentCode.ARCHIVE,
                         MetricSegmentSourceType.SNAPSHOT,
                         START_TIME,
                         END_TIME,
@@ -122,7 +128,7 @@ class MetricResultContractTests {
         LocalDateTime cutoverTime = LocalDateTime.of(2026, 4, 15, 0, 0);
         List<MetricSegmentResult> segments = List.of(
                 new MetricSegmentResult(
-                        "archive",
+                        MetricSegmentCode.ARCHIVE,
                         MetricSegmentSourceType.SNAPSHOT,
                         START_TIME,
                         cutoverTime,
@@ -131,7 +137,7 @@ class MetricResultContractTests {
                         cutoverTime,
                         null),
                 new MetricSegmentResult(
-                        "recent",
+                        MetricSegmentCode.RECENT,
                         MetricSegmentSourceType.REALTIME,
                         cutoverTime.plusHours(1),
                         END_TIME,
@@ -171,7 +177,7 @@ class MetricResultContractTests {
     void testSegmentedResultAcceptsSupportedExecutionShapes() {
         LocalDateTime cutoverTime = LocalDateTime.of(2026, 4, 15, 0, 0);
         MetricSegmentResult archive = new MetricSegmentResult(
-                "archive",
+                MetricSegmentCode.ARCHIVE,
                 MetricSegmentSourceType.SNAPSHOT,
                 START_TIME,
                 cutoverTime,
@@ -180,7 +186,7 @@ class MetricResultContractTests {
                 cutoverTime,
                 null);
         MetricSegmentResult realtimeRecent = new MetricSegmentResult(
-                "recent",
+                MetricSegmentCode.RECENT,
                 MetricSegmentSourceType.REALTIME,
                 cutoverTime,
                 END_TIME,
@@ -189,7 +195,7 @@ class MetricResultContractTests {
                 null,
                 CALCULATED_TIME);
         MetricSegmentResult snapshotRecent = new MetricSegmentResult(
-                "recent",
+                MetricSegmentCode.RECENT,
                 MetricSegmentSourceType.SNAPSHOT,
                 cutoverTime,
                 END_TIME,
@@ -198,7 +204,7 @@ class MetricResultContractTests {
                 END_TIME,
                 null);
         MetricSegmentResult onlyRecent = new MetricSegmentResult(
-                "recent",
+                MetricSegmentCode.RECENT,
                 MetricSegmentSourceType.REALTIME,
                 START_TIME,
                 END_TIME,

@@ -20,12 +20,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * DSL Codec 共用的严格 JSON 读取、字段校验和规范序列化工具。
+ * Metric DSL 共用的严格 JSON 读取、字段校验和规范序列化原语。
  *
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-final class MetricDslJsonSupport {
+final class MetricDslJson {
 
     private static final JsonFactory STRICT_JSON_FACTORY = new JsonFactory();
 
@@ -34,7 +34,7 @@ final class MetricDslJsonSupport {
             .enable(StreamWriteFeature.WRITE_BIGDECIMAL_AS_PLAIN)
             .build();
 
-    private MetricDslJsonSupport() {
+    private MetricDslJson() {
     }
 
     static Map<String, Object> parseRootObject(String json) {
@@ -43,10 +43,22 @@ final class MetricDslJsonSupport {
         }
         try (JsonParser parser = STRICT_JSON_FACTORY.createParser(json)) {
             parser.nextToken();
-            Object value = readValue(parser, "");
+            Map<String, Object> result = parseRootObject(parser);
             if (parser.nextToken() != null) {
                 throw error(MetricErrorCode.DSL_JSON_INVALID, "", "Unexpected trailing JSON content");
             }
+            return result;
+        } catch (MetricValidationException exception) {
+            throw exception;
+        } catch (JacksonException exception) {
+            throw new MetricValidationException(
+                    MetricErrorCode.DSL_JSON_INVALID, "", "Invalid JSON", exception);
+        }
+    }
+
+    static Map<String, Object> parseRootObject(JsonParser parser) {
+        try {
+            Object value = readValue(parser, "");
             if (!(value instanceof Map<?, ?> map)) {
                 throw error(MetricErrorCode.DSL_ROOT_NOT_OBJECT, "", "JSON root must be an object");
             }

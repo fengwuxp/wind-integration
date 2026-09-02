@@ -1,7 +1,9 @@
 package com.wind.integration.metrics.query;
 
+import com.wind.integration.metrics.dsl.MetricQueryJsonParser;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -23,6 +25,7 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  * @date 2026-07-21 17:51
  */
 @Schema(description = "单个指标的查询条件")
+@JsonDeserialize(using = MetricQueryJsonParser.QueryDeserializer.class)
 public record MetricQuery(
         @Schema(description = "指标编码") String metricCode,
         @Nullable @Schema(description = "主体标识；全局指标查询为空") String subjectId,

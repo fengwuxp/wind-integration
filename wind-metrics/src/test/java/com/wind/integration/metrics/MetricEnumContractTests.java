@@ -15,6 +15,7 @@ import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
+import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -63,5 +64,14 @@ class MetricEnumContractTests {
                 () -> Assertions.assertEquals("实时查询", MetricQueryMode.REALTIME.getDesc()),
                 () -> Assertions.assertEquals("快照查询", MetricQueryMode.SNAPSHOT.getDesc()),
                 () -> Assertions.assertEquals("分段查询", MetricQueryMode.SEGMENTED.getDesc()));
+    }
+
+    @Test
+    void testMetricSegmentCodeUsesStableJsonCode() {
+        Assertions.assertAll(
+                () -> Assertions.assertEquals("\"archive\"", WindJson.toJsonString(MetricSegmentCode.ARCHIVE)),
+                () -> Assertions.assertEquals(
+                        MetricSegmentCode.RECENT,
+                        WindJson.parseObject("\"recent\"", MetricSegmentCode.class)));
     }
 }

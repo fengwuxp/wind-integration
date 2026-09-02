@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.query;
 
 import com.wind.integration.metrics.enums.MetricErrorCode;
+import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -15,7 +16,7 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  *
  * <p>快照分段必须返回粒度和连续覆盖区间，实时分段只返回计算时间。</p>
  *
- * @param segmentCode 实际分段编码，当前为 {@code archive} 或 {@code recent}
+ * @param segmentCode 实际分段编码
  * @param sourceType 分段实际数据来源
  * @param startTime 分段开始时间，包含
  * @param endTime 分段结束时间，不包含
@@ -29,7 +30,7 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  */
 @Schema(description = "指标查询结果的连续时间分段摘要")
 public record MetricSegmentResult(
-        @Schema(description = "实际分段编码") String segmentCode,
+        @Schema(description = "实际分段编码") MetricSegmentCode segmentCode,
         @Schema(description = "分段实际数据来源") MetricSegmentSourceType sourceType,
         @Schema(description = "分段开始时间，包含") LocalDateTime startTime,
         @Schema(description = "分段结束时间，不包含") LocalDateTime endTime,
@@ -39,8 +40,8 @@ public record MetricSegmentResult(
         @Nullable @Schema(description = "实时计算完成时间；快照分段为空") LocalDateTime calculatedTime) {
 
     public MetricSegmentResult {
-        if (segmentCode == null || segmentCode.isBlank()) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/segmentCode", "segmentCode must not be blank");
+        if (segmentCode == null) {
+            throw error(MetricErrorCode.RESULT_INVALID, "/segmentCode", "segmentCode must not be null");
         }
         if (sourceType == null) {
             throw error(MetricErrorCode.RESULT_INVALID, "/sourceType", "sourceType must not be null");

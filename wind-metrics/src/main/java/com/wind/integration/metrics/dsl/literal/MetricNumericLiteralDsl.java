@@ -1,4 +1,4 @@
-package com.wind.integration.metrics.dsl.filter;
+package com.wind.integration.metrics.dsl.literal;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 

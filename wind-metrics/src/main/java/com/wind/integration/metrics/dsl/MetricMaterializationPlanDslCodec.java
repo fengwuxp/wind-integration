@@ -1,12 +1,10 @@
 package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.dsl.materialization.MetricMaterializationDependencyDsl;
-import com.wind.integration.metrics.dsl.materialization.MetricMaterializationMeasureDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricMaterializationPlanDsl;
+import com.wind.integration.metrics.dsl.materialization.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricSegmentDsl;
 import com.wind.integration.metrics.enums.MetricErrorCode;
-import com.wind.integration.metrics.enums.MetricMergeState;
 import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
@@ -31,9 +29,9 @@ import static com.wind.integration.metrics.dsl.MetricDslJson.required;
 import static com.wind.integration.metrics.dsl.MetricDslJson.string;
 
 /**
- * 指标逻辑物化计划 v1 的关闭世界解析、基础校验与确定性规范化入口。
+ * 指标逻辑物化计划 v2 的关闭世界解析、基础校验与确定性规范化入口。
  *
- * <p>该入口只描述快照、分段拓扑和冻结的叶子物化依赖，不解析物理表、数据源或运行时水位。</p>
+ * <p>该入口只描述快照、分段拓扑和指标关联声明，不解析定义版本、计算依赖、物理绑定或运行时水位。</p>
  *
  * @author wuxp
  * @date 2026-07-21 17:51
@@ -43,7 +41,7 @@ public final class MetricMaterializationPlanDslCodec {
     /**
      * 当前支持的 Plan DSL 结构版本。
      */
-    private static final int SCHEMA_VERSION = 1;
+    private static final int SCHEMA_VERSION = 2;
 
     /**
      * 快照键提供者和逻辑目标编码允许使用的格式。
@@ -60,14 +58,14 @@ public final class MetricMaterializationPlanDslCodec {
      */
     private static final Set<String> ROOT_FIELDS = Set.of(
             "schemaVersion", "executionMode", "snapshotKeyProviderCode", "snapshotGranularity",
-            "snapshotTargetCode", "recentWindow", "segments", "dependencies");
+            "snapshotTargetCode", "recentWindow", "segments", "metrics");
 
     /**
      * 解析并校验指标物化 Plan DSL JSON。
      *
      * @param json Plan DSL JSON
      * @return 不可变的逻辑物化计划
-     * @throws MetricValidationException JSON、字段或计划结构不符合 v1 契约时抛出
+     * @throws MetricValidationException JSON、字段或计划结构不符合 v2 契约时抛出
      */
     public MetricMaterializationPlanDsl parse(String json) {
         return parse(MetricDslJson.parseRootObject(json));
@@ -87,8 +85,7 @@ public final class MetricMaterializationPlanDslCodec {
                 required(root, "executionMode", ""), MetricQueryMode.class, "/executionMode");
         String keyProviderCode = string(
                 required(root, "snapshotKeyProviderCode", ""), "/snapshotKeyProviderCode");
-        List<MetricMaterializationDependencyDsl> dependencies = parseDependencies(
-                MetricDslJson.optionalValue(root, "dependencies", "/dependencies"));
+        List<MetricReferenceDsl> metrics = parseMetrics(required(root, "metrics", ""));
         SnapshotGranularity granularity = root.containsKey("snapshotGranularity")
                 ? MetricDslJson.enumValue(
                 root.get("snapshotGranularity"), SnapshotGranularity.class, "/snapshotGranularity")
@@ -100,14 +97,14 @@ public final class MetricMaterializationPlanDslCodec {
         List<MetricSegmentDsl> segments = parseSegments(
                 MetricDslJson.optionalValue(root, "segments", "/segments"));
         MetricMaterializationPlanDsl plan = new MetricMaterializationPlanDsl(
-                schemaVersion, executionMode, keyProviderCode, dependencies,
+                schemaVersion, executionMode, keyProviderCode, metrics,
                 granularity, targetCode, recentWindow, segments);
         validateBasic(plan);
         return plan;
     }
 
     /**
-     * 校验已构造的逻辑物化计划是否满足 v1 基础结构约束。
+     * 校验已构造的逻辑物化计划是否满足 v2 基础结构约束。
      *
      * @param plan 逻辑物化计划
      * @throws MetricValidationException 计划模式、分段或快照字段不符合约束时抛出
@@ -117,7 +114,7 @@ public final class MetricMaterializationPlanDslCodec {
             throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
         validateIdentifier(plan.snapshotKeyProviderCode(), "/snapshotKeyProviderCode");
-        validateDependencies(plan.dependencies());
+        validateMetrics(plan.metrics());
         if (plan.executionMode() == MetricQueryMode.REALTIME) {
             throw error(MetricErrorCode.DSL_PLAN_INVALID, "/executionMode", "REALTIME does not use a plan");
         }
@@ -152,7 +149,7 @@ public final class MetricMaterializationPlanDslCodec {
      *
      * @param plan 逻辑物化计划
      * @return 可用于内容比对和签名的规范 JSON
-     * @throws MetricValidationException 计划不满足 v1 契约时抛出
+     * @throws MetricValidationException 计划不满足 v2 契约时抛出
      */
     public String canonicalize(MetricMaterializationPlanDsl plan) {
         validateBasic(plan);
@@ -160,12 +157,10 @@ public final class MetricMaterializationPlanDslCodec {
         result.put("schemaVersion", plan.schemaVersion());
         result.put("executionMode", plan.executionMode().name());
         result.put("snapshotKeyProviderCode", plan.snapshotKeyProviderCode());
-        if (!plan.dependencies().isEmpty()) {
-            result.put("dependencies", plan.dependencies().stream()
-                    .sorted(Comparator.comparing(MetricMaterializationDependencyDsl::metricCode))
-                    .map(this::toCanonicalDependency)
-                    .toList());
-        }
+        result.put("metrics", plan.metrics().stream()
+                .sorted(Comparator.comparing(MetricReferenceDsl::metricCode))
+                .map(this::toCanonicalMetric)
+                .toList());
         if (plan.executionMode() == MetricQueryMode.SNAPSHOT) {
             result.put("snapshotGranularity", plan.snapshotGranularity().name());
             result.put("snapshotTargetCode", plan.snapshotTargetCode());
@@ -176,98 +171,51 @@ public final class MetricMaterializationPlanDslCodec {
         return MetricDslJson.toJson(result);
     }
 
-    private List<MetricMaterializationDependencyDsl> parseDependencies(@Nullable Object value) {
-        if (value == null) {
-            return List.of();
-        }
-        List<Object> source = MetricDslJson.array(value, "/dependencies");
-        List<MetricMaterializationDependencyDsl> result = new ArrayList<>(source.size());
+    private List<MetricReferenceDsl> parseMetrics(Object value) {
+        List<Object> source = MetricDslJson.array(value, "/metrics");
+        List<MetricReferenceDsl> result = new ArrayList<>(source.size());
         for (int index = 0; index < source.size(); index++) {
-            String path = child("/dependencies", Integer.toString(index));
-            Map<String, Object> dependency = MetricDslJson.object(source.get(index), path);
-            MetricDslJson.rejectUnknown(
-                    dependency, path, Set.of("metricCode", "definitionRevision", "measures"));
-            result.add(new MetricMaterializationDependencyDsl(
-                    string(required(dependency, "metricCode", path), child(path, "metricCode")),
-                    MetricDslJson.integer(
-                            required(dependency, "definitionRevision", path), child(path, "definitionRevision")),
-                    parseMeasures(required(dependency, "measures", path), child(path, "measures"))));
+            String path = child("/metrics", Integer.toString(index));
+            Map<String, Object> metric = MetricDslJson.object(source.get(index), path);
+            MetricDslJson.rejectUnknown(metric, path, Set.of("metricCode", "definitionRevision"));
+            Object revision = MetricDslJson.optionalValue(metric, "definitionRevision", child(path, "definitionRevision"));
+            result.add(new MetricReferenceDsl(
+                    string(required(metric, "metricCode", path), child(path, "metricCode")),
+                    revision == null ? null : MetricDslJson.integer(revision, child(path, "definitionRevision"))));
         }
         return result;
     }
 
-    private List<MetricMaterializationMeasureDsl> parseMeasures(Object value, String path) {
-        List<Object> source = MetricDslJson.array(value, path);
-        List<MetricMaterializationMeasureDsl> result = new ArrayList<>(source.size());
-        for (int index = 0; index < source.size(); index++) {
-            String measurePath = child(path, Integer.toString(index));
-            Map<String, Object> measure = MetricDslJson.object(source.get(index), measurePath);
-            MetricDslJson.rejectUnknown(measure, measurePath, Set.of("valueField", "mergeState"));
-            result.add(new MetricMaterializationMeasureDsl(
-                    string(required(measure, "valueField", measurePath), child(measurePath, "valueField")),
-                    MetricDslJson.enumValue(
-                            required(measure, "mergeState", measurePath),
-                            MetricMergeState.class,
-                            child(measurePath, "mergeState"))));
-        }
-        return result;
-    }
-
-    private void validateDependencies(List<MetricMaterializationDependencyDsl> dependencies) {
-        if (dependencies.isEmpty()) {
-            return;
+    private void validateMetrics(List<MetricReferenceDsl> metrics) {
+        if (metrics.isEmpty()) {
+            throw error(MetricErrorCode.DSL_PLAN_INVALID, "/metrics", "Plan metrics must not be empty");
         }
         Set<String> metricCodes = new HashSet<>();
-        for (int index = 0; index < dependencies.size(); index++) {
-            MetricMaterializationDependencyDsl dependency = dependencies.get(index);
-            String path = child("/dependencies", Integer.toString(index));
-            validateIdentifier(dependency.metricCode(), child(path, "metricCode"), 100);
-            if (!metricCodes.add(dependency.metricCode())) {
+        for (int index = 0; index < metrics.size(); index++) {
+            MetricReferenceDsl metric = metrics.get(index);
+            String path = child("/metrics", Integer.toString(index));
+            validateIdentifier(metric.metricCode(), child(path, "metricCode"), 100);
+            if (!metricCodes.add(metric.metricCode())) {
                 throw error(
                         MetricErrorCode.DSL_PLAN_INVALID,
                         child(path, "metricCode"),
-                        "Duplicate dependency metricCode");
+                        "Duplicate metricCode");
             }
-            if (dependency.definitionRevision() <= 0) {
+            if (metric.definitionRevision() != null && metric.definitionRevision() <= 0) {
                 throw error(
                         MetricErrorCode.DSL_PLAN_INVALID,
                         child(path, "definitionRevision"),
                         "definitionRevision must be positive");
             }
-            validateMeasures(dependency.measures(), child(path, "measures"));
         }
     }
 
-    private void validateMeasures(List<MetricMaterializationMeasureDsl> measures, String path) {
-        if (measures.isEmpty()) {
-            throw error(MetricErrorCode.DSL_PLAN_INVALID, path, "Dependency measures must not be empty");
-        }
-        Set<String> valueFields = new HashSet<>();
-        for (int index = 0; index < measures.size(); index++) {
-            MetricMaterializationMeasureDsl measure = measures.get(index);
-            String valueFieldPath = child(child(path, Integer.toString(index)), "valueField");
-            validateIdentifier(measure.valueField(), valueFieldPath, 64);
-            if (!valueFields.add(measure.valueField())) {
-                throw error(MetricErrorCode.DSL_PLAN_INVALID, valueFieldPath, "Duplicate dependency valueField");
-            }
-        }
-    }
-
-    private Map<String, Object> toCanonicalDependency(MetricMaterializationDependencyDsl dependency) {
+    private Map<String, Object> toCanonicalMetric(MetricReferenceDsl metric) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("metricCode", dependency.metricCode());
-        result.put("definitionRevision", dependency.definitionRevision());
-        result.put("measures", dependency.measures().stream()
-                .sorted(Comparator.comparing(MetricMaterializationMeasureDsl::valueField))
-                .map(this::toCanonicalMeasure)
-                .toList());
-        return result;
-    }
-
-    private Map<String, Object> toCanonicalMeasure(MetricMaterializationMeasureDsl measure) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("valueField", measure.valueField());
-        result.put("mergeState", measure.mergeState().name());
+        result.put("metricCode", metric.metricCode());
+        if (metric.definitionRevision() != null) {
+            result.put("definitionRevision", metric.definitionRevision());
+        }
         return result;
     }
 

@@ -20,7 +20,8 @@ class MetricMaterializationPlanDslJsonBindingTests {
 
     private static final String PLAN_JSON = """
             {
-              "schemaVersion": 1,
+              "schemaVersion": 2,
+              "metrics": [{"metricCode": "B", "definitionRevision": 7}, {"metricCode": "A"}],
               "executionMode": "SEGMENTED",
               "snapshotKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
               "recentWindow": "P90D",
@@ -67,6 +68,58 @@ class MetricMaterializationPlanDslJsonBindingTests {
 
         Assertions.assertEquals(MetricErrorCode.DSL_ROOT_NOT_OBJECT, cause.errorCode());
         Assertions.assertEquals("", cause.fieldPath());
+    }
+
+    @Test
+    void testDirectBindingPreservesOptionalRevision() {
+        MetricMaterializationPlanDsl plan = jsonMapper.readValue(PLAN_JSON, MetricMaterializationPlanDsl.class);
+
+        Assertions.assertEquals(7, plan.metrics().getFirst().definitionRevision());
+        Assertions.assertNull(plan.metrics().getLast().definitionRevision());
+        Assertions.assertEquals(codec.canonicalize(plan), jsonMapper.writeValueAsString(plan));
+        Assertions.assertEquals(codec.canonicalize(plan),
+                codec.canonicalize(jsonMapper.readValue(jsonMapper.writeValueAsString(plan), MetricMaterializationPlanDsl.class)));
+    }
+
+    @Test
+    void testNestedBindingPreservesOptionalRevision() {
+        PlanRequest request = jsonMapper.readValue("{\"plan\":" + PLAN_JSON + "}", PlanRequest.class);
+        String canonical = jsonMapper.writeValueAsString(request);
+        PlanRequest restored = jsonMapper.readValue(canonical, PlanRequest.class);
+
+        Assertions.assertNull(restored.plan().metrics().getFirst().definitionRevision());
+        Assertions.assertEquals(7, restored.plan().metrics().getLast().definitionRevision());
+        Assertions.assertFalse(canonical.contains("\"definitionRevision\":null"));
+        Assertions.assertEquals(canonical, jsonMapper.writeValueAsString(restored));
+    }
+
+    @Test
+    void testNestedBindingRejectsExplicitNullRevision() {
+        assertInvalidNestedPlan(PLAN_JSON.replace("\"definitionRevision\": 7", "\"definitionRevision\": null"),
+                MetricErrorCode.DSL_FIELD_TYPE_INVALID, "/metrics/0/definitionRevision");
+    }
+
+    @Test
+    void testNestedBindingRejectsDuplicateMetricCode() {
+        assertInvalidNestedPlan(PLAN_JSON.replace("\"metricCode\": \"B\"", "\"metricCode\": \"A\""),
+                MetricErrorCode.DSL_PLAN_INVALID, "/metrics/1/metricCode");
+    }
+
+    @Test
+    void testNestedBindingRejectsOldPlanDeclarations() {
+        assertInvalidNestedPlan(PLAN_JSON.replace("\"schemaVersion\": 2", "\"schemaVersion\": 1"),
+                MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion");
+        assertInvalidNestedPlan(PLAN_JSON.replace("\"schemaVersion\": 2", "\"schemaVersion\": 2, \"dependencies\": []"),
+                MetricErrorCode.DSL_FIELD_UNKNOWN, "/dependencies");
+    }
+
+    private void assertInvalidNestedPlan(String plan, MetricErrorCode errorCode, String fieldPath) {
+        DatabindException exception = Assertions.assertThrows(DatabindException.class,
+                () -> jsonMapper.readValue("{\"plan\":" + plan + "}", PlanRequest.class));
+        MetricValidationException cause = Assertions.assertInstanceOf(MetricValidationException.class, exception.getCause());
+
+        Assertions.assertEquals(errorCode, cause.errorCode());
+        Assertions.assertEquals(fieldPath, cause.fieldPath());
     }
 
     private record PlanRequest(MetricMaterializationPlanDsl plan) {

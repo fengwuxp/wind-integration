@@ -9,6 +9,7 @@ import org.jspecify.annotations.NonNull;
  * @since 2026-07-21
  */
 @FunctionalInterface
+@Deprecated(forRemoval = true)
 public interface CurrentApplicationMatcher {
 
     /**

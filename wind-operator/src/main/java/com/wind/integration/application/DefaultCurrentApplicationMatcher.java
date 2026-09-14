@@ -12,6 +12,7 @@ import java.util.Objects;
  * @author wuxp
  * @date 2026-07-21 14:00
  **/
+@Deprecated(forRemoval = true)
 public class DefaultCurrentApplicationMatcher implements CurrentApplicationMatcher {
 
     @Override

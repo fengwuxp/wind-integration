@@ -23,8 +23,8 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  * 指标查询结果及本次顶层查询模式与实际数据来源摘要。
  *
  * <p>{@code SCALAR} 使用 {@code valueType/value} 且 {@code fields} 为空；
- * {@code FIELD_SET} 只使用 {@code fields}。全量快照在根级返回覆盖范围，分段查询只在
- * {@code segments} 中返回各段覆盖信息。</p>
+ * {@code FIELD_SET} 只使用 {@code fields}。{@code SNAPSHOT} 查询在根级返回实际连续覆盖范围，
+ * 不表示已物化全部历史；分段查询只在 {@code segments} 中返回各段覆盖信息。</p>
  *
  * @param metricCode 对外查询的指标编码
  * @param definitionRevision 实际生效的指标定义修订号
@@ -40,9 +40,9 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  * @param endTime 查询结束时间，不包含
  * @param calculatedTime 本次结果的计算完成时间
  * @param timeZone 时间字段解释所使用的时区
- * @param snapshotGranularity 全量快照桶粒度；其他模式为空
- * @param queryableStartTime 全量快照连续可读区间下界，包含；其他模式为空
- * @param watermarkTime 全量快照连续覆盖上界，不包含；其他模式为空
+ * @param snapshotGranularity SNAPSHOT 查询模式的快照桶粒度；其他模式为空
+ * @param queryableStartTime SNAPSHOT 查询模式的实际连续可读区间下界，包含；其他模式为空
+ * @param watermarkTime SNAPSHOT 查询模式的已提交连续覆盖上界，不包含；其他模式为空
  * @param planCode 本次实际使用的物化计划编码；实时模式为空
  * @param segments 分段模式实际执行的连续分段；其他模式为空列表
  *
@@ -65,9 +65,9 @@ public record MetricResult(
         @Schema(description = "查询结束时间，不包含") LocalDateTime endTime,
         @Schema(description = "本次结果的计算完成时间") LocalDateTime calculatedTime,
         @Schema(description = "时间字段解释所使用的时区") ZoneId timeZone,
-        @Nullable @Schema(description = "全量快照桶粒度；其他模式为空") SnapshotGranularity snapshotGranularity,
-        @Nullable @Schema(description = "全量快照连续可读区间下界；其他模式为空") LocalDateTime queryableStartTime,
-        @Nullable @Schema(description = "全量快照连续覆盖上界；其他模式为空") LocalDateTime watermarkTime,
+        @Nullable @Schema(description = "SNAPSHOT 查询模式的快照桶粒度；其他模式为空") SnapshotGranularity snapshotGranularity,
+        @Nullable @Schema(description = "SNAPSHOT 查询模式的实际连续可读区间下界；其他模式为空") LocalDateTime queryableStartTime,
+        @Nullable @Schema(description = "SNAPSHOT 查询模式的已提交连续覆盖上界；其他模式为空") LocalDateTime watermarkTime,
         @Nullable @Schema(description = "实际使用的物化计划编码；实时模式为空") String planCode,
         @Schema(description = "分段模式实际执行的连续分段；其他模式为空列表") List<MetricSegmentResult> segments) {
 

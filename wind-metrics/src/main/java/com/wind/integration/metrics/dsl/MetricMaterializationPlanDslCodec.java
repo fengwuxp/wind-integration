@@ -4,10 +4,13 @@ import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.dsl.materialization.MetricMaterializationPlanDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricSegmentDsl;
+import com.wind.integration.metrics.dsl.materialization.MetricSnapshotTargetDsl;
+import com.wind.integration.metrics.dsl.materialization.MetricSnapshotTargetMappingDsl;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
+import com.wind.integration.metrics.enums.MetricSnapshotStorageType;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JsonParser;
@@ -22,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.wind.integration.metrics.dsl.MetricDslJson.child;
 import static com.wind.integration.metrics.dsl.MetricDslJson.error;
@@ -44,7 +48,7 @@ public final class MetricMaterializationPlanDslCodec {
     private static final int SCHEMA_VERSION = 2;
 
     /**
-     * 快照键提供者和逻辑目标编码允许使用的格式。
+     * 快照键提供者、指标编码和逻辑结果字段允许使用的格式。
      */
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z][A-Za-z0-9_]*");
 
@@ -58,7 +62,7 @@ public final class MetricMaterializationPlanDslCodec {
      */
     private static final Set<String> ROOT_FIELDS = Set.of(
             "schemaVersion", "executionMode", "snapshotKeyProviderCode", "snapshotGranularity",
-            "snapshotTargetCode", "recentWindow", "segments", "metrics");
+            "snapshotTarget", "recentWindow", "segments", "metrics");
 
     /**
      * 解析并校验指标物化 Plan DSL JSON。
@@ -90,7 +94,8 @@ public final class MetricMaterializationPlanDslCodec {
                 ? MetricDslJson.enumValue(
                 root.get("snapshotGranularity"), SnapshotGranularity.class, "/snapshotGranularity")
                 : null;
-        String targetCode = optionalString(root, "snapshotTargetCode", "/snapshotTargetCode");
+        MetricSnapshotTargetDsl snapshotTarget = parseSnapshotTarget(
+                MetricDslJson.optionalValue(root, "snapshotTarget", "/snapshotTarget"), "/snapshotTarget");
         String recentWindow = root.containsKey("recentWindow")
                 ? normalizeRecentWindow(string(root.get("recentWindow"), "/recentWindow"))
                 : null;
@@ -98,7 +103,7 @@ public final class MetricMaterializationPlanDslCodec {
                 MetricDslJson.optionalValue(root, "segments", "/segments"));
         MetricMaterializationPlanDsl plan = new MetricMaterializationPlanDsl(
                 schemaVersion, executionMode, keyProviderCode, metrics,
-                granularity, targetCode, recentWindow, segments);
+                granularity, snapshotTarget, recentWindow, segments);
         validateBasic(plan);
         return plan;
     }
@@ -125,23 +130,23 @@ public final class MetricMaterializationPlanDslCodec {
                         "/snapshotGranularity",
                         "Snapshot granularity is required");
             }
-            if (plan.snapshotTargetCode() == null) {
-                throw error(MetricErrorCode.DSL_FIELD_REQUIRED, "/snapshotTargetCode", "Snapshot target is required");
+            if (plan.snapshotTarget() == null) {
+                throw error(MetricErrorCode.DSL_FIELD_REQUIRED, "/snapshotTarget", "Snapshot target is required");
             }
-            validateIdentifier(plan.snapshotTargetCode(), "/snapshotTargetCode");
+            validateSnapshotTarget(plan.snapshotTarget(), "/snapshotTarget", plan.metrics());
             if (plan.recentWindow() != null || !plan.segments().isEmpty()) {
                 throw error(MetricErrorCode.DSL_PLAN_INVALID, "", "SNAPSHOT forbids segmented fields");
             }
             return;
         }
-        if (plan.snapshotGranularity() != null || plan.snapshotTargetCode() != null) {
+        if (plan.snapshotGranularity() != null || plan.snapshotTarget() != null) {
             throw error(MetricErrorCode.DSL_PLAN_INVALID, "", "SEGMENTED forbids root snapshot fields");
         }
         if (plan.recentWindow() == null) {
             throw error(MetricErrorCode.DSL_FIELD_REQUIRED, "/recentWindow", "recentWindow is required");
         }
         normalizeRecentWindow(plan.recentWindow());
-        validateSegments(plan.segments());
+        validateSegments(plan.segments(), plan.metrics());
     }
 
     /**
@@ -163,7 +168,7 @@ public final class MetricMaterializationPlanDslCodec {
                 .toList());
         if (plan.executionMode() == MetricQueryMode.SNAPSHOT) {
             result.put("snapshotGranularity", plan.snapshotGranularity().name());
-            result.put("snapshotTargetCode", plan.snapshotTargetCode());
+            result.put("snapshotTarget", toCanonicalSnapshotTarget(plan.snapshotTarget()));
         } else {
             result.put("recentWindow", normalizeRecentWindow(plan.recentWindow()));
             result.put("segments", plan.segments().stream().map(this::toCanonicalSegment).toList());
@@ -178,10 +183,9 @@ public final class MetricMaterializationPlanDslCodec {
             String path = child("/metrics", Integer.toString(index));
             Map<String, Object> metric = MetricDslJson.object(source.get(index), path);
             MetricDslJson.rejectUnknown(metric, path, Set.of("metricCode", "definitionRevision"));
-            Object revision = MetricDslJson.optionalValue(metric, "definitionRevision", child(path, "definitionRevision"));
             result.add(new MetricReferenceDsl(
                     string(required(metric, "metricCode", path), child(path, "metricCode")),
-                    revision == null ? null : MetricDslJson.integer(revision, child(path, "definitionRevision"))));
+                    MetricDslJson.integer(required(metric, "definitionRevision", path), child(path, "definitionRevision"))));
         }
         return result;
     }
@@ -201,7 +205,7 @@ public final class MetricMaterializationPlanDslCodec {
                         child(path, "metricCode"),
                         "Duplicate metricCode");
             }
-            if (metric.definitionRevision() != null && metric.definitionRevision() <= 0) {
+            if (metric.definitionRevision() <= 0) {
                 throw error(
                         MetricErrorCode.DSL_PLAN_INVALID,
                         child(path, "definitionRevision"),
@@ -213,9 +217,7 @@ public final class MetricMaterializationPlanDslCodec {
     private Map<String, Object> toCanonicalMetric(MetricReferenceDsl metric) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("metricCode", metric.metricCode());
-        if (metric.definitionRevision() != null) {
-            result.put("definitionRevision", metric.definitionRevision());
-        }
+        result.put("definitionRevision", metric.definitionRevision());
         return result;
     }
 
@@ -229,7 +231,7 @@ public final class MetricMaterializationPlanDslCodec {
             String path = child("/segments", Integer.toString(index));
             Map<String, Object> segment = MetricDslJson.object(source.get(index), path);
             MetricDslJson.rejectUnknown(segment, path, Set.of(
-                    "segmentCode", "sourceType", "snapshotGranularity", "snapshotTargetCode"));
+                    "segmentCode", "sourceType", "snapshotGranularity", "snapshotTarget"));
             MetricSegmentCode segmentCode = parseSegmentCode(
                     string(required(segment, "segmentCode", path), child(path, "segmentCode")),
                     child(path, "segmentCode"));
@@ -240,13 +242,15 @@ public final class MetricMaterializationPlanDslCodec {
                     segment.get("snapshotGranularity"), SnapshotGranularity.class,
                     child(path, "snapshotGranularity"))
                     : null;
-            String targetCode = optionalString(segment, "snapshotTargetCode", child(path, "snapshotTargetCode"));
-            result.add(new MetricSegmentDsl(segmentCode, sourceType, granularity, targetCode));
+            MetricSnapshotTargetDsl snapshotTarget = parseSnapshotTarget(
+                    MetricDslJson.optionalValue(segment, "snapshotTarget", child(path, "snapshotTarget")),
+                    child(path, "snapshotTarget"));
+            result.add(new MetricSegmentDsl(segmentCode, sourceType, granularity, snapshotTarget));
         }
         return result;
     }
 
-    private void validateSegments(List<MetricSegmentDsl> segments) {
+    private void validateSegments(List<MetricSegmentDsl> segments, List<MetricReferenceDsl> metrics) {
         if (segments.size() != 2) {
             throw error(MetricErrorCode.DSL_PLAN_INVALID, "/segments", "SEGMENTED requires exactly two segments");
         }
@@ -259,11 +263,11 @@ public final class MetricMaterializationPlanDslCodec {
             MetricSegmentDsl segment = segments.get(index);
             String path = child("/segments", Integer.toString(index));
             if (segment.sourceType() == MetricSegmentSourceType.SNAPSHOT) {
-                if (segment.snapshotGranularity() == null || segment.snapshotTargetCode() == null) {
+                if (segment.snapshotGranularity() == null || segment.snapshotTarget() == null) {
                     throw error(MetricErrorCode.DSL_FIELD_REQUIRED, path, "SNAPSHOT segment requires snapshot fields");
                 }
-                validateIdentifier(segment.snapshotTargetCode(), child(path, "snapshotTargetCode"));
-            } else if (segment.snapshotGranularity() != null || segment.snapshotTargetCode() != null) {
+                validateSnapshotTarget(segment.snapshotTarget(), child(path, "snapshotTarget"), metrics);
+            } else if (segment.snapshotGranularity() != null || segment.snapshotTarget() != null) {
                 throw error(MetricErrorCode.DSL_PLAN_INVALID, path, "REALTIME segment forbids snapshot fields");
             }
         }
@@ -275,8 +279,78 @@ public final class MetricMaterializationPlanDslCodec {
         result.put("sourceType", segment.sourceType().name());
         if (segment.sourceType() == MetricSegmentSourceType.SNAPSHOT) {
             result.put("snapshotGranularity", segment.snapshotGranularity().name());
-            result.put("snapshotTargetCode", segment.snapshotTargetCode());
+            result.put("snapshotTarget", toCanonicalSnapshotTarget(segment.snapshotTarget()));
         }
+        return result;
+    }
+
+    private @Nullable MetricSnapshotTargetDsl parseSnapshotTarget(@Nullable Object value, String path) {
+        if (value == null) {
+            return null;
+        }
+        Map<String, Object> target = MetricDslJson.object(value, path);
+        MetricDslJson.rejectUnknown(target, path, Set.of("storageType", "bucketTimeField", "valueMappings"));
+        MetricSnapshotStorageType storageType = MetricDslJson.enumValue(
+                required(target, "storageType", path), MetricSnapshotStorageType.class, child(path, "storageType"));
+        String bucketTimeField = string(required(target, "bucketTimeField", path), child(path, "bucketTimeField"));
+        List<MetricSnapshotTargetMappingDsl> valueMappings = parseTargetMappings(
+                required(target, "valueMappings", path), child(path, "valueMappings"));
+        return new MetricSnapshotTargetDsl(storageType, bucketTimeField, valueMappings);
+    }
+
+    private void validateSnapshotTarget(MetricSnapshotTargetDsl target,
+                                        String path,
+                                        List<MetricReferenceDsl> metrics) {
+        validateIdentifier(target.bucketTimeField(), child(path, "bucketTimeField"));
+        if (target.valueMappings().isEmpty()) {
+            throw error(MetricErrorCode.DSL_PLAN_INVALID, child(path, "valueMappings"), "valueMappings must not be empty");
+        }
+        Set<String> planMetricCodes = metrics.stream()
+                .map(MetricReferenceDsl::metricCode)
+                .collect(Collectors.toSet());
+        for (int index = 0; index < target.valueMappings().size(); index++) {
+            MetricSnapshotTargetMappingDsl mapping = target.valueMappings().get(index);
+            String mappingPath = child(child(path, "valueMappings"), Integer.toString(index));
+            validateIdentifier(mapping.metricCode(), child(mappingPath, "metricCode"), 100);
+            validateIdentifier(mapping.fieldName(), child(mappingPath, "fieldName"));
+            if (!planMetricCodes.contains(mapping.metricCode())) {
+                throw error(MetricErrorCode.DSL_PLAN_INVALID, child(mappingPath, "metricCode"),
+                        "Mapping metricCode must be declared by the plan");
+            }
+        }
+    }
+
+    private Map<String, Object> toCanonicalSnapshotTarget(MetricSnapshotTargetDsl target) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("storageType", target.storageType().name());
+        result.put("bucketTimeField", target.bucketTimeField());
+        result.put("valueMappings", target.valueMappings().stream()
+                .sorted(Comparator.comparing(MetricSnapshotTargetMappingDsl::metricCode)
+                        .thenComparing(MetricSnapshotTargetMappingDsl::fieldName))
+                .map(this::toCanonicalTargetMapping)
+                .toList());
+        return result;
+    }
+
+    private List<MetricSnapshotTargetMappingDsl> parseTargetMappings(Object value, String path) {
+        List<Object> source = MetricDslJson.array(value, path);
+        List<MetricSnapshotTargetMappingDsl> result = new ArrayList<>(source.size());
+        for (int index = 0; index < source.size(); index++) {
+            String mappingPath = child(path, Integer.toString(index));
+            Map<String, Object> mapping = MetricDslJson.object(source.get(index), mappingPath);
+            MetricDslJson.rejectUnknown(mapping, mappingPath,
+                    Set.of("metricCode", "fieldName"));
+            result.add(new MetricSnapshotTargetMappingDsl(
+                    string(required(mapping, "metricCode", mappingPath), child(mappingPath, "metricCode")),
+                    string(required(mapping, "fieldName", mappingPath), child(mappingPath, "fieldName"))));
+        }
+        return result;
+    }
+
+    private Map<String, Object> toCanonicalTargetMapping(MetricSnapshotTargetMappingDsl mapping) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("metricCode", mapping.metricCode());
+        result.put("fieldName", mapping.fieldName());
         return result;
     }
 
@@ -299,16 +373,6 @@ public final class MetricMaterializationPlanDslCodec {
         } catch (IllegalArgumentException exception) {
             throw error(MetricErrorCode.DSL_PLAN_INVALID, path, "Unsupported segmentCode");
         }
-    }
-
-    private @Nullable String optionalString(Map<String, Object> source, String field, String path) {
-        if (!source.containsKey(field)) {
-            return null;
-        }
-        if (source.get(field) == null) {
-            throw error(MetricErrorCode.DSL_FIELD_TYPE_INVALID, path, "Explicit null is not allowed");
-        }
-        return string(source.get(field), path);
     }
 
     private void validateIdentifier(String value, String path) {

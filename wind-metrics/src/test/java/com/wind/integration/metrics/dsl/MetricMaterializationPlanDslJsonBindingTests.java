@@ -7,6 +7,8 @@ import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.DatabindException;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -21,7 +23,7 @@ class MetricMaterializationPlanDslJsonBindingTests {
     private static final String PLAN_JSON = """
             {
               "schemaVersion": 2,
-              "metrics": [{"metricCode": "B", "definitionRevision": 7}, {"metricCode": "A"}],
+              "metrics": [{"metricCode": "B", "definitionRevision": 7}, {"metricCode": "A", "definitionRevision": 2}],
               "executionMode": "SEGMENTED",
               "snapshotKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
               "recentWindow": "P90D",
@@ -30,7 +32,9 @@ class MetricMaterializationPlanDslJsonBindingTests {
                   "segmentCode": "archive",
                   "sourceType": "SNAPSHOT",
                   "snapshotGranularity": "DAY",
-                  "snapshotTargetCode": "authArchiveValue"
+                  "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
+                    "bucketTimeField": "bucketEndTime",
+                    "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}
                 },
                 {"segmentCode": "recent", "sourceType": "REALTIME"}
               ]
@@ -71,32 +75,45 @@ class MetricMaterializationPlanDslJsonBindingTests {
     }
 
     @Test
-    void testDirectBindingPreservesOptionalRevision() {
+    void testDirectBindingPreservesExplicitRevision() {
         MetricMaterializationPlanDsl plan = jsonMapper.readValue(PLAN_JSON, MetricMaterializationPlanDsl.class);
 
         Assertions.assertEquals(7, plan.metrics().getFirst().definitionRevision());
-        Assertions.assertNull(plan.metrics().getLast().definitionRevision());
+        Assertions.assertEquals(2, plan.metrics().getLast().definitionRevision());
         Assertions.assertEquals(codec.canonicalize(plan), jsonMapper.writeValueAsString(plan));
         Assertions.assertEquals(codec.canonicalize(plan),
                 codec.canonicalize(jsonMapper.readValue(jsonMapper.writeValueAsString(plan), MetricMaterializationPlanDsl.class)));
     }
 
     @Test
-    void testNestedBindingPreservesOptionalRevision() {
+    void testNestedBindingPreservesExplicitRevision() {
         PlanRequest request = jsonMapper.readValue("{\"plan\":" + PLAN_JSON + "}", PlanRequest.class);
         String canonical = jsonMapper.writeValueAsString(request);
         PlanRequest restored = jsonMapper.readValue(canonical, PlanRequest.class);
 
-        Assertions.assertNull(restored.plan().metrics().getFirst().definitionRevision());
+        Assertions.assertEquals(2, restored.plan().metrics().getFirst().definitionRevision());
         Assertions.assertEquals(7, restored.plan().metrics().getLast().definitionRevision());
         Assertions.assertFalse(canonical.contains("\"definitionRevision\":null"));
         Assertions.assertEquals(canonical, jsonMapper.writeValueAsString(restored));
     }
 
-    @Test
-    void testNestedBindingRejectsExplicitNullRevision() {
-        assertInvalidNestedPlan(PLAN_JSON.replace("\"definitionRevision\": 7", "\"definitionRevision\": null"),
-                MetricErrorCode.DSL_FIELD_TYPE_INVALID, "/metrics/0/definitionRevision");
+    @ParameterizedTest
+    @ValueSource(strings = {"missing", "null", "0", "-1"})
+    void testDirectAndNestedBindingRequirePositiveMemberRevision(String revision) {
+        String source = "missing".equals(revision)
+                ? PLAN_JSON.replace(", \"definitionRevision\": 7", "")
+                : PLAN_JSON.replace("\"definitionRevision\": 7", "\"definitionRevision\": " + revision);
+        MetricErrorCode expected = "missing".equals(revision) || "null".equals(revision)
+                ? MetricErrorCode.DSL_FIELD_REQUIRED : MetricErrorCode.DSL_PLAN_INVALID;
+        MetricValidationException parsed = Assertions.assertThrows(MetricValidationException.class,
+                () -> codec.parse(source));
+        Assertions.assertEquals(expected, parsed.errorCode());
+        Assertions.assertEquals("/metrics/0/definitionRevision", parsed.fieldPath());
+        MetricValidationException direct = Assertions.assertThrows(MetricValidationException.class,
+                () -> jsonMapper.readValue(source, MetricMaterializationPlanDsl.class));
+        Assertions.assertEquals(expected, direct.errorCode());
+        Assertions.assertEquals(parsed.fieldPath(), direct.fieldPath());
+        assertInvalidNestedPlan(source, expected, parsed.fieldPath());
     }
 
     @Test

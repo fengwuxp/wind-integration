@@ -14,7 +14,7 @@ import java.util.Objects;
  * @param segmentCode 固定的 archive 或 recent 分段
  * @param sourceType 分段数据来源
  * @param snapshotGranularity 快照分段的桶粒度；实时分段为空
- * @param snapshotTargetCode 快照分段的逻辑目标编码；实时分段为空
+ * @param snapshotTarget 快照分段的逻辑保存目标；实时分段为空
  *
  * @author wuxp
  * @date 2026-07-21 17:51
@@ -24,7 +24,7 @@ public record MetricSegmentDsl(
         @Schema(description = "固定的 archive 或 recent 分段") MetricSegmentCode segmentCode,
         @Schema(description = "分段数据来源") MetricSegmentSourceType sourceType,
         @Nullable @Schema(description = "快照分段的桶粒度；实时分段为空") SnapshotGranularity snapshotGranularity,
-        @Nullable @Schema(description = "快照分段的逻辑目标编码；实时分段为空") String snapshotTargetCode) {
+        @Nullable @Schema(description = "快照分段的逻辑保存目标；实时分段为空") MetricSnapshotTargetDsl snapshotTarget) {
 
     public MetricSegmentDsl {
         Objects.requireNonNull(segmentCode, "segmentCode must not be null");

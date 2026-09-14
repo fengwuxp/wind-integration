@@ -18,8 +18,18 @@ public enum SnapshotGranularity implements DescriptiveEnum {
 
     @Schema(description = "小时")
     HOUR("小时"),
+
     @Schema(description = "自然日")
-    DAY("自然日");
+    DAY("自然日"),
+
+    @Schema(description = "自然周")
+    WEEK("自然周"),
+
+    @Schema(description = "自然月")
+    MONTH("自然月"),
+
+    @Schema(description = "自然年")
+    YEAR("自然年");
 
     /** 枚举描述。 */
     private final String desc;

@@ -15,16 +15,18 @@ import java.util.Objects;
  * 指标逻辑物化计划，不包含物理表或数据源绑定。
  *
  * <p>{@code SNAPSHOT} 使用根级快照字段且不包含分段；{@code SEGMENTED} 使用
- * {@code recentWindow} 和固定的 archive、recent 两段。</p>
+ * {@code recentWindow} 和固定的 archive、recent 两段。查询模式不规定一次物化的起止范围；
+ * 覆盖范围、目标截止时间和已提交水位由宿主管理，不属于逻辑保存目标。
+ * 初次物化从配置覆盖起点开始，后续从已提交水位继续处理已关闭桶，不因追赶目标重算已提交桶。</p>
  *
  * @param schemaVersion Plan DSL 结构版本，当前只支持 {@code 2}
  * @param executionMode 计划对应的顶层查询模式，只允许 {@code SNAPSHOT} 或 {@code SEGMENTED}
  * @param snapshotKeyProviderCode 快照主体与维度键枚举器编码
- * @param metrics 计划关联的一个或多个独立指标，不包含发布生成的依赖或原始度量
- * @param snapshotGranularity 全量快照桶粒度；分段模式为空
- * @param snapshotTargetCode 全量快照逻辑目标编码；分段模式为空
+ * @param metrics 计划关联的一个或多个独立指标，每项显式指定定义修订，不包含发布生成的依赖或原始度量
+ * @param snapshotGranularity SNAPSHOT 查询拓扑采用的快照桶粒度；SEGMENTED 时由各 SNAPSHOT 分段声明
+ * @param snapshotTarget SNAPSHOT 查询拓扑的逻辑快照保存目标；SEGMENTED 时由各 SNAPSHOT 分段声明
  * @param recentWindow 分段模式近期窗口，只支持正数天或小时的 ISO-8601 Duration
- * @param segments 分段模式固定的 archive、recent 两段；全量快照模式为空列表
+ * @param segments SEGMENTED 查询拓扑固定的 archive、recent 两段；SNAPSHOT 时为空列表
  *
  * @author wuxp
  * @date 2026-07-21 17:51
@@ -36,11 +38,11 @@ public record MetricMaterializationPlanDsl(
         @Schema(description = "Plan DSL 结构版本，当前只支持 2") Integer schemaVersion,
         @Schema(description = "计划对应的顶层查询模式") MetricQueryMode executionMode,
         @Schema(description = "快照主体与维度键枚举器编码") String snapshotKeyProviderCode,
-        @Schema(description = "计划关联的独立指标，非空且指标编码唯一") List<MetricReferenceDsl> metrics,
-        @Nullable @Schema(description = "全量快照桶粒度；分段模式为空") SnapshotGranularity snapshotGranularity,
-        @Nullable @Schema(description = "全量快照逻辑目标编码；分段模式为空") String snapshotTargetCode,
+        @Schema(description = "计划关联的独立指标，非空且指标编码唯一，每项定义修订必填") List<MetricReferenceDsl> metrics,
+        @Nullable @Schema(description = "SNAPSHOT 查询拓扑采用的快照桶粒度；SEGMENTED 时由各 SNAPSHOT 分段声明") SnapshotGranularity snapshotGranularity,
+        @Nullable @Schema(description = "SNAPSHOT 查询拓扑的逻辑快照保存目标；SEGMENTED 时由各 SNAPSHOT 分段声明") MetricSnapshotTargetDsl snapshotTarget,
         @Nullable @Schema(description = "分段模式近期窗口") String recentWindow,
-        @Schema(description = "分段模式固定的 archive、recent 两段") List<MetricSegmentDsl> segments) {
+        @Schema(description = "SEGMENTED 查询拓扑固定的 archive、recent 两段；SNAPSHOT 时为空列表") List<MetricSegmentDsl> segments) {
 
     public MetricMaterializationPlanDsl {
         Objects.requireNonNull(schemaVersion, "schemaVersion must not be null");

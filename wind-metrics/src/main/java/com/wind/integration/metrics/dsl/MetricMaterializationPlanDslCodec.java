@@ -49,7 +49,7 @@ public final class MetricMaterializationPlanDslCodec {
     private static final int SCHEMA_VERSION = 2;
 
     /**
-     * 快照键提供者、指标编码和逻辑结果字段允许使用的格式。
+     * 维度键提供方、指标编码和逻辑结果字段允许使用的格式。
      */
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z][A-Za-z0-9_]*");
 
@@ -62,7 +62,7 @@ public final class MetricMaterializationPlanDslCodec {
      * Plan DSL 根节点允许出现的字段。
      */
     private static final Set<String> ROOT_FIELDS = Set.of(
-            "schemaVersion", "executionMode", "snapshotKeyProviderCode", "snapshotGranularity",
+            "schemaVersion", "executionMode", "dimensionKeyProviderCode", "snapshotGranularity",
             "snapshotTarget", "recentWindow", "segments", "metrics");
 
     /**
@@ -88,8 +88,8 @@ public final class MetricMaterializationPlanDslCodec {
         MetricDslJson.rejectUnknown(root, "", ROOT_FIELDS);
         MetricQueryMode executionMode = MetricDslJson.enumValue(
                 required(root, "executionMode", ""), MetricQueryMode.class, "/executionMode");
-        String keyProviderCode = string(
-                required(root, "snapshotKeyProviderCode", ""), "/snapshotKeyProviderCode");
+        String dimensionKeyProviderCode = string(
+                required(root, "dimensionKeyProviderCode", ""), "/dimensionKeyProviderCode");
         List<MetricReferenceDsl> metrics = parseMetrics(required(root, "metrics", ""));
         SnapshotGranularity granularity = root.containsKey("snapshotGranularity")
                 ? MetricDslJson.enumValue(
@@ -103,7 +103,7 @@ public final class MetricMaterializationPlanDslCodec {
         List<MetricSegmentDsl> segments = parseSegments(
                 MetricDslJson.optionalValue(root, "segments", "/segments"));
         MetricMaterializationPlanDsl plan = new MetricMaterializationPlanDsl(
-                schemaVersion, executionMode, keyProviderCode, metrics,
+                schemaVersion, executionMode, dimensionKeyProviderCode, metrics,
                 granularity, snapshotTarget, recentWindow, segments);
         validateBasic(plan);
         return plan;
@@ -119,7 +119,7 @@ public final class MetricMaterializationPlanDslCodec {
         if (plan.schemaVersion() != SCHEMA_VERSION) {
             throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
-        validateIdentifier(plan.snapshotKeyProviderCode(), "/snapshotKeyProviderCode");
+        validateIdentifier(plan.dimensionKeyProviderCode(), "/dimensionKeyProviderCode");
         validateMetrics(plan.metrics());
         if (plan.executionMode() == MetricQueryMode.REALTIME) {
             throw error(MetricErrorCode.DSL_PLAN_INVALID, "/executionMode", "REALTIME does not use a plan");
@@ -162,7 +162,7 @@ public final class MetricMaterializationPlanDslCodec {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("schemaVersion", plan.schemaVersion());
         result.put("executionMode", plan.executionMode().name());
-        result.put("snapshotKeyProviderCode", plan.snapshotKeyProviderCode());
+        result.put("dimensionKeyProviderCode", plan.dimensionKeyProviderCode());
         result.put("metrics", plan.metrics().stream()
                 .sorted(Comparator.comparing(MetricReferenceDsl::metricCode))
                 .map(this::toCanonicalMetric)

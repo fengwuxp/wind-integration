@@ -203,7 +203,7 @@ class MetricMaterializationPlanDslCodecSnapshotTargetTests {
     void testNestedSnapshotSegmentRejectsRemovedRowKeys(String storageType) {
         MetricMaterializationPlanDsl snapshot = codec.parse(planJson(WIDE_TARGET.replace("WIDE_TABLE", storageType)));
         MetricMaterializationPlanDsl segmented = new MetricMaterializationPlanDsl(2, MetricQueryMode.SEGMENTED,
-                snapshot.snapshotKeyProviderCode(), snapshot.metrics(), null, null, "P90D", List.of(
+                snapshot.dimensionKeyProviderCode(), snapshot.metrics(), null, null, "P90D", List.of(
                 new MetricSegmentDsl(MetricSegmentCode.ARCHIVE, MetricSegmentSourceType.SNAPSHOT,
                         SnapshotGranularity.DAY, snapshot.snapshotTarget()),
                 new MetricSegmentDsl(MetricSegmentCode.RECENT, MetricSegmentSourceType.REALTIME, null, null)));
@@ -267,7 +267,7 @@ class MetricMaterializationPlanDslCodecSnapshotTargetTests {
     void testApplySameContractToSnapshotSegments() {
         MetricMaterializationPlanDsl snapshot = codec.parse(planJson(WIDE_TARGET));
         MetricMaterializationPlanDsl segmented = new MetricMaterializationPlanDsl(2, MetricQueryMode.SEGMENTED,
-                snapshot.snapshotKeyProviderCode(), snapshot.metrics(), null, null, "P90D", List.of(
+                snapshot.dimensionKeyProviderCode(), snapshot.metrics(), null, null, "P90D", List.of(
                 new MetricSegmentDsl(MetricSegmentCode.ARCHIVE, MetricSegmentSourceType.SNAPSHOT,
                         SnapshotGranularity.DAY, snapshot.snapshotTarget()),
                 new MetricSegmentDsl(MetricSegmentCode.RECENT, MetricSegmentSourceType.REALTIME, null, null)));
@@ -305,7 +305,7 @@ class MetricMaterializationPlanDslCodecSnapshotTargetTests {
 
     private String planJson(String target) {
         return """
-                {"schemaVersion":2,"executionMode":"SNAPSHOT","snapshotKeyProviderCode":"WALLET_KEYS",
+                {"schemaVersion":2,"executionMode":"SNAPSHOT","dimensionKeyProviderCode":"WALLET_KEYS",
                  "metrics":[{"metricCode":"USER_WALLET_INCOME_TOTAL","definitionRevision":2},
                             {"metricCode":"USER_WALLET_TRANSACTION_COUNT","definitionRevision":7},
                             {"metricCode":"USER_WALLET_SUMMARY","definitionRevision":3}],

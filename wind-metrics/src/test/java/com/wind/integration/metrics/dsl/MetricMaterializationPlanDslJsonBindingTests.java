@@ -25,7 +25,7 @@ class MetricMaterializationPlanDslJsonBindingTests {
               "schemaVersion": 2,
               "metrics": [{"metricCode": "B", "definitionRevision": 7}, {"metricCode": "A", "definitionRevision": 2}],
               "executionMode": "SEGMENTED",
-              "snapshotKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
+              "dimensionKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
               "recentWindow": "P90D",
               "segments": [
                 {
@@ -51,6 +51,7 @@ class MetricMaterializationPlanDslJsonBindingTests {
 
         Assertions.assertEquals(MetricSegmentCode.ARCHIVE, request.plan().segments().getFirst().segmentCode());
         Assertions.assertEquals(MetricSegmentCode.RECENT, request.plan().segments().getLast().segmentCode());
+        Assertions.assertEquals("VCC_CUSTOMER_CURRENCY_KEYS", request.plan().dimensionKeyProviderCode());
     }
 
     @Test
@@ -80,6 +81,7 @@ class MetricMaterializationPlanDslJsonBindingTests {
 
         Assertions.assertEquals(7, plan.metrics().getFirst().definitionRevision());
         Assertions.assertEquals(2, plan.metrics().getLast().definitionRevision());
+        Assertions.assertEquals("VCC_CUSTOMER_CURRENCY_KEYS", plan.dimensionKeyProviderCode());
         Assertions.assertEquals(codec.canonicalize(plan), jsonMapper.writeValueAsString(plan));
         Assertions.assertEquals(codec.canonicalize(plan),
                 codec.canonicalize(jsonMapper.readValue(jsonMapper.writeValueAsString(plan), MetricMaterializationPlanDsl.class)));
@@ -93,6 +95,9 @@ class MetricMaterializationPlanDslJsonBindingTests {
 
         Assertions.assertEquals(2, restored.plan().metrics().getFirst().definitionRevision());
         Assertions.assertEquals(7, restored.plan().metrics().getLast().definitionRevision());
+        Assertions.assertEquals("VCC_CUSTOMER_CURRENCY_KEYS", restored.plan().dimensionKeyProviderCode());
+        Assertions.assertTrue(canonical.contains("\"dimensionKeyProviderCode\":\"VCC_CUSTOMER_CURRENCY_KEYS\""));
+        Assertions.assertFalse(canonical.contains("snapshotKeyProviderCode"));
         Assertions.assertFalse(canonical.contains("\"definitionRevision\":null"));
         Assertions.assertEquals(canonical, jsonMapper.writeValueAsString(restored));
     }
@@ -128,6 +133,49 @@ class MetricMaterializationPlanDslJsonBindingTests {
                 MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion");
         assertInvalidNestedPlan(PLAN_JSON.replace("\"schemaVersion\": 2", "\"schemaVersion\": 2, \"dependencies\": []"),
                 MetricErrorCode.DSL_FIELD_UNKNOWN, "/dependencies");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missing", "null", "blank", "number", "invalid"})
+    void testDirectAndNestedBindingRequireDimensionProvider(String input) {
+        String declaration = "\"dimensionKeyProviderCode\": \"VCC_CUSTOMER_CURRENCY_KEYS\"";
+        String source = switch (input) {
+            case "missing" -> PLAN_JSON.replace(declaration + ",", "");
+            case "null" -> PLAN_JSON.replace(declaration, "\"dimensionKeyProviderCode\": null");
+            case "blank" -> PLAN_JSON.replace("VCC_CUSTOMER_CURRENCY_KEYS", " ");
+            case "number" -> PLAN_JSON.replace(declaration, "\"dimensionKeyProviderCode\": 123");
+            default -> PLAN_JSON.replace("VCC_CUSTOMER_CURRENCY_KEYS", "INVALID-KEYS");
+        };
+        MetricErrorCode expected = switch (input) {
+            case "missing", "null" -> MetricErrorCode.DSL_FIELD_REQUIRED;
+            case "blank", "number" -> MetricErrorCode.DSL_FIELD_TYPE_INVALID;
+            default -> MetricErrorCode.DSL_IDENTIFIER_INVALID;
+        };
+
+        assertInvalidDirectAndNestedPlan(source, expected, "/dimensionKeyProviderCode");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testRejectLegacyProviderNameEvenWhenNewNameIsPresent(boolean includeNewName) {
+        String source = includeNewName
+                ? PLAN_JSON.replace("\"dimensionKeyProviderCode\":",
+                        "\"snapshotKeyProviderCode\": \"OTHER_KEYS\", \"dimensionKeyProviderCode\":")
+                : PLAN_JSON.replace("dimensionKeyProviderCode", "snapshotKeyProviderCode");
+
+        assertInvalidDirectAndNestedPlan(source, MetricErrorCode.DSL_FIELD_UNKNOWN, "/snapshotKeyProviderCode");
+    }
+
+    private void assertInvalidDirectAndNestedPlan(String source, MetricErrorCode errorCode, String fieldPath) {
+        MetricValidationException parsed = Assertions.assertThrows(MetricValidationException.class,
+                () -> codec.parse(source));
+        Assertions.assertEquals(errorCode, parsed.errorCode());
+        Assertions.assertEquals(fieldPath, parsed.fieldPath());
+        MetricValidationException direct = Assertions.assertThrows(MetricValidationException.class,
+                () -> jsonMapper.readValue(source, MetricMaterializationPlanDsl.class));
+        Assertions.assertEquals(errorCode, direct.errorCode());
+        Assertions.assertEquals(fieldPath, direct.fieldPath());
+        assertInvalidNestedPlan(source, errorCode, fieldPath);
     }
 
     private void assertInvalidNestedPlan(String plan, MetricErrorCode errorCode, String fieldPath) {

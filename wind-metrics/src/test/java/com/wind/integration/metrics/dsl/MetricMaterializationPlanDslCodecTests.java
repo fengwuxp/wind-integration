@@ -34,7 +34,7 @@ class MetricMaterializationPlanDslCodecTests {
                 {
                   "schemaVersion": 2,
                   "executionMode": "SNAPSHOT",
-                  "snapshotKeyProviderCode": "VCC_KEYS",
+                  "dimensionKeyProviderCode": "VCC_KEYS",
                   "metrics": [{"metricCode": "B", "definitionRevision": 7}, {"metricCode": "A", "definitionRevision": 2}],
                   "snapshotGranularity": "DAY",
                   "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
@@ -47,7 +47,7 @@ class MetricMaterializationPlanDslCodecTests {
 
         Assertions.assertEquals(
                 "{\"schemaVersion\":2,\"executionMode\":\"SNAPSHOT\","
-                        + "\"snapshotKeyProviderCode\":\"VCC_KEYS\","
+                        + "\"dimensionKeyProviderCode\":\"VCC_KEYS\","
                         + "\"metrics\":[{\"metricCode\":\"A\",\"definitionRevision\":2},{\"metricCode\":\"B\",\"definitionRevision\":7}],"
                         + "\"snapshotGranularity\":\"DAY\",\"snapshotTarget\":{\"storageType\":\"METRIC_VALUE_TABLE\","
                         + "\"bucketTimeField\":\"bucketEndTime\","
@@ -64,7 +64,7 @@ class MetricMaterializationPlanDslCodecTests {
                     "bucketTimeField": "bucketEndTime",
                     "valueMappings": [{"metricCode": "A", "fieldName": "value"}]},
                   "snapshotGranularity": "DAY",
-                  "snapshotKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
+                  "dimensionKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
                   "executionMode": "SNAPSHOT",
                   "schemaVersion": 2,
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}]
@@ -76,7 +76,7 @@ class MetricMaterializationPlanDslCodecTests {
         Assertions.assertEquals(MetricQueryMode.SNAPSHOT, plan.executionMode());
         Assertions.assertEquals(
                 "{\"schemaVersion\":2,\"executionMode\":\"SNAPSHOT\","
-                        + "\"snapshotKeyProviderCode\":\"VCC_CUSTOMER_CURRENCY_KEYS\","
+                        + "\"dimensionKeyProviderCode\":\"VCC_CUSTOMER_CURRENCY_KEYS\","
                         + "\"metrics\":[{\"metricCode\":\"A\",\"definitionRevision\":2}],"
                         + "\"snapshotGranularity\":\"DAY\",\"snapshotTarget\":{\"storageType\":\"METRIC_VALUE_TABLE\","
                         + "\"bucketTimeField\":\"bucketEndTime\","
@@ -87,7 +87,7 @@ class MetricMaterializationPlanDslCodecTests {
     @Test
     void testRejectLegacySnapshotTargetCode() {
         String legacy = """
-                {"schemaVersion":2,"executionMode":"SNAPSHOT","snapshotKeyProviderCode":"VCC_KEYS",
+                {"schemaVersion":2,"executionMode":"SNAPSHOT","dimensionKeyProviderCode":"VCC_KEYS",
                  "metrics":[{"metricCode":"A","definitionRevision":2}],"snapshotGranularity":"DAY","snapshotTargetCode":"refundValue"}
                 """;
 
@@ -102,7 +102,7 @@ class MetricMaterializationPlanDslCodecTests {
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "recentWindow": "P090D",
-                  "snapshotKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
+                  "dimensionKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
                   "segments": [
                     {
                       "segmentCode": "archive",
@@ -131,7 +131,7 @@ class MetricMaterializationPlanDslCodecTests {
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "recentWindow": "PT0H",
-                  "snapshotKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
+                  "dimensionKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
                   "segments": []
                 }
                 """;
@@ -152,7 +152,7 @@ class MetricMaterializationPlanDslCodecTests {
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "recentWindow": "P90D",
-                  "snapshotKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
+                  "dimensionKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
                   "segments": [
                     {
                       "segmentCode": "archive",
@@ -179,7 +179,7 @@ class MetricMaterializationPlanDslCodecTests {
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "recentWindow": "PT024H",
-                  "snapshotKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
+                  "dimensionKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
                   "segments": [
                     {
                       "segmentCode": "archive",
@@ -213,7 +213,7 @@ class MetricMaterializationPlanDslCodecTests {
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "recentWindow": "P90D",
-                  "snapshotKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
+                  "dimensionKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
                   "segments": [
                     {
                       "segmentCode": "archive",
@@ -250,7 +250,7 @@ class MetricMaterializationPlanDslCodecTests {
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "recentWindow": "P90D",
-                  "snapshotKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
+                  "dimensionKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
                   "segments": [
                     {"segmentCode": "recent", "sourceType": "REALTIME"},
                     {
@@ -285,7 +285,7 @@ class MetricMaterializationPlanDslCodecTests {
     @Test
     void testRejectTrailingComma() {
         assertInvalidJson("""
-                {"schemaVersion":1,"executionMode":"SNAPSHOT","snapshotKeyProviderCode":"VCC_KEYS",
+                {"schemaVersion":1,"executionMode":"SNAPSHOT","dimensionKeyProviderCode":"VCC_KEYS",
                  "snapshotGranularity":"DAY","snapshotTarget":{"storageType":"METRIC_VALUE_TABLE","bucketTimeField":"bucketEndTime","valueMappings":[{"metricCode":"A","fieldName":"value"}]},}
                 """);
     }
@@ -294,7 +294,7 @@ class MetricMaterializationPlanDslCodecTests {
     void testRejectJsonComment() {
         assertInvalidJson("""
                 {"schemaVersion":1,/* comment */"executionMode":"SNAPSHOT",
-                 "snapshotKeyProviderCode":"VCC_KEYS","snapshotGranularity":"DAY",
+                 "dimensionKeyProviderCode":"VCC_KEYS","snapshotGranularity":"DAY",
                  "snapshotTarget":{"storageType":"METRIC_VALUE_TABLE","bucketTimeField":"bucketEndTime","valueMappings":[{"metricCode":"A","fieldName":"value"}]}}
                 """);
     }
@@ -302,7 +302,7 @@ class MetricMaterializationPlanDslCodecTests {
     @Test
     void testRejectUnquotedJsonField() {
         assertInvalidJson("""
-                {schemaVersion:1,executionMode:"SNAPSHOT",snapshotKeyProviderCode:"VCC_KEYS",
+                {schemaVersion:1,executionMode:"SNAPSHOT",dimensionKeyProviderCode:"VCC_KEYS",
                  snapshotGranularity:"DAY",snapshotTarget:{storageType:"METRIC_VALUE_TABLE",bucketTimeField:"bucketEndTime",
                  valueMappings:[{metricCode:"A",fieldName:"value"}]}}
                 """);
@@ -317,7 +317,7 @@ class MetricMaterializationPlanDslCodecTests {
     void testRejectNonStandardJsonNumbers() {
         for (String schemaVersion : new String[]{"+1", "0x1", "1."}) {
             assertInvalidJson("""
-                    {"schemaVersion":%s,"executionMode":"SNAPSHOT","snapshotKeyProviderCode":"VCC_KEYS",
+                    {"schemaVersion":%s,"executionMode":"SNAPSHOT","dimensionKeyProviderCode":"VCC_KEYS",
                      "snapshotGranularity":"DAY","snapshotTarget":{"storageType":"METRIC_VALUE_TABLE","bucketTimeField":"bucketEndTime","valueMappings":[{"metricCode":"A","fieldName":"value"}]}}
                     """.formatted(schemaVersion));
         }
@@ -330,7 +330,7 @@ class MetricMaterializationPlanDslCodecTests {
                   "schemaVersion": 2,
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SNAPSHOT",
-                  "snapshotKeyProviderCode": "VCC_KEYS",
+                  "dimensionKeyProviderCode": "VCC_KEYS",
                   "snapshotGranularity": "DAY",
                   "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                     "bucketTimeField": "bucketEndTime",
@@ -380,7 +380,7 @@ class MetricMaterializationPlanDslCodecTests {
                   "schemaVersion": 2,
                   "metrics": [{"metricCode": "B", "definitionRevision": 7}, {"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
-                  "snapshotKeyProviderCode": "VCC_KEYS",
+                  "dimensionKeyProviderCode": "VCC_KEYS",
                   "recentWindow": "P090D",
                   "segments": [
                     {"segmentCode": "archive", "sourceType": "SNAPSHOT",
@@ -508,7 +508,7 @@ class MetricMaterializationPlanDslCodecTests {
                               "schemaVersion": 2,
                               "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                               "executionMode": "SNAPSHOT",
-                              "snapshotKeyProviderCode": "VCC_KEYS",
+                              "dimensionKeyProviderCode": "VCC_KEYS",
                               "snapshotGranularity": "DAY",
                               "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                                 "bucketTimeField": "bucketEndTime",
@@ -525,7 +525,7 @@ class MetricMaterializationPlanDslCodecTests {
                   "schemaVersion": 2,
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
-                  "snapshotKeyProviderCode": "VCC_KEYS",
+                  "dimensionKeyProviderCode": "VCC_KEYS",
                   "snapshotGranularity": "DAY",
                   "recentWindow": "P90D",
                   "segments": [
@@ -548,7 +548,7 @@ class MetricMaterializationPlanDslCodecTests {
                 {
                   "schemaVersion": 2,
                   "executionMode": "SNAPSHOT",
-                  "snapshotKeyProviderCode": "VCC_KEYS",
+                  "dimensionKeyProviderCode": "VCC_KEYS",
                   "metrics": [%s],
                   "snapshotGranularity": "DAY",
                   "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",

@@ -50,6 +50,19 @@ GET 观察到水位达到目标只证明覆盖；未达到目标不证明原请�
 宿主聚合、时间规范化、调度与回填必须使用同一固定业务时区；未指定 ZoneId 的 `LocalDateTime.now()`
 不能用于解释业务桶或时间型维度。JVM 默认时区与业务时区不同的行为需由消费端验证。
 
+## 维度键提供方
+
+Plan 根字段 `dimensionKeyProviderCode` 选择宿主注册的业务维度键提供方，SNAPSHOT 和 SEGMENTED 均必填。
+编码沿用 `[A-Za-z][A-Za-z0-9_]*`、最长 64 字符；它选择业务来源及枚举范围，
+`WindMetricsDimensionKeyProvider.queryDimensionKeys` 的 `dimensions` 参数描述每行需要的完整逻辑键组合。
+例如 `CARD_CURRENCY_KEYS` 提供真实的卡与币种组合，`WALLET_CURRENCY_KEYS` 提供钱包与币种组合。
+宿主按编码选择唯一实现，不能只根据维度名集合取首个匹配者；同形键可能对应不同业务范围。
+
+字段由 `snapshotKeyProviderCode` 统一更名为 `dimensionKeyProviderCode`，Java record 访问器同步更名，
+schemaVersion 仍为 2。解析和 canonical 只使用新名，旧名及新旧名同时出现均拒绝。
+这是输入及 Java 调用合同的变更；已有持久 Plan JSON 与 canonical 摘要须由宿主在升级时协调处理，
+不能仅替换 JAR 后假定旧内容可读，也不能在普通运行中静默重写已发布计划及其冻结身份。
+
 ## 快照逻辑保存合同
 
 `SNAPSHOT` 使用根级 `snapshotGranularity` 和 `snapshotTarget`；`SEGMENTED` 的快照分段使用同样的字段。
@@ -83,7 +96,7 @@ GET 观察到水位达到目标只证明覆盖；未达到目标不证明原请�
 {
   "schemaVersion": 2,
   "executionMode": "SNAPSHOT",
-  "snapshotKeyProviderCode": "WALLET_KEYS",
+  "dimensionKeyProviderCode": "WALLET_KEYS",
   "metrics": [
     {"metricCode": "USER_WALLET_INCOME_TOTAL", "definitionRevision": 2},
     {"metricCode": "USER_WALLET_TRANSACTION_COUNT", "definitionRevision": 7},

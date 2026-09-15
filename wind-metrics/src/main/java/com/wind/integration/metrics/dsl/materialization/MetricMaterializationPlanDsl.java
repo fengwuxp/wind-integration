@@ -21,7 +21,7 @@ import java.util.Objects;
  *
  * @param schemaVersion Plan DSL 结构版本，当前只支持 {@code 2}
  * @param executionMode 计划对应的顶层查询模式，只允许 {@code SNAPSHOT} 或 {@code SEGMENTED}
- * @param snapshotKeyProviderCode 快照主体与维度键枚举器编码
+ * @param dimensionKeyProviderCode 业务维度键提供方的逻辑注册编码
  * @param metrics 计划关联的一个或多个独立指标，每项显式指定定义修订，不包含发布生成的依赖或原始度量
  * @param snapshotGranularity SNAPSHOT 查询拓扑采用的快照桶粒度；SEGMENTED 时由各 SNAPSHOT 分段声明
  * @param snapshotTarget SNAPSHOT 查询拓扑的逻辑快照保存目标；SEGMENTED 时由各 SNAPSHOT 分段声明
@@ -37,7 +37,7 @@ import java.util.Objects;
 public record MetricMaterializationPlanDsl(
         @Schema(description = "Plan DSL 结构版本，当前只支持 2") Integer schemaVersion,
         @Schema(description = "计划对应的顶层查询模式") MetricQueryMode executionMode,
-        @Schema(description = "快照主体与维度键枚举器编码") String snapshotKeyProviderCode,
+        @Schema(description = "业务维度键提供方的逻辑注册编码") String dimensionKeyProviderCode,
         @Schema(description = "计划关联的独立指标，非空且指标编码唯一，每项定义修订必填") List<MetricReferenceDsl> metrics,
         @Nullable @Schema(description = "SNAPSHOT 查询拓扑采用的快照桶粒度；SEGMENTED 时由各 SNAPSHOT 分段声明") SnapshotGranularity snapshotGranularity,
         @Nullable @Schema(description = "SNAPSHOT 查询拓扑的逻辑快照保存目标；SEGMENTED 时由各 SNAPSHOT 分段声明") MetricSnapshotTargetDsl snapshotTarget,
@@ -47,7 +47,7 @@ public record MetricMaterializationPlanDsl(
     public MetricMaterializationPlanDsl {
         Objects.requireNonNull(schemaVersion, "schemaVersion must not be null");
         Objects.requireNonNull(executionMode, "executionMode must not be null");
-        Objects.requireNonNull(snapshotKeyProviderCode, "snapshotKeyProviderCode must not be null");
+        Objects.requireNonNull(dimensionKeyProviderCode, "dimensionKeyProviderCode must not be null");
         metrics = List.copyOf(metrics);
         segments = List.copyOf(segments);
     }

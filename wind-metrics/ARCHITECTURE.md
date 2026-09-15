@@ -96,6 +96,8 @@ List<Map<String, Serializable>> queryDimensionKeys(Set<String> dimensions, int q
 例如 Set.of("userId") 或 Set.of("cardId", "currency")。每行必须给出完整具名组合，按真实业务关系生成，
 不自动做笛卡尔积。页码从 1 开始，页大小按组合计数，非空短页仍继续，空页才表示结束；
 不支持组合抛异常，不能返回空页冒充成功。业务实现负责排序、权限和稳定分页，Set 的迭代顺序不定义排序。
+多个实现由宿主按逻辑注册编码选择；Plan 的 `dimensionKeyProviderCode` 指向该编码，Wind 接口不新增注册方法。
+编码确定来源及范围，dimensions 确定完整键形状；同形键不能作为自动选择不同业务来源的充分条件。
 本接口没有 Plan、bucket、fact keySpec、有效期或一致性 token，不宣称历史视图及跨源一致性；
 变化数据集的稳定遍历和历史范围资格仍由宿主及数据提供方验证。注解表达约束，不等于 Java 直接调用自动校验。
 

@@ -1,5 +1,7 @@
 package com.wind.integration.metrics.query;
 
+import com.wind.integration.metrics.WindMetricsValue;
+import com.wind.integration.metrics.WindMetricsValueSet;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
@@ -27,7 +29,7 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
  * 不表示已物化全部历史；分段查询只在 {@code segments} 中返回各段覆盖信息。</p>
  *
  * @param metricCode 对外查询的指标编码
- * @param definitionRevision 实际生效的指标定义修订号
+ * @param definitionRevision 实际执行的指标定义修订号
  * @param executionMode 本次查询采用的顶层查询模式
  * @param routeMetricCode 单指标派生结果实际继承路由的指标编码；未继承时为空
  * @param routeDefinitionRevision 路由指标实际修订号；与 routeMetricCode 同时存在或同时为空
@@ -52,7 +54,7 @@ import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
 @Schema(description = "指标查询结果及实际执行摘要")
 public record MetricResult(
         @Schema(description = "对外查询的指标编码") String metricCode,
-        @Schema(description = "实际生效的指标定义修订号") Integer definitionRevision,
+        @Schema(description = "实际执行的指标定义修订号") Integer definitionRevision,
         @Schema(description = "本次查询采用的顶层查询模式") MetricQueryMode executionMode,
         @Nullable @Schema(description = "派生结果实际继承的指标编码") String routeMetricCode,
         @Nullable @Schema(description = "路由指标实际修订号") Integer routeDefinitionRevision,
@@ -118,6 +120,24 @@ public record MetricResult(
                 segments,
                 startTime,
                 endTime);
+    }
+
+    /**
+     * 将本次结果作为策略无关的公共指标值读取，不重新查询、合并或写回。
+     *
+     * <p>SCALAR 返回具名数值，FIELD_SET 返回 {@link WindMetricsValueSet}，
+     * 名称取 metricCode，子字段保留自身名称和正常空值。版本、覆盖、类型及路由信息
+     * 仍由本对象承载；调用方需要这些信息时保留本对象，不从具名值重建存储身份。</p>
+     *
+     * @return 只读指标值；不包含执行策略信息
+     */
+    public WindMetricsValue<?> toMetricsValue() {
+        if (valueShape == MetricValueShape.SCALAR) {
+            return WindMetricsValue.of(metricCode, value);
+        }
+        Map<String, Object> values = new LinkedHashMap<>();
+        fields.forEach((name, field) -> values.put(name, field.value()));
+        return WindMetricsValueSet.of(metricCode, values);
     }
 
     private static Map<String, MetricFieldValue> immutableFields(Map<String, MetricFieldValue> source) {

@@ -1,6 +1,5 @@
 package com.wind.integration.metrics.query;
 
-import com.wind.integration.metrics.dsl.MetricQueryJsonParser;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.annotation.JsonDeserialize;

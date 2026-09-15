@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.json.MetricJsonSupport;
 import com.wind.integration.metrics.dsl.materialization.MetricMaterializationPlanDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricSegmentDsl;
@@ -27,7 +28,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static com.wind.integration.metrics.dsl.MetricDslJson.child;
+import static com.wind.integration.metrics.json.MetricJsonSupport.child;
 import static com.wind.integration.metrics.dsl.MetricDslJson.error;
 import static com.wind.integration.metrics.dsl.MetricDslJson.required;
 import static com.wind.integration.metrics.dsl.MetricDslJson.string;
@@ -72,11 +73,11 @@ public final class MetricMaterializationPlanDslCodec {
      * @throws MetricValidationException JSON、字段或计划结构不符合 v2 契约时抛出
      */
     public MetricMaterializationPlanDsl parse(String json) {
-        return parse(MetricDslJson.parseRootObject(json));
+        return parse(MetricJsonSupport.parseRootObject(json));
     }
 
     MetricMaterializationPlanDsl parse(JsonParser parser) {
-        return parse(MetricDslJson.parseRootObject(parser));
+        return parse(MetricJsonSupport.parseRootObject(parser));
     }
 
     private MetricMaterializationPlanDsl parse(Map<String, Object> root) {
@@ -173,7 +174,7 @@ public final class MetricMaterializationPlanDslCodec {
             result.put("recentWindow", normalizeRecentWindow(plan.recentWindow()));
             result.put("segments", plan.segments().stream().map(this::toCanonicalSegment).toList());
         }
-        return MetricDslJson.toJson(result);
+        return MetricJsonSupport.toJson(result);
     }
 
     private List<MetricReferenceDsl> parseMetrics(Object value) {

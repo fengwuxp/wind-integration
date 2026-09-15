@@ -4,7 +4,11 @@ import com.wind.integration.metrics.WindMetricsEvaluator;
 import com.wind.integration.metrics.WindMetricsValue;
 
 /**
- * 单个值的指标字段，支持{@link #increase}、{@link #decrease}、{@link #setValue}
+ * 同时支持条件求值和数值修改的单值指标字段。
+ *
+ * <p>只读单值结果使用 {@link WindMetricsValue}，不必实现本接口。
+ * 本接口仅用于确实提供 {@link #increase}、{@link #decrease}、{@link #setValue} 的实现，
+ * 这些修改不自动具有完整桶提交、幂等写回或快照水位推进语义。</p>
  *
  * @author wuxp
  * @date 2025-06-17 14:14

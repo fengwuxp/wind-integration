@@ -1,9 +1,8 @@
-package com.wind.integration.metrics.dsl;
+package com.wind.integration.metrics.query;
 
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.enums.MetricErrorCode;
-import com.wind.integration.metrics.query.MetricBatchQuery;
-import com.wind.integration.metrics.query.MetricQuery;
+import com.wind.integration.metrics.json.MetricJsonSupport;
 import com.wind.jackson.WindJson;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
@@ -52,11 +51,11 @@ public final class MetricQueryJsonParser {
      * @throws MetricValidationException JSON 或查询字段不符合公开合同时抛出
      */
     public MetricQuery parse(String json) {
-        return parse(MetricDslJson.parseRootObject(json));
+        return parse(MetricJsonSupport.parseRootObject(json));
     }
 
     private MetricQuery parse(JsonParser parser) {
-        return parse(MetricDslJson.parseRootObject(parser));
+        return parse(MetricJsonSupport.parseRootObject(parser));
     }
 
     private MetricQuery parse(Map<String, Object> source) {
@@ -66,7 +65,7 @@ public final class MetricQueryJsonParser {
         } else {
             source.put("parameterValues", Map.of());
         }
-        MetricQueryPayload payload = deserialize(MetricDslJson.toJson(source), MetricQueryPayload.class);
+        MetricQueryPayload payload = deserialize(MetricJsonSupport.toJson(source), MetricQueryPayload.class);
         return new MetricQuery(
                 payload.metricCode(),
                 payload.subjectId(),
@@ -84,12 +83,12 @@ public final class MetricQueryJsonParser {
      * @throws MetricValidationException JSON 或查询字段不符合公开合同时抛出
      */
     public MetricBatchQuery parseBatch(String json) {
-        return parseBatch(MetricDslJson.parseRootObject(json));
+        return parseBatch(MetricJsonSupport.parseRootObject(json));
     }
 
     private MetricBatchQuery parseBatch(Map<String, Object> source) {
         rejectUnknownFields(source, BATCH_QUERY_FIELDS);
-        MetricBatchQueryPayload payload = deserialize(MetricDslJson.toJson(source), MetricBatchQueryPayload.class);
+        MetricBatchQueryPayload payload = deserialize(MetricJsonSupport.toJson(source), MetricBatchQueryPayload.class);
         return new MetricBatchQuery(
                 payload.metricCodes(),
                 payload.subjectId(),
@@ -103,7 +102,7 @@ public final class MetricQueryJsonParser {
             if (!allowedFields.contains(field)) {
                 throw new MetricValidationException(
                         MetricErrorCode.QUERY_INVALID,
-                        MetricDslJson.child("", field),
+                        MetricJsonSupport.child("", field),
                         "Unknown query field");
             }
         }
@@ -117,7 +116,7 @@ public final class MetricQueryJsonParser {
             String fieldName = name instanceof String text ? text : "";
             String path = fieldName.isBlank()
                     ? "/parameterValues"
-                    : MetricDslJson.child("/parameterValues", fieldName);
+                    : MetricJsonSupport.child("/parameterValues", fieldName);
             if (fieldName.isBlank()
                     || !(parameter instanceof BigInteger integer)
                     || integer.compareTo(BigInteger.valueOf(Integer.MIN_VALUE)) < 0

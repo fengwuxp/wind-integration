@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.json.MetricJsonSupport;
 import com.wind.integration.metrics.dsl.definition.MetricDefinitionDsl;
 import com.wind.integration.metrics.dsl.definition.MetricDefinitionSpec;
 import com.wind.integration.metrics.dsl.definition.MetricExpressionDsl;
@@ -52,7 +53,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
-import static com.wind.integration.metrics.dsl.MetricDslJson.child;
+import static com.wind.integration.metrics.json.MetricJsonSupport.child;
 import static com.wind.integration.metrics.dsl.MetricDslJson.error;
 import static com.wind.integration.metrics.dsl.MetricDslJson.required;
 import static com.wind.integration.metrics.dsl.MetricDslJson.string;
@@ -98,11 +99,11 @@ public final class MetricDefinitionDslCodec {
      * @throws MetricValidationException JSON、字段或指标结构不符合 v1 契约时抛出
      */
     public MetricDefinitionDsl parse(String json) {
-        return parse(MetricDslJson.parseRootObject(json));
+        return parse(MetricJsonSupport.parseRootObject(json));
     }
 
     MetricDefinitionDsl parse(JsonParser parser) {
-        return parse(MetricDslJson.parseRootObject(parser));
+        return parse(MetricJsonSupport.parseRootObject(parser));
     }
 
     private MetricDefinitionDsl parse(Map<String, Object> root) {
@@ -225,7 +226,7 @@ public final class MetricDefinitionDslCodec {
      */
     public String canonicalize(MetricDefinitionDsl definition) {
         validateBasic(definition);
-        return MetricDslJson.toJson(toCanonicalMap(definition));
+        return MetricJsonSupport.toJson(toCanonicalMap(definition));
     }
 
     private MetricDefinitionSpec parseMetric(Map<String, Object> source) {
@@ -992,7 +993,7 @@ public final class MetricDefinitionDslCodec {
             Map<String, Object> valuesByCanonicalJson = new TreeMap<>();
             set.values().forEach(literal -> {
                 Object value = literalValue(literal);
-                valuesByCanonicalJson.put(MetricDslJson.toJson(value), value);
+                valuesByCanonicalJson.put(MetricJsonSupport.toJson(value), value);
             });
             List<Object> values = List.copyOf(valuesByCanonicalJson.values());
             return Map.of(operatorName(set.operator()), Map.of(set.fieldRef(), values));
@@ -1003,7 +1004,7 @@ public final class MetricDefinitionDslCodec {
         LogicalMetricFilterDsl logical = (LogicalMetricFilterDsl) filter;
         List<Map<String, Object>> operands = logical.operands().stream()
                 .map(this::toCanonicalFilter)
-                .sorted(Comparator.comparing(MetricDslJson::toJson))
+                .sorted(Comparator.comparing(MetricJsonSupport::toJson))
                 .toList();
         return Map.of(operatorName(logical.operator()), operands);
     }

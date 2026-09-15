@@ -1,9 +1,7 @@
-package com.wind.integration.metrics.dsl;
+package com.wind.integration.metrics.query;
 
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.enums.MetricErrorCode;
-import com.wind.integration.metrics.query.MetricBatchQuery;
-import com.wind.integration.metrics.query.MetricQuery;
 import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;

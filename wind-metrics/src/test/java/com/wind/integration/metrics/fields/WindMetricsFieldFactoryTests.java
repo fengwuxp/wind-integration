@@ -1,7 +1,6 @@
 package com.wind.integration.metrics.fields;
 
 import com.wind.integration.metrics.WindMetricsAggregationQuery;
-import com.wind.integration.metrics.WindStructuredMetricsValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -62,14 +61,14 @@ class WindMetricsFieldFactoryTests {
     @Test
     void testFieldValuesKeepsLegacyImplementationAndNullFieldWithoutEagerRead() {
         MultipleValueMetricsField<Map<String, Object>> legacy = mock(MultipleValueMetricsField.class, CALLS_REAL_METHODS);
-        WindStructuredMetricsValue<Map<String, Object>> fields = legacy;
+        MultipleValueMetricsField<Map<String, Object>> fields = legacy;
         verifyNoInteractions(legacy);
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("count", 10L);
         values.put("amount", null);
         when(legacy.getValue()).thenReturn(values);
 
-        assertSame(values, fields.asFieldValues());
+        assertSame(values, fields.asValues());
         assertTrue(values.containsKey("amount"));
     }
 }

@@ -118,14 +118,20 @@ class WindMetricsValueCapabilityTests {
             }
 
             @Override
+            public List<WindMetricsValue<Object>> getMetricsFields() {
+                return asValues().entrySet().stream()
+                        .map(entry -> WindMetricsValue.of(entry.getKey(), entry.getValue())).toList();
+            }
+
+            @Override
             public Map<String, Object> evaluate(WindMetricsAggregationQuery query) {
                 return getValue();
             }
         };
-        WindStructuredMetricsValue<?> view = field;
+        WindMetricsValue<?> view = field;
         assertEquals("codedSummary", view.getName());
-        assertEquals(8L, view.asFieldValues().get("count"));
-        assertEquals(field.getValue(), view.asFieldValues());
+        assertEquals(8L, field.asValues().get("count"));
+        assertEquals(field.getValue(), field.asValues());
     }
 
     @Test

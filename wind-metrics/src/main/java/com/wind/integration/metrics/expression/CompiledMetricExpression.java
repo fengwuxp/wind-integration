@@ -1,4 +1,4 @@
-package com.wind.integration.metrics.dsl.expression;
+package com.wind.integration.metrics.expression;
 
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
@@ -43,7 +43,7 @@ public final class CompiledMetricExpression {
 
     private final boolean ratio;
 
-    CompiledMetricExpression(
+    public CompiledMetricExpression(
             SpelExpression expression,
             Set<String> localValueFields,
             Set<MetricValueReference> metricValueReferences,

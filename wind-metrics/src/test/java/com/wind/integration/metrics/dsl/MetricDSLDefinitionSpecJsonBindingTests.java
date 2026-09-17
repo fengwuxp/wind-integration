@@ -1,11 +1,13 @@
 package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.dsl.definition.MetricDefinitionDsl;
+import com.wind.integration.metrics.json.MetricDefinitionDslCodec;
+import com.wind.integration.metrics.spec.MetricDefinitionSpec.MetricDSLDefinitionSpec;
 import com.wind.integration.metrics.dsl.definition.selection.MetricRowSelectionDsl;
 import com.wind.integration.metrics.dsl.filter.LogicalMetricFilterDsl;
 import com.wind.integration.metrics.dsl.filter.SetMetricFilterDsl;
 import com.wind.integration.metrics.dsl.literal.StringMetricLiteralDsl;
+import com.wind.integration.metrics.enums.MetricDefinitionType;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricFilterOperator;
 import com.wind.jackson.WindJson;
@@ -22,7 +24,7 @@ import java.util.List;
  * @author wuxp
  * @date 2026-09-02 16:20
  */
-class MetricDefinitionDslJsonBindingTests {
+class MetricDSLDefinitionSpecJsonBindingTests {
 
     private static final String DEFINITION_JSON = """
             {
@@ -65,7 +67,7 @@ class MetricDefinitionDslJsonBindingTests {
         DefinitionRequest request = jsonMapper.readValue(
                 "{\"definition\":" + DEFINITION_JSON + "}", DefinitionRequest.class);
 
-        MetricRowSelectionDsl rowSelection = request.definition().metric().rowSelection();
+        MetricRowSelectionDsl rowSelection = request.definition().definition().rowSelection();
         Assertions.assertNotNull(rowSelection);
         SetMetricFilterDsl filter = Assertions.assertInstanceOf(SetMetricFilterDsl.class, rowSelection.filter());
         Assertions.assertEquals(MetricFilterOperator.IN, filter.operator());
@@ -74,12 +76,12 @@ class MetricDefinitionDslJsonBindingTests {
                 List.of(new StringMetricLiteralDsl("REFUND"), new StringMetricLiteralDsl("REVERSAL")),
                 filter.values());
         Assertions.assertInstanceOf(
-                LogicalMetricFilterDsl.class, request.definition().metric().value().measure().filter());
+                LogicalMetricFilterDsl.class, request.definition().definition().value().measure().filter());
     }
 
     @Test
     void testSerializeNestedDefinitionAsCanonicalDslJson() {
-        MetricDefinitionDsl definition = codec.parse(DEFINITION_JSON);
+        MetricDSLDefinitionSpec definition = codec.parse(DEFINITION_JSON);
 
         String json = jsonMapper.writeValueAsString(new DefinitionRequest(definition));
 
@@ -111,6 +113,15 @@ class MetricDefinitionDslJsonBindingTests {
         Assertions.assertEquals("", cause.fieldPath());
     }
 
-    private record DefinitionRequest(MetricDefinitionDsl definition) {
+    /** definitionType 由实现类型派生，不得进入规范 JSON，否则已发布定义的内容指纹会失效。 */
+    @Test
+    void testDefinitionTypeIsDerivedAndAbsentFromCanonicalJson() {
+        MetricDSLDefinitionSpec definition = codec.parse(DEFINITION_JSON);
+
+        Assertions.assertEquals(MetricDefinitionType.DSL, definition.definitionType());
+        Assertions.assertFalse(codec.canonicalize(definition).contains("definitionType"));
+    }
+
+    private record DefinitionRequest(MetricDSLDefinitionSpec definition) {
     }
 }

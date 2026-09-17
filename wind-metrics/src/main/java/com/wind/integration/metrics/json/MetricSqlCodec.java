@@ -1,13 +1,12 @@
-package com.wind.integration.metrics.dsl;
+package com.wind.integration.metrics.json;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDefinitionDsl;
-import com.wind.integration.metrics.dsl.definition.MetricSqlTemplateDefinition;
-import com.wind.integration.metrics.dsl.definition.MetricSqlTemplateSpec;
+import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDsl;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
-import com.wind.integration.metrics.json.MetricJsonSupport;
+import com.wind.integration.metrics.spec.MetricDefinitionSpec;
+import com.wind.integration.metrics.spec.MetricSqlDefinition;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JsonParser;
 
@@ -19,9 +18,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import static com.wind.integration.metrics.dsl.MetricDslJson.error;
-import static com.wind.integration.metrics.dsl.MetricDslJson.required;
-import static com.wind.integration.metrics.dsl.MetricDslJson.string;
+import static com.wind.integration.metrics.json.MetricDslJson.error;
+import static com.wind.integration.metrics.json.MetricDslJson.required;
+import static com.wind.integration.metrics.json.MetricDslJson.string;
 import static com.wind.integration.metrics.json.MetricJsonSupport.child;
 
 /**
@@ -32,18 +31,26 @@ import static com.wind.integration.metrics.json.MetricJsonSupport.child;
  * @author wuxp
  * @date 2026-09-17
  */
-public final class MetricSqlTemplateCodec {
+public final class MetricSqlCodec {
 
-    /** 当前支持的 SQL 模板定义 DSL 结构版本。 */
+    /**
+     * 当前支持的 SQL 模板定义 DSL 结构版本。
+     */
     private static final int SCHEMA_VERSION = 1;
 
-    /** DSL 编码和别名允许使用的标识符格式。 */
+    /**
+     * DSL 编码和别名允许使用的标识符格式。
+     */
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z][A-Za-z0-9_]*");
 
-    /** SQL 模板定义根节点允许出现的字段。 */
+    /**
+     * SQL 模板定义根节点允许出现的字段。
+     */
     private static final Set<String> ROOT_FIELDS = Set.of("schemaVersion", "metric");
 
-    /** SQL 模板指标定义节点允许出现的字段。 */
+    /**
+     * SQL 模板指标定义节点允许出现的字段。
+     */
     private static final Set<String> METRIC_FIELDS = Set.of(
             "code", "valueShape", "subjectType", "dimensions", "parameters", "sqlTemplate");
 
@@ -54,21 +61,21 @@ public final class MetricSqlTemplateCodec {
      * @return 不可变的 SQL 模板指标定义对象
      * @throws MetricValidationException JSON、字段或指标结构不符合 v1 契约时抛出
      */
-    public MetricSqlTemplateDefinition parse(String json) {
+    public MetricDefinitionSpec.MetricSqlDefinitionSpec parse(String json) {
         return parse(MetricJsonSupport.parseRootObject(json));
     }
 
-    MetricSqlTemplateDefinition parse(JsonParser parser) {
+    MetricDefinitionSpec.MetricSqlDefinitionSpec parse(JsonParser parser) {
         return parse(MetricJsonSupport.parseRootObject(parser));
     }
 
-    private MetricSqlTemplateDefinition parse(Map<String, Object> root) {
+    private MetricDefinitionSpec.MetricSqlDefinitionSpec parse(Map<String, Object> root) {
         int schemaVersion = MetricDslJson.integer(required(root, "schemaVersion", ""), "/schemaVersion");
         if (schemaVersion != SCHEMA_VERSION) {
             throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
         MetricDslJson.rejectUnknown(root, "", ROOT_FIELDS);
-        MetricSqlTemplateDefinition definition = new MetricSqlTemplateDefinition(
+        MetricDefinitionSpec.MetricSqlDefinitionSpec definition = new MetricDefinitionSpec.MetricSqlDefinitionSpec(
                 schemaVersion,
                 parseMetric(MetricDslJson.object(required(root, "metric", ""), "/metric")));
         validateBasic(definition);
@@ -81,34 +88,34 @@ public final class MetricSqlTemplateCodec {
      * @param definition SQL 模板指标定义
      * @throws MetricValidationException 定义不满足封闭字段、分支或值约束时抛出
      */
-    public void validateBasic(MetricSqlTemplateDefinition definition) {
+    public void validateBasic(MetricDefinitionSpec.MetricSqlDefinitionSpec definition) {
         if (definition.schemaVersion() != SCHEMA_VERSION) {
             throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
-        MetricSqlTemplateSpec metric = definition.metric();
+        MetricSqlDefinition metric = definition.definition();
         validateIdentifier(metric.code(), 100, "/metric/code");
         validateIdentifier(metric.subjectType(), 64, "/metric/subjectType");
-        
+
         if (metric.dimensions().size() != new LinkedHashSet<>(metric.dimensions()).size()) {
             throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/dimensions", "Dimensions must be unique");
         }
-        
+
         for (int index = 0; index < metric.dimensions().size(); index++) {
             validateIdentifier(
                     metric.dimensions().get(index),
                     64,
                     child("/metric/dimensions", Integer.toString(index)));
         }
-        
+
         metric.parameters().forEach((name, parameter) -> {
             String path = child("/metric/parameters", name);
             validateIdentifier(name, 64, path);
-            if (parameter.minimum() != null && parameter.maximum() != null 
+            if (parameter.minimum() != null && parameter.maximum() != null
                     && parameter.maximum() < parameter.minimum()) {
                 throw error(MetricErrorCode.DSL_VALUE_INVALID, path, "Invalid parameter range");
             }
         });
-        
+
         if (metric.sqlTemplate().isBlank()) {
             throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/sqlTemplate", "SQL template must not be blank");
         }
@@ -121,12 +128,12 @@ public final class MetricSqlTemplateCodec {
      * @return 可用于内容比对和签名的规范 JSON
      * @throws MetricValidationException 定义不满足 v1 契约时抛出
      */
-    public String canonicalize(MetricSqlTemplateDefinition definition) {
+    public String canonicalize(MetricDefinitionSpec.MetricSqlDefinitionSpec definition) {
         validateBasic(definition);
         return MetricJsonSupport.toJson(toCanonicalMap(definition));
     }
 
-    private MetricSqlTemplateSpec parseMetric(Map<String, Object> source) {
+    private MetricSqlDefinition parseMetric(Map<String, Object> source) {
         MetricDslJson.rejectUnknown(source, "/metric", METRIC_FIELDS);
         String code = string(required(source, "code", "/metric"), "/metric/code");
         MetricValueShape valueShape = MetricDslJson.enumValue(
@@ -135,14 +142,14 @@ public final class MetricSqlTemplateCodec {
         List<String> dimensions = parseStringList(
                 required(source, "dimensions", "/metric"), "/metric/dimensions", false);
         dimensions = dimensions.stream().sorted().toList();
-        Map<String, MetricQueryParameterDefinitionDsl> parameters = parseParameters(
+        Map<String, MetricQueryParameterDsl> parameters = parseParameters(
                 MetricDslJson.optionalValue(source, "parameters", "/metric/parameters"));
         String sqlTemplate = string(required(source, "sqlTemplate", "/metric"), "/metric/sqlTemplate");
-        
-        return new MetricSqlTemplateSpec(code, valueShape, subjectType, dimensions, parameters, sqlTemplate);
+
+        return new MetricSqlDefinition(code, valueShape, subjectType, dimensions, parameters, sqlTemplate);
     }
 
-    private Map<String, MetricQueryParameterDefinitionDsl> parseParameters(@Nullable Object value) {
+    private Map<String, MetricQueryParameterDsl> parseParameters(@Nullable Object value) {
         if (value == null) {
             return Map.of();
         }
@@ -150,18 +157,18 @@ public final class MetricSqlTemplateCodec {
         if (source.isEmpty()) {
             throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/parameters", "Parameters must not be empty");
         }
-        Map<String, MetricQueryParameterDefinitionDsl> result = new LinkedHashMap<>();
+        Map<String, MetricQueryParameterDsl> result = new LinkedHashMap<>();
         source.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
             String path = child("/metric/parameters", entry.getKey());
             validateIdentifier(entry.getKey(), 64, path);
             Map<String, Object> parameter = MetricDslJson.object(entry.getValue(), path);
             MetricDslJson.rejectUnknown(parameter, path, Set.of("valueType", "minimum", "maximum"));
-            result.put(entry.getKey(), new MetricQueryParameterDefinitionDsl(
+            result.put(entry.getKey(), new MetricQueryParameterDsl(
                     MetricDslJson.enumValue(
                             required(parameter, "valueType", path),
                             MetricValueType.class,
                             child(path, "valueType")),
-                    parameter.containsKey("minimum") 
+                    parameter.containsKey("minimum")
                             ? MetricDslJson.integer(parameter.get("minimum"), child(path, "minimum"))
                             : null,
                     parameter.containsKey("maximum")
@@ -186,14 +193,14 @@ public final class MetricSqlTemplateCodec {
         return result;
     }
 
-    private Map<String, Object> toCanonicalMap(MetricSqlTemplateDefinition definition) {
+    private Map<String, Object> toCanonicalMap(MetricDefinitionSpec.MetricSqlDefinitionSpec definition) {
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("schemaVersion", definition.schemaVersion());
-        root.put("metric", toCanonicalMetric(definition.metric()));
+        root.put("metric", toCanonicalMetric(definition.definition()));
         return root;
     }
 
-    private Map<String, Object> toCanonicalMetric(MetricSqlTemplateSpec metric) {
+    private Map<String, Object> toCanonicalMetric(MetricSqlDefinition metric) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("code", metric.code());
         result.put("valueShape", metric.valueShape().name());
@@ -201,7 +208,7 @@ public final class MetricSqlTemplateCodec {
         result.put("dimensions", metric.dimensions().stream().sorted().toList());
         if (!metric.parameters().isEmpty()) {
             Map<String, Object> parameters = new LinkedHashMap<>();
-            metric.parameters().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> 
+            metric.parameters().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
                     parameters.put(entry.getKey(), toCanonicalParameter(entry.getValue())));
             result.put("parameters", parameters);
         }
@@ -209,7 +216,7 @@ public final class MetricSqlTemplateCodec {
         return result;
     }
 
-    private Map<String, Object> toCanonicalParameter(MetricQueryParameterDefinitionDsl parameter) {
+    private Map<String, Object> toCanonicalParameter(MetricQueryParameterDsl parameter) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("valueType", parameter.valueType().name());
         if (parameter.minimum() != null) {

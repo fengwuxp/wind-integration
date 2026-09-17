@@ -1,7 +1,7 @@
 package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.dsl.definition.MetricDslSpec;
+import com.wind.integration.metrics.spec.MetricDSLDefinition;
 import com.wind.integration.metrics.dsl.definition.MetricExpressionDsl;
 import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
 import com.wind.integration.metrics.dsl.definition.MetricOrElseDsl;
@@ -9,8 +9,8 @@ import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
 import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
 import com.wind.integration.metrics.dsl.definition.selection.MetricLimitDsl;
 import com.wind.integration.metrics.dsl.definition.selection.MetricRowSelectionDsl;
-import com.wind.integration.metrics.dsl.expression.CompiledMetricExpression;
-import com.wind.integration.metrics.dsl.expression.MetricExpressionCompiler;
+import com.wind.integration.metrics.expression.CompiledMetricExpression;
+import com.wind.integration.metrics.expression.MetricExpressionCompiler;
 import com.wind.integration.metrics.dsl.literal.DecimalMetricLiteralDsl;
 import com.wind.integration.metrics.enums.MetricAggregation;
 import com.wind.integration.metrics.enums.MetricErrorCode;
@@ -46,7 +46,7 @@ class MetricValueCalculatorTests {
     void testMergeBeforeRoundingAndExpressions() {
         MetricValueDsl amount =
                 measure(MetricAggregation.SUM, MetricValueType.DECIMAL, MetricOrElseMode.NULL);
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 fields(Map.of("amount", amount, "doubleAmount", expression()));
         Map<String, Number> raw =
                 calculator.merge(
@@ -71,7 +71,7 @@ class MetricValueCalculatorTests {
 
     @Test
     void testMergeSumCountMinMaxAndNull() {
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 fields(
                         Map.of(
                                 "count",
@@ -134,7 +134,7 @@ class MetricValueCalculatorTests {
     void testAllNullStaysNullUntilFinalOrElse() {
         for (MetricAggregation aggregation :
                 List.of(MetricAggregation.SUM, MetricAggregation.MIN, MetricAggregation.MAX)) {
-            MetricDslSpec definition =
+            MetricDSLDefinition definition =
                     scalar(measure(aggregation, MetricValueType.DECIMAL, MetricOrElseMode.ZERO));
             Map<String, Number> raw =
                     calculator.merge(
@@ -152,7 +152,7 @@ class MetricValueCalculatorTests {
 
     @Test
     void testExpressionsSeeMeasuresBeforeOrElseAndCannotMutateThem() {
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 fields(
                         Map.of(
                                 "amount",
@@ -181,7 +181,7 @@ class MetricValueCalculatorTests {
 
     @Test
     void testCountRejectsNullFractionAndMissingFields() {
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 scalar(
                         measure(
                                 MetricAggregation.COUNT,
@@ -204,7 +204,7 @@ class MetricValueCalculatorTests {
 
     @Test
     void testCountAccumulatesExactlyBeforeFinalRangeCheck() {
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 scalar(
                         measure(
                                 MetricAggregation.COUNT,
@@ -258,7 +258,7 @@ class MetricValueCalculatorTests {
 
     @Test
     void testMergeRejectsFloatingPointAndBadSegments() {
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 scalar(
                         measure(
                                 MetricAggregation.SUM,
@@ -277,7 +277,7 @@ class MetricValueCalculatorTests {
 
     @Test
     void testAvgIsAllowedForSingleQueryAndRejectedForMerge() {
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 scalar(
                         measure(
                                 MetricAggregation.AVG,
@@ -305,14 +305,14 @@ class MetricValueCalculatorTests {
 
     @Test
     void testRowSelectionRejectsBucketMerge() {
-        MetricDslSpec original =
+        MetricDSLDefinition original =
                 scalar(
                         measure(
                                 MetricAggregation.COUNT,
                                 MetricValueType.LONG,
                                 MetricOrElseMode.NULL));
-        MetricDslSpec limited =
-                new MetricDslSpec(
+        MetricDSLDefinition limited =
+                new MetricDSLDefinition(
                         original.code(),
                         original.valueShape(),
                         original.fact(),
@@ -338,8 +338,8 @@ class MetricValueCalculatorTests {
 
     @Test
     void testDerivedExpressionUsesEmptyMeasuresAndNormalizesResult() {
-        MetricDslSpec definition =
-                new MetricDslSpec(
+        MetricDSLDefinition definition =
+                new MetricDSLDefinition(
                         "DERIVED",
                         MetricValueShape.SCALAR,
                         null,
@@ -381,7 +381,7 @@ class MetricValueCalculatorTests {
                         null,
                         expression.expression(),
                         new MetricOrElseDsl(MetricOrElseMode.ZERO, null));
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 fields(
                         Map.of(
                                 "count",
@@ -450,7 +450,7 @@ class MetricValueCalculatorTests {
                         new MetricExpressionDsl(
                                 MetricExpressionType.SPEL, "count == 0 ? null : ratio(sum, count)"),
                         new MetricOrElseDsl(MetricOrElseMode.ZERO, null));
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 fields(
                         Map.of(
                                 "count",
@@ -527,8 +527,8 @@ class MetricValueCalculatorTests {
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
     }
 
-    private static MetricDslSpec scalar(MetricValueDsl value) {
-        return new MetricDslSpec(
+    private static MetricDSLDefinition scalar(MetricValueDsl value) {
+        return new MetricDSLDefinition(
                 "TOTAL",
                 MetricValueShape.SCALAR,
                 "ORDER",
@@ -542,8 +542,8 @@ class MetricValueCalculatorTests {
                 Map.of());
     }
 
-    private static MetricDslSpec fields(Map<String, MetricValueDsl> fields) {
-        return new MetricDslSpec(
+    private static MetricDSLDefinition fields(Map<String, MetricValueDsl> fields) {
+        return new MetricDSLDefinition(
                 "SUMMARY",
                 MetricValueShape.FIELD_SET,
                 "ORDER",

@@ -91,6 +91,18 @@ public final class MetricJsonSupport {
     }
 
     /**
+     * 将 JSON 文本反序列化为指定类型，委托 Jackson 注解绑定完成类型分派。
+     *
+     * @param json  JSON 文本
+     * @param type  目标类型
+     * @param <T>   目标类型参数
+     * @return 反序列化结果
+     */
+    public static <T> T parseObject(String json, Class<T> type) {
+        return JSON_MAPPER.readValue(json, type);
+    }
+
+    /**
      * @param path 父级 JSON Pointer
      * @param field 当前字段或数组下标
      * @return 正确转义的子路径

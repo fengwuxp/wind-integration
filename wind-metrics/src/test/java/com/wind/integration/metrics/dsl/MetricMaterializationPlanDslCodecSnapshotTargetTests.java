@@ -11,6 +11,7 @@ import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricSnapshotStorageType;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
+import com.wind.integration.metrics.json.MetricMaterializationPlanDslCodec;
 import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

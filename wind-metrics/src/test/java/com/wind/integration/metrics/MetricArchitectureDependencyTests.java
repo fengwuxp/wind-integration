@@ -26,6 +26,9 @@ class MetricArchitectureDependencyTests {
             List<Path> violations = paths.filter(path -> path.toString().endsWith(".java"))
                     .filter(path -> !root.relativize(path).startsWith("dsl"))
                     .filter(path -> !root.relativize(path).startsWith("jdbc"))
+                    .filter(path -> !root.relativize(path).startsWith("json"))
+                    .filter(path -> !root.relativize(path).startsWith("spec"))
+                    .filter(path -> !root.relativize(path).startsWith("expression"))
                     .filter(path -> references(path, implementationDependency)).toList();
             assertTrue(violations.isEmpty(), () -> "Public capabilities depend on DSL/JDBC: " + violations);
         }

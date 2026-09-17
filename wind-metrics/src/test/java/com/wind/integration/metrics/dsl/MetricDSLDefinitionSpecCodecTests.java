@@ -1,8 +1,9 @@
 package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.dsl.definition.MetricDefinitionDsl;
-import com.wind.integration.metrics.dsl.definition.MetricDslSpec;
+import com.wind.integration.metrics.json.MetricDefinitionDslCodec;
+import com.wind.integration.metrics.spec.MetricDefinitionSpec.MetricDSLDefinitionSpec;
+import com.wind.integration.metrics.spec.MetricDSLDefinition;
 import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
 import com.wind.integration.metrics.dsl.definition.MetricOrElseDsl;
 import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
@@ -33,7 +34,7 @@ import java.util.Map;
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-class MetricDefinitionDslCodecTests {
+class MetricDSLDefinitionSpecCodecTests {
 
     private final MetricDefinitionDslCodec codec = new MetricDefinitionDslCodec();
 
@@ -57,10 +58,10 @@ class MetricDefinitionDslCodecTests {
                 }
                 """;
 
-        MetricDefinitionDsl definition = codec.parse(source);
+        MetricDSLDefinitionSpec definition = codec.parse(source);
 
-        Assertions.assertEquals("VCC_APPROVED_TOTAL", definition.metric().code());
-        Assertions.assertEquals(MetricValueShape.SCALAR, definition.metric().valueShape());
+        Assertions.assertEquals("VCC_APPROVED_TOTAL", definition.definition().code());
+        Assertions.assertEquals(MetricValueShape.SCALAR, definition.definition().valueShape());
         Assertions.assertEquals(
                 "{\"schemaVersion\":1,\"metric\":{\"code\":\"VCC_APPROVED_TOTAL\",\"valueShape\":\"SCALAR\","
                         + "\"fact\":\"VccTransaction\",\"subject\":{\"type\":\"CUSTOMER\",\"field\":\"customerId\"},"
@@ -172,9 +173,9 @@ class MetricDefinitionDslCodecTests {
                 new MetricMeasureDsl(MetricAggregation.COUNT, null, filter),
                 null,
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
-        MetricDefinitionDsl definition = new MetricDefinitionDsl(
+        MetricDSLDefinitionSpec definition = new MetricDSLDefinitionSpec(
                 1,
-                new MetricDslSpec(
+                new MetricDSLDefinition(
                         "VCC_AMOUNT_MATCH_TOTAL",
                         MetricValueShape.SCALAR,
                         "VccTransaction",
@@ -316,9 +317,9 @@ class MetricDefinitionDslCodecTests {
                 new MetricMeasureDsl(MetricAggregation.COUNT, null, null),
                 null,
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
-        MetricDefinitionDsl definition = new MetricDefinitionDsl(
+        MetricDSLDefinitionSpec definition = new MetricDSLDefinitionSpec(
                 1,
-                new MetricDslSpec(
+                new MetricDSLDefinition(
                         "VCC_APPROVED_TOTAL",
                         MetricValueShape.SCALAR,
                         "VccTransaction",
@@ -426,11 +427,11 @@ class MetricDefinitionDslCodecTests {
                 }
                 """;
 
-        MetricDefinitionDsl fieldSetDefinition = codec.parse(fieldSet);
-        MetricDefinitionDsl derivedDefinition = codec.parse(derivedOnly);
+        MetricDSLDefinitionSpec fieldSetDefinition = codec.parse(fieldSet);
+        MetricDSLDefinitionSpec derivedDefinition = codec.parse(derivedOnly);
 
-        Assertions.assertEquals(2, fieldSetDefinition.metric().fields().size());
-        Assertions.assertNull(derivedDefinition.metric().fact());
+        Assertions.assertEquals(2, fieldSetDefinition.definition().fields().size());
+        Assertions.assertNull(derivedDefinition.definition().fact());
         Assertions.assertEquals(
                 codec.canonicalize(fieldSetDefinition),
                 codec.canonicalize(codec.parse(codec.canonicalize(fieldSetDefinition))));

@@ -10,6 +10,9 @@ import com.wind.integration.metrics.enums.MetricExpressionType;
 import com.wind.integration.metrics.enums.MetricOrElseMode;
 import com.wind.integration.metrics.enums.MetricValueType;
 
+import com.wind.integration.metrics.expression.CompiledMetricExpression;
+import com.wind.integration.metrics.expression.MetricExpressionCompiler;
+import com.wind.integration.metrics.expression.MetricValueReference;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.expression.spel.standard.SpelExpression;

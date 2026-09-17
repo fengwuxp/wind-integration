@@ -3,9 +3,9 @@ package com.wind.integration.metrics.jdbc;
 import static com.wind.integration.metrics.jdbc.MetricJdbcTestFixtures.binding;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.dsl.MetricDefinitionDslCodec;
-import com.wind.integration.metrics.dsl.definition.MetricDefinitionDsl;
-import com.wind.integration.metrics.dsl.definition.MetricDslSpec;
+import com.wind.integration.metrics.json.MetricDefinitionDslCodec;
+import com.wind.integration.metrics.spec.MetricDefinitionSpec.MetricDSLDefinitionSpec;
+import com.wind.integration.metrics.spec.MetricDSLDefinition;
 import com.wind.integration.metrics.dsl.filter.ComparisonMetricFilterDsl;
 import com.wind.integration.metrics.dsl.filter.LogicalMetricFilterDsl;
 import com.wind.integration.metrics.dsl.filter.NullMetricFilterDsl;
@@ -47,7 +47,7 @@ class MetricJdbcSqlCompilerTests {
     /** 验证 FIELD_SET 使用一条 SQL、稳定投影和有序 JDBC bindings，业务值不进入 SQL 文本。 */
     @Test
     void testCompileFieldSetWithJoinAndConditionalMeasures() throws Exception {
-        MetricDslSpec definition = prepared(MetricJdbcTestFixtures.fieldSetDefinition());
+        MetricDSLDefinition definition = prepared(MetricJdbcTestFixtures.fieldSetDefinition());
         MetricJdbcSqlCompiler sqlCompiler = new MetricJdbcSqlCompiler(METRIC_TIME_ZONE);
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
@@ -90,7 +90,7 @@ class MetricJdbcSqlCompilerTests {
     /** 验证表达式字段不进入 SQL 投影，只查询其依赖的基础 measure 字段。 */
     @Test
     void testCompileOnlyMeasureProjectionsForExpressionMetric() throws Exception {
-        MetricDslSpec definition = prepared(MetricJdbcTestFixtures.factRatioDefinition());
+        MetricDSLDefinition definition = prepared(MetricJdbcTestFixtures.factRatioDefinition());
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
 
@@ -117,7 +117,7 @@ class MetricJdbcSqlCompilerTests {
     /** 验证维度键必须和 Definition 精确一致，缺失或多余均失败关闭。 */
     @Test
     void testRejectMismatchedDimensionKeys() throws Exception {
-        MetricDslSpec definition = prepared(MetricJdbcTestFixtures.scalarCountDefinition());
+        MetricDSLDefinition definition = prepared(MetricJdbcTestFixtures.scalarCountDefinition());
         MetricJdbcSqlCompiler sqlCompiler = new MetricJdbcSqlCompiler(METRIC_TIME_ZONE);
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
@@ -149,7 +149,7 @@ class MetricJdbcSqlCompilerTests {
                         .replace(
                                 "\"subject\":{\"type\":\"CUSTOMER\",\"field\":\"customerId\"}",
                                 "\"subject\":{\"type\":\"GLOBAL\"}");
-        MetricDslSpec definition = prepared(MetricJdbcTestFixtures.parse(json));
+        MetricDSLDefinition definition = prepared(MetricJdbcTestFixtures.parse(json));
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
 
@@ -186,7 +186,7 @@ class MetricJdbcSqlCompilerTests {
                         .replace(
                                 "\"dimensions\":[\"region\"]",
                                 "\"dimensions\":[\"region\",\"quantity\"]");
-        MetricDslSpec definition = prepared(MetricJdbcTestFixtures.parse(json));
+        MetricDSLDefinition definition = prepared(MetricJdbcTestFixtures.parse(json));
         MetricJdbcSqlCompiler compiler = new MetricJdbcSqlCompiler(METRIC_TIME_ZONE);
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
@@ -214,7 +214,7 @@ class MetricJdbcSqlCompilerTests {
     /** 验证基础编译链对尚未接入的运行时参数失败关闭。 */
     @Test
     void testRejectUnexpectedQueryParameter() throws Exception {
-        MetricDslSpec definition = prepared(MetricJdbcTestFixtures.scalarCountDefinition());
+        MetricDSLDefinition definition = prepared(MetricJdbcTestFixtures.scalarCountDefinition());
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
 
@@ -244,7 +244,7 @@ class MetricJdbcSqlCompilerTests {
                 new MetricDefinitionDslCodec()
                         .canonicalize(MetricJdbcTestFixtures.scalarCountDefinition())
                         .replace("\"field\":\"customerId\"", "\"field\":\"customerNumber\"");
-        MetricDslSpec definition = prepared(MetricJdbcTestFixtures.parse(json));
+        MetricDSLDefinition definition = prepared(MetricJdbcTestFixtures.parse(json));
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
 
@@ -283,7 +283,7 @@ class MetricJdbcSqlCompilerTests {
     /** 验证字符串主体标识不允许首尾空白，避免查询合法但错误的主体。 */
     @Test
     void testRejectStringSubjectIdWithSurroundingWhitespace() throws Exception {
-        MetricDslSpec definition = prepared(MetricJdbcTestFixtures.scalarCountDefinition());
+        MetricDSLDefinition definition = prepared(MetricJdbcTestFixtures.scalarCountDefinition());
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
 
@@ -316,7 +316,7 @@ class MetricJdbcSqlCompilerTests {
                                 "\"measure\":{\"aggregation\":\"COUNT\"}",
                                 "\"measure\":{\"aggregation\":\"COUNT\",\"filter\":{\"ge\":{"
                                         + "\"occurredAt\":\"2026-07-01T00:00:00Z\"}}}");
-        MetricDslSpec definition = prepared(MetricJdbcTestFixtures.parse(json));
+        MetricDSLDefinition definition = prepared(MetricJdbcTestFixtures.parse(json));
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
 
@@ -367,7 +367,7 @@ class MetricJdbcSqlCompilerTests {
                 new MetricDefinitionDslCodec()
                         .canonicalize(MetricJdbcTestFixtures.scalarCountDefinition())
                         .replace("\"dimensions\":[\"region\"]", "\"dimensions\":[\"occurredAt\"]");
-        MetricDslSpec definition = prepared(MetricJdbcTestFixtures.parse(json));
+        MetricDSLDefinition definition = prepared(MetricJdbcTestFixtures.parse(json));
         OffsetDateTime dimensionValue = OffsetDateTime.parse("2026-07-01T00:00:00Z");
 
         CompiledMetricSql compiled =
@@ -390,7 +390,7 @@ class MetricJdbcSqlCompilerTests {
     /** 验证 AVG、MAX、MIN 聚合共享主体、时间和维度条件，并按 valueField 稳定生成投影。 */
     @Test
     void testCompileAverageMaximumAndMinimumAggregations() throws Exception {
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 prepared(MetricJdbcTestFixtures.aggregateFieldSetDefinition());
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
@@ -431,7 +431,7 @@ class MetricJdbcSqlCompilerTests {
     /** 验证参数化行选择先形成稳定的最早 N 条共享行集，再由 FIELD_SET 一次完成聚合。 */
     @Test
     void testCompileParameterizedRowSelection() throws Exception {
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 prepared(MetricJdbcTestFixtures.parameterizedRowSelectionDefinition());
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
@@ -476,11 +476,11 @@ class MetricJdbcSqlCompilerTests {
     /** 外层 measure 过滤参数必须排在行集过滤和参数化 LIMIT 之前。 */
     @Test
     void testCompileConditionalMeasuresWithinParameterizedRowSelection() {
-        MetricDslSpec source = MetricJdbcTestFixtures.parameterizedRowSelectionDefinition().metric();
-        MetricDslSpec definition = new MetricDslSpec(
+        MetricDSLDefinition source = MetricJdbcTestFixtures.parameterizedRowSelectionDefinition().definition();
+        MetricDSLDefinition definition = new MetricDSLDefinition(
                 source.code(), source.valueShape(), source.fact(), source.joins(), source.subject(), source.time(),
                 source.dimensions(), source.parameters(), source.rowSelection(), source.value(),
-                MetricJdbcTestFixtures.fieldSetDefinition().metric().fields());
+                MetricJdbcTestFixtures.fieldSetDefinition().definition().fields());
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
 
@@ -515,11 +515,11 @@ class MetricJdbcSqlCompilerTests {
     /** 纯 COUNT 的有限行集仍选择有效列，并允许 LIMIT 等于编译器上限。 */
     @Test
     void testCompileCountRowSelectionAtSystemMaximum() {
-        MetricDslSpec source = MetricJdbcTestFixtures.scalarCountDefinition().metric();
-        MetricDslSpec definition = new MetricDslSpec(
+        MetricDSLDefinition source = MetricJdbcTestFixtures.scalarCountDefinition().definition();
+        MetricDSLDefinition definition = new MetricDSLDefinition(
                 source.code(), source.valueShape(), source.fact(), source.joins(), source.subject(), source.time(),
                 source.dimensions(), source.parameters(),
-                MetricJdbcTestFixtures.fixedRowSelectionDefinition(10).metric().rowSelection(),
+                MetricJdbcTestFixtures.fixedRowSelectionDefinition(10).definition().rowSelection(),
                 source.value(), source.fields());
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
@@ -549,7 +549,7 @@ class MetricJdbcSqlCompilerTests {
     /** 验证 rowSelection 引用的查询参数缺失时在 SQL 生成前失败关闭。 */
     @Test
     void testRejectMissingRowSelectionParameter() throws Exception {
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 prepared(MetricJdbcTestFixtures.parameterizedRowSelectionDefinition());
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
@@ -576,7 +576,7 @@ class MetricJdbcSqlCompilerTests {
     /** 验证 rowSelection 查询参数严格遵守 Definition 声明的闭区间。 */
     @Test
     void testRejectOutOfRangeRowSelectionParameter() throws Exception {
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 prepared(MetricJdbcTestFixtures.parameterizedRowSelectionDefinition());
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
@@ -604,7 +604,7 @@ class MetricJdbcSqlCompilerTests {
     /** 验证查询参数即使满足 Definition 范围，也不能超过系统行选择上限。 */
     @Test
     void testRejectRowSelectionLimitAboveSystemMaximum() throws Exception {
-        MetricDslSpec definition =
+        MetricDSLDefinition definition =
                 prepared(MetricJdbcTestFixtures.parameterizedRowSelectionDefinition());
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
@@ -628,7 +628,7 @@ class MetricJdbcSqlCompilerTests {
                 MetricErrorCode.METRIC_PARAMETER_OUT_OF_RANGE, exception.errorCode());
         Assertions.assertEquals("/parameterValues/entryLimit", exception.fieldPath());
 
-        MetricDslSpec fixedLimitDefinition =
+        MetricDSLDefinition fixedLimitDefinition =
                 prepared(MetricJdbcTestFixtures.fixedRowSelectionDefinition(11));
         MetricValidationException fixedLimitException =
                 Assertions.assertThrows(
@@ -657,7 +657,7 @@ class MetricJdbcSqlCompilerTests {
                 new MetricDefinitionDslCodec()
                         .canonicalize(MetricJdbcTestFixtures.scalarCountDefinition())
                         .replace("\"dimensions\":[\"region\"]", "\"dimensions\":[\"status\"]");
-        MetricDslSpec definition = prepared(MetricJdbcTestFixtures.parse(json));
+        MetricDSLDefinition definition = prepared(MetricJdbcTestFixtures.parse(json));
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
 
@@ -683,7 +683,7 @@ class MetricJdbcSqlCompilerTests {
     /** 验证两个直接 Join 按 alias 排序，复合 Join Key 按主事实字段排序后生成确定性 SQL。 */
     @Test
     void testCompileTwoJoinsWithCompositeKeyDeterministically() throws Exception {
-        MetricDslSpec definition = prepared(MetricJdbcTestFixtures.doubleJoinDefinition());
+        MetricDSLDefinition definition = prepared(MetricJdbcTestFixtures.doubleJoinDefinition());
         LocalDateTime startTime = LocalDateTime.of(2026, 7, 1, 0, 0);
         LocalDateTime endTime = LocalDateTime.of(2026, 8, 1, 0, 0);
 
@@ -719,7 +719,7 @@ class MetricJdbcSqlCompilerTests {
 
     @Test
     void testCustomCodecReceivesNormalizedStringUuidAndTimeExactlyOnce() {
-        MetricDslSpec definition = MetricJdbcTestFixtures.scalarCountDefinition().metric();
+        MetricDSLDefinition definition = MetricJdbcTestFixtures.scalarCountDefinition().definition();
         MetricJdbcBinding original = binding(definition);
         String subject = "a0895fa8-9d5f-457a-a03d-4ad42f3eb9ba";
         LocalDateTime start = LocalDateTime.of(2026, 7, 1, 0, 0);
@@ -763,7 +763,7 @@ class MetricJdbcSqlCompilerTests {
 
     @Test
     void testCharacterCodecReceivesCharacterForSubjectDimensionAndFilter() {
-        MetricDslSpec definition = MetricJdbcTestFixtures.scalarCountDefinition().metric();
+        MetricDSLDefinition definition = MetricJdbcTestFixtures.scalarCountDefinition().definition();
         MetricJdbcBinding original = binding(definition);
         MetricJdbcBinding customized =
                 new CodecBinding(
@@ -812,7 +812,7 @@ class MetricJdbcSqlCompilerTests {
 
     @Test
     void testDerivedDefinitionIsRejectedBeforePhysicalBindingAccess() {
-        MetricDslSpec definition = MetricJdbcTestFixtures.derivedRatioDefinition().metric();
+        MetricDSLDefinition definition = MetricJdbcTestFixtures.derivedRatioDefinition().definition();
         MetricValidationException exception =
                 Assertions.assertThrows(
                         MetricValidationException.class,
@@ -826,7 +826,7 @@ class MetricJdbcSqlCompilerTests {
 
     @Test
     void testFilterFailureDoesNotAppendPartialParameters() {
-        MetricDslSpec definition = MetricJdbcTestFixtures.scalarCountDefinition().metric();
+        MetricDSLDefinition definition = MetricJdbcTestFixtures.scalarCountDefinition().definition();
         MetricJdbcBinding customized =
                 new CodecBinding(
                         binding(definition),
@@ -884,7 +884,7 @@ class MetricJdbcSqlCompilerTests {
         String sql =
                 new MetricJdbcSqlCompiler(METRIC_TIME_ZONE)
                         .renderValidatedFilter(
-                                binding(MetricJdbcTestFixtures.scalarCountDefinition().metric()),
+                                binding(MetricJdbcTestFixtures.scalarCountDefinition().definition()),
                                 filter,
                                 parameters,
                                 field -> "`page`.`" + field + "`");
@@ -899,7 +899,7 @@ class MetricJdbcSqlCompilerTests {
 
     @Test
     void testCodecFailureReportsTheQueryField() {
-        MetricDslSpec definition = MetricJdbcTestFixtures.scalarCountDefinition().metric();
+        MetricDSLDefinition definition = MetricJdbcTestFixtures.scalarCountDefinition().definition();
         MetricJdbcBinding broken =
                 new CodecBinding(
                         binding(definition),
@@ -920,7 +920,7 @@ class MetricJdbcSqlCompilerTests {
 
     @Test
     void testPhysicalIdentifiersCannotContainSql() {
-        MetricDslSpec definition = MetricJdbcTestFixtures.scalarCountDefinition().metric();
+        MetricDSLDefinition definition = MetricJdbcTestFixtures.scalarCountDefinition().definition();
         MetricJdbcBinding original = binding(definition);
         for (boolean table : List.of(true, false)) {
             MetricJdbcBinding invalid =
@@ -1026,8 +1026,8 @@ class MetricJdbcSqlCompilerTests {
         }
     }
 
-    private static MetricDslSpec prepared(MetricDefinitionDsl definition) {
-        return definition.metric();
+    private static MetricDSLDefinition prepared(MetricDSLDefinitionSpec definition) {
+        return definition.definition();
     }
     /** 渲染器允许增加 AS/OUTER/括号；投影、运算和参数次序仍逐项比较。 */
     private static void assertSqlEquivalent(String expected, String actual) {

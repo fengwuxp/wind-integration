@@ -1,7 +1,6 @@
-package com.wind.integration.metrics.dsl;
+package com.wind.integration.metrics.json;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.json.MetricJsonSupport;
 import com.wind.integration.metrics.dsl.materialization.MetricMaterializationPlanDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricSegmentDsl;
@@ -27,9 +26,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.wind.integration.metrics.json.MetricJsonSupport.child;
-import static com.wind.integration.metrics.dsl.MetricDslJson.error;
-import static com.wind.integration.metrics.dsl.MetricDslJson.required;
-import static com.wind.integration.metrics.dsl.MetricDslJson.string;
+import static com.wind.integration.metrics.json.MetricDslJson.error;
+import static com.wind.integration.metrics.json.MetricDslJson.required;
+import static com.wind.integration.metrics.json.MetricDslJson.string;
 
 /**
  * 指标逻辑物化计划 v3 的关闭世界解析、基础校验与确定性规范化入口。

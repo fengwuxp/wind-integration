@@ -1,9 +1,10 @@
 package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDefinitionDsl;
-import com.wind.integration.metrics.dsl.definition.MetricSqlTemplateDefinition;
-import com.wind.integration.metrics.dsl.definition.MetricSqlTemplateSpec;
+import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDsl;
+import com.wind.integration.metrics.json.MetricSqlCodec;
+import com.wind.integration.metrics.spec.MetricDefinitionSpec.MetricSqlDefinitionSpec;
+import com.wind.integration.metrics.spec.MetricSqlDefinition;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
 import org.junit.jupiter.api.Test;
@@ -13,9 +14,9 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class MetricSqlTemplateCodecTest {
+class MetricSqlCodecTests {
 
-    private final MetricSqlTemplateCodec codec = new MetricSqlTemplateCodec();
+    private final MetricSqlCodec codec = new MetricSqlCodec();
 
     @Test
     void testParseMinimal() {
@@ -31,14 +32,14 @@ class MetricSqlTemplateCodecTest {
                   }
                 }
                 """;
-        MetricSqlTemplateDefinition definition = codec.parse(json);
+        MetricSqlDefinitionSpec definition = codec.parse(json);
         assertEquals(1, definition.schemaVersion());
-        assertEquals("order_count", definition.metric().code());
-        assertEquals(MetricValueShape.SCALAR, definition.metric().valueShape());
-        assertEquals("Order", definition.metric().subjectType());
-        assertTrue(definition.metric().dimensions().isEmpty());
-        assertTrue(definition.metric().parameters().isEmpty());
-        assertEquals("SELECT COUNT(*) FROM orders", definition.metric().sqlTemplate());
+        assertEquals("order_count", definition.definition().code());
+        assertEquals(MetricValueShape.SCALAR, definition.definition().valueShape());
+        assertEquals("Order", definition.definition().subjectType());
+        assertTrue(definition.definition().dimensions().isEmpty());
+        assertTrue(definition.definition().parameters().isEmpty());
+        assertEquals("SELECT COUNT(*) FROM orders", definition.definition().sqlTemplate());
     }
 
     @Test
@@ -66,19 +67,19 @@ class MetricSqlTemplateCodecTest {
                   }
                 }
                 """;
-        MetricSqlTemplateDefinition definition = codec.parse(json);
-        MetricSqlTemplateSpec metric = definition.metric();
+        MetricSqlDefinitionSpec definition = codec.parse(json);
+        MetricSqlDefinition metric = definition.definition();
         assertEquals("sales_amount", metric.code());
         assertEquals(List.of("product", "region"), metric.dimensions());
         assertEquals(2, metric.parameters().size());
         
-        MetricQueryParameterDefinitionDsl limitParam = metric.parameters().get("limit");
+        MetricQueryParameterDsl limitParam = metric.parameters().get("limit");
         assertNotNull(limitParam);
         assertEquals(MetricValueType.INTEGER, limitParam.valueType());
         assertEquals(1, limitParam.minimum());
         assertEquals(1000, limitParam.maximum());
         
-        MetricQueryParameterDefinitionDsl offsetParam = metric.parameters().get("offset");
+        MetricQueryParameterDsl offsetParam = metric.parameters().get("offset");
         assertNotNull(offsetParam);
         assertEquals(MetricValueType.INTEGER, offsetParam.valueType());
         assertEquals(0, offsetParam.minimum());
@@ -104,8 +105,8 @@ class MetricSqlTemplateCodecTest {
                   }
                 }
                 """;
-        MetricSqlTemplateDefinition definition = codec.parse(json);
-        MetricQueryParameterDefinitionDsl param = definition.metric().parameters().get("unbounded");
+        MetricSqlDefinitionSpec definition = codec.parse(json);
+        MetricQueryParameterDsl param = definition.definition().parameters().get("unbounded");
         assertNotNull(param);
         assertNull(param.minimum());
         assertNull(param.maximum());
@@ -113,14 +114,14 @@ class MetricSqlTemplateCodecTest {
 
     @Test
     void testValidateInvalidParameterRange() {
-        MetricSqlTemplateDefinition definition = new MetricSqlTemplateDefinition(
+        MetricSqlDefinitionSpec definition = new MetricSqlDefinitionSpec(
                 1,
-                new MetricSqlTemplateSpec(
+                new MetricSqlDefinition(
                         "test",
                         MetricValueShape.SCALAR,
                         "Test",
                         List.of(),
-                        Map.of("invalid", new MetricQueryParameterDefinitionDsl(
+                        Map.of("invalid", new MetricQueryParameterDsl(
                                 MetricValueType.INTEGER, 100, 50)),
                         "SELECT 1"));
         assertThrows(MetricValidationException.class, () -> codec.validateBasic(definition));
@@ -128,9 +129,9 @@ class MetricSqlTemplateCodecTest {
 
     @Test
     void testValidateBlankSqlTemplate() {
-        MetricSqlTemplateDefinition definition = new MetricSqlTemplateDefinition(
+        MetricSqlDefinitionSpec definition = new MetricSqlDefinitionSpec(
                 1,
-                new MetricSqlTemplateSpec(
+                new MetricSqlDefinition(
                         "test",
                         MetricValueShape.SCALAR,
                         "Test",
@@ -142,17 +143,17 @@ class MetricSqlTemplateCodecTest {
 
     @Test
     void testCanonicalize() {
-        MetricSqlTemplateDefinition definition = new MetricSqlTemplateDefinition(
+        MetricSqlDefinitionSpec definition = new MetricSqlDefinitionSpec(
                 1,
-                new MetricSqlTemplateSpec(
+                new MetricSqlDefinition(
                         "test_metric",
                         MetricValueShape.SCALAR,
                         "Test",
                         List.of("dim1", "dim2"),
                         Map.of(
-                                "limit", new MetricQueryParameterDefinitionDsl(
+                                "limit", new MetricQueryParameterDsl(
                                         MetricValueType.INTEGER, 1, 100),
-                                "offset", new MetricQueryParameterDefinitionDsl(
+                                "offset", new MetricQueryParameterDsl(
                                         MetricValueType.INTEGER, null, null)),
                         "SELECT COUNT(*) FROM test"));
         String canonical = codec.canonicalize(definition);

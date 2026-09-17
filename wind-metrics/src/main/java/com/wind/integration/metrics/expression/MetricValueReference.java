@@ -1,4 +1,4 @@
-package com.wind.integration.metrics.dsl.expression;
+package com.wind.integration.metrics.expression;
 
 /**
  * 表达式中对另一个指标结果字段的确定性引用。

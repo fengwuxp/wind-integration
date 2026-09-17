@@ -2,6 +2,7 @@ package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.enums.MetricErrorCode;
+import com.wind.integration.metrics.json.MetricDefinitionDslCodec;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,7 +13,7 @@ import org.junit.jupiter.api.Test;
  * @author wuxp
  * @date 2026-07-23 11:10
  */
-class MetricDefinitionDslRowSelectionCodecTests {
+class MetricDSLDefinitionSpecRowSelectionCodecTests {
 
     private final MetricDefinitionDslCodec codec = new MetricDefinitionDslCodec();
 

@@ -2,6 +2,7 @@ package com.wind.integration.metrics;
 
 import com.wind.common.enums.DescriptiveEnum;
 import com.wind.integration.metrics.enums.MetricAggregation;
+import com.wind.integration.metrics.enums.MetricDefinitionType;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricExpressionType;
 import com.wind.integration.metrics.enums.MetricFilterOperator;
@@ -32,6 +33,7 @@ class MetricEnumContractTests {
     void testMetricEnumsProvideNonBlankDescriptions() {
         List<Class<? extends Enum<?>>> enumTypes = List.of(
                 MetricAggregation.class,
+                MetricDefinitionType.class,
                 MetricErrorCode.class,
                 MetricQueryMode.class,
                 MetricExpressionType.class,

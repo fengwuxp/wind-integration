@@ -1,8 +1,8 @@
 package com.wind.integration.metrics.jdbc;
 
-import com.wind.integration.metrics.dsl.MetricDefinitionDslCodec;
-import com.wind.integration.metrics.dsl.definition.MetricDefinitionDsl;
-import com.wind.integration.metrics.dsl.definition.MetricDslSpec;
+import com.wind.integration.metrics.json.MetricDefinitionDslCodec;
+import com.wind.integration.metrics.spec.MetricDefinitionSpec.MetricDSLDefinitionSpec;
+import com.wind.integration.metrics.spec.MetricDSLDefinition;
 import com.wind.integration.metrics.dsl.definition.selection.MetricLimitDsl;
 import com.wind.integration.metrics.dsl.definition.selection.MetricRowSelectionDsl;
 
@@ -19,7 +19,7 @@ import java.util.Map;
 final class MetricJdbcTestFixtures {
     private MetricJdbcTestFixtures() {}
 
-    static MetricDefinitionDsl scalarCountDefinition() {
+    static MetricDSLDefinitionSpec scalarCountDefinition() {
         return parse(
                 """
                 {
@@ -41,7 +41,7 @@ final class MetricJdbcTestFixtures {
                 """);
     }
 
-    static MetricDefinitionDsl fieldSetDefinition() {
+    static MetricDSLDefinitionSpec fieldSetDefinition() {
         return parse(
                 """
                 {
@@ -86,7 +86,7 @@ final class MetricJdbcTestFixtures {
                 """);
     }
 
-    public static MetricDefinitionDsl factExpressionDefinition() {
+    public static MetricDSLDefinitionSpec factExpressionDefinition() {
         return parse(
                 """
                 {
@@ -118,7 +118,7 @@ final class MetricJdbcTestFixtures {
                 """);
     }
 
-    public static MetricDefinitionDsl factRatioDefinition() {
+    public static MetricDSLDefinitionSpec factRatioDefinition() {
         return parse(
                 """
                 {
@@ -160,7 +160,7 @@ final class MetricJdbcTestFixtures {
                 """);
     }
 
-    public static MetricDefinitionDsl derivedRatioDefinition() {
+    public static MetricDSLDefinitionSpec derivedRatioDefinition() {
         return parse(
                 """
                 {
@@ -185,7 +185,7 @@ final class MetricJdbcTestFixtures {
                 """);
     }
 
-    static MetricDefinitionDsl numericJoinDefinition() {
+    static MetricDSLDefinitionSpec numericJoinDefinition() {
         return parse(
                 """
                 {
@@ -214,7 +214,7 @@ final class MetricJdbcTestFixtures {
                 """);
     }
 
-    static MetricDefinitionDsl aggregateFieldSetDefinition() {
+    static MetricDSLDefinitionSpec aggregateFieldSetDefinition() {
         return parse(
                 """
                 {
@@ -250,7 +250,7 @@ final class MetricJdbcTestFixtures {
                 """);
     }
 
-    public static MetricDefinitionDsl parameterizedRowSelectionDefinition() {
+    public static MetricDSLDefinitionSpec parameterizedRowSelectionDefinition() {
         return parse(
                 """
                 {
@@ -301,7 +301,7 @@ final class MetricJdbcTestFixtures {
                 """);
     }
 
-    static MetricDefinitionDsl doubleJoinDefinition() {
+    static MetricDSLDefinitionSpec doubleJoinDefinition() {
         return parse(
                 """
                 {
@@ -342,13 +342,13 @@ final class MetricJdbcTestFixtures {
                 """);
     }
 
-    public static MetricDefinitionDsl fixedRowSelectionDefinition(int limit) {
-        MetricDefinitionDsl source = parameterizedRowSelectionDefinition();
-        MetricDslSpec metric = source.metric();
+    public static MetricDSLDefinitionSpec fixedRowSelectionDefinition(int limit) {
+        MetricDSLDefinitionSpec source = parameterizedRowSelectionDefinition();
+        MetricDSLDefinition metric = source.definition();
         MetricRowSelectionDsl rowSelection = metric.rowSelection();
-        return new MetricDefinitionDsl(
+        return new MetricDSLDefinitionSpec(
                 source.schemaVersion(),
-                new MetricDslSpec(
+                new MetricDSLDefinition(
                         metric.code(),
                         metric.valueShape(),
                         metric.fact(),
@@ -365,11 +365,11 @@ final class MetricJdbcTestFixtures {
                         metric.fields()));
     }
 
-    static MetricDefinitionDsl parse(String json) {
+    static MetricDSLDefinitionSpec parse(String json) {
         return new MetricDefinitionDslCodec().parse(json);
     }
 
-    static MetricJdbcBinding binding(MetricDslSpec definition) {
+    static MetricJdbcBinding binding(MetricDSLDefinition definition) {
         return new MetricJdbcBinding() {
             @Override
             public String tableName(String reference) {

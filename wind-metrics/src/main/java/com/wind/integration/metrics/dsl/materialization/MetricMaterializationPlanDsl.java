@@ -1,6 +1,6 @@
 package com.wind.integration.metrics.dsl.materialization;
 
-import com.wind.integration.metrics.dsl.MetricMaterializationPlanDslJsonBinding;
+import com.wind.integration.metrics.json.MetricMaterializationPlanDslJsonBinding;
 import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
 import io.swagger.v3.oas.annotations.media.Schema;

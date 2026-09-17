@@ -1,4 +1,4 @@
-package com.wind.integration.metrics.dsl.expression;
+package com.wind.integration.metrics.expression;
 
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.dsl.definition.MetricExpressionDsl;

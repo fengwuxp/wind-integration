@@ -1,16 +1,14 @@
-package com.wind.integration.metrics.dsl;
+package com.wind.integration.metrics.json;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.json.MetricJsonSupport;
-import com.wind.integration.metrics.dsl.definition.MetricDefinitionDsl;
-import com.wind.integration.metrics.dsl.definition.MetricDefinitionSpec;
-import com.wind.integration.metrics.dsl.definition.MetricDslSpec;
+import com.wind.integration.metrics.spec.MetricDefinitionSpec.MetricDSLDefinitionSpec;
+import com.wind.integration.metrics.spec.MetricDSLDefinition;
 import com.wind.integration.metrics.dsl.definition.MetricExpressionDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinOnDsl;
 import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
 import com.wind.integration.metrics.dsl.definition.MetricOrElseDsl;
-import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDefinitionDsl;
+import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDsl;
 import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
 import com.wind.integration.metrics.dsl.definition.MetricTimeDsl;
 import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
@@ -55,9 +53,9 @@ import java.util.TreeMap;
 import java.util.regex.Pattern;
 
 import static com.wind.integration.metrics.json.MetricJsonSupport.child;
-import static com.wind.integration.metrics.dsl.MetricDslJson.error;
-import static com.wind.integration.metrics.dsl.MetricDslJson.required;
-import static com.wind.integration.metrics.dsl.MetricDslJson.string;
+import static com.wind.integration.metrics.json.MetricDslJson.error;
+import static com.wind.integration.metrics.json.MetricDslJson.required;
+import static com.wind.integration.metrics.json.MetricDslJson.string;
 
 /**
  * 指标 Definition DSL 的关闭世界解析、基础校验与确定性规范化入口。
@@ -99,21 +97,21 @@ public final class MetricDefinitionDslCodec {
      * @return 不可变的指标定义对象
      * @throws MetricValidationException JSON、字段或指标结构不符合 v1 契约时抛出
      */
-    public MetricDefinitionDsl parse(String json) {
+    public MetricDSLDefinitionSpec parse(String json) {
         return parse(MetricJsonSupport.parseRootObject(json));
     }
 
-    MetricDefinitionDsl parse(JsonParser parser) {
+    MetricDSLDefinitionSpec parse(JsonParser parser) {
         return parse(MetricJsonSupport.parseRootObject(parser));
     }
 
-    private MetricDefinitionDsl parse(Map<String, Object> root) {
+    private MetricDSLDefinitionSpec parse(Map<String, Object> root) {
         int schemaVersion = MetricDslJson.integer(required(root, "schemaVersion", ""), "/schemaVersion");
         if (schemaVersion != SCHEMA_VERSION) {
             throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
         MetricDslJson.rejectUnknown(root, "", ROOT_FIELDS);
-        MetricDefinitionDsl definition = new MetricDefinitionDsl(
+        MetricDSLDefinitionSpec definition = new MetricDSLDefinitionSpec(
                 schemaVersion,
                 parseMetric(MetricDslJson.object(required(root, "metric", ""), "/metric")));
         validateBasic(definition);
@@ -126,11 +124,11 @@ public final class MetricDefinitionDslCodec {
      * @param definition 指标定义
      * @throws MetricValidationException 定义不满足封闭字段、分支或值约束时抛出
      */
-    public void validateBasic(MetricDefinitionDsl definition) {
+    public void validateBasic(MetricDSLDefinitionSpec definition) {
         if (definition.schemaVersion() != SCHEMA_VERSION) {
             throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
-        MetricDslSpec metric = definition.metric();
+        MetricDSLDefinition metric = definition.definition();
         validateIdentifier(metric.code(), 100, "/metric/code");
         validateIdentifier(metric.subject().type(), 64, "/metric/subject/type");
         validateMetricStructure(metric);
@@ -165,7 +163,7 @@ public final class MetricDefinitionDslCodec {
         metric.fields().forEach((fieldName, value) -> validateValue(value, child("/metric/fields", fieldName)));
     }
 
-    private void validateMetricStructure(MetricDslSpec metric) {
+    private void validateMetricStructure(MetricDSLDefinition metric) {
         if (metric.fact() != null) {
             validateIdentifier(metric.fact(), 100, "/metric/fact");
         }
@@ -225,12 +223,12 @@ public final class MetricDefinitionDslCodec {
      * @return 可用于内容比对和签名的规范 JSON
      * @throws MetricValidationException 定义不满足 v1 契约时抛出
      */
-    public String canonicalize(MetricDefinitionDsl definition) {
+    public String canonicalize(MetricDSLDefinitionSpec definition) {
         validateBasic(definition);
         return MetricJsonSupport.toJson(toCanonicalMap(definition));
     }
 
-    private MetricDslSpec parseMetric(Map<String, Object> source) {
+    private MetricDSLDefinition parseMetric(Map<String, Object> source) {
         MetricDslJson.rejectUnknown(source, "/metric", METRIC_FIELDS);
         String code = string(required(source, "code", "/metric"), "/metric/code");
         MetricValueShape valueShape = MetricDslJson.enumValue(
@@ -246,7 +244,7 @@ public final class MetricDefinitionDslCodec {
         List<String> dimensions = parseStringList(
                 required(source, "dimensions", "/metric"), "/metric/dimensions", false);
         dimensions = dimensions.stream().sorted().toList();
-        Map<String, MetricQueryParameterDefinitionDsl> parameters = parseParameters(
+        Map<String, MetricQueryParameterDsl> parameters = parseParameters(
                 MetricDslJson.optionalValue(source, "parameters", "/metric/parameters"));
         MetricRowSelectionDsl rowSelection = source.containsKey("rowSelection")
                 ? parseRowSelection(MetricDslJson.object(source.get("rowSelection"), "/metric/rowSelection"))
@@ -256,11 +254,11 @@ public final class MetricDefinitionDslCodec {
                 : null;
         Map<String, MetricValueDsl> fields = parseFields(
                 MetricDslJson.optionalValue(source, "fields", "/metric/fields"));
-        return new MetricDslSpec(
+        return new MetricDSLDefinition(
                 code, valueShape, fact, joins, subject, time, dimensions, parameters, rowSelection, value, fields);
     }
 
-    private Map<String, MetricQueryParameterDefinitionDsl> parseParameters(@Nullable Object value) {
+    private Map<String, MetricQueryParameterDsl> parseParameters(@Nullable Object value) {
         if (value == null) {
             return Map.of();
         }
@@ -268,13 +266,13 @@ public final class MetricDefinitionDslCodec {
         if (source.isEmpty()) {
             throw error(MetricErrorCode.DSL_VALUE_INVALID, "/metric/parameters", "Parameters must not be empty");
         }
-        Map<String, MetricQueryParameterDefinitionDsl> result = new LinkedHashMap<>();
+        Map<String, MetricQueryParameterDsl> result = new LinkedHashMap<>();
         source.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
             String path = child("/metric/parameters", entry.getKey());
             validateIdentifier(entry.getKey(), 64, path);
             Map<String, Object> parameter = MetricDslJson.object(entry.getValue(), path);
             MetricDslJson.rejectUnknown(parameter, path, Set.of("valueType", "minimum", "maximum"));
-            result.put(entry.getKey(), new MetricQueryParameterDefinitionDsl(
+            result.put(entry.getKey(), new MetricQueryParameterDsl(
                     MetricDslJson.enumValue(
                             required(parameter, "valueType", path),
                             MetricValueType.class,
@@ -592,7 +590,7 @@ public final class MetricDefinitionDslCodec {
         throw error(MetricErrorCode.DSL_FIELD_TYPE_INVALID, path, "Expected numeric literal");
     }
 
-    private void validateParametersAndRowSelection(MetricDslSpec metric, boolean factBased) {
+    private void validateParametersAndRowSelection(MetricDSLDefinition metric, boolean factBased) {
         if (!factBased && !metric.parameters().isEmpty()) {
             throw error(
                     MetricErrorCode.DSL_VALUE_BRANCH_INVALID,
@@ -636,7 +634,7 @@ public final class MetricDefinitionDslCodec {
     }
 
     private void validateRowSelection(MetricRowSelectionDsl rowSelection,
-                                      Map<String, MetricQueryParameterDefinitionDsl> parameters,
+                                      Map<String, MetricQueryParameterDsl> parameters,
                                       Set<String> referencedParameters) {
         String path = "/metric/rowSelection";
         if (rowSelection.filter() != null) {
@@ -678,7 +676,7 @@ public final class MetricDefinitionDslCodec {
         }
     }
 
-    private void validateValueShape(MetricDslSpec metric, boolean factBased) {
+    private void validateValueShape(MetricDSLDefinition metric, boolean factBased) {
         List<MetricValueDsl> values;
         if (metric.valueShape() == MetricValueShape.SCALAR) {
             if (metric.value() == null || !metric.fields().isEmpty()) {
@@ -860,14 +858,14 @@ public final class MetricDefinitionDslCodec {
         }
     }
 
-    private Map<String, Object> toCanonicalMap(MetricDefinitionDsl definition) {
+    private Map<String, Object> toCanonicalMap(MetricDSLDefinitionSpec definition) {
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("schemaVersion", definition.schemaVersion());
-        root.put("metric", toCanonicalMetric(definition.metric()));
+        root.put("metric", toCanonicalMetric(definition.definition()));
         return root;
     }
 
-    private Map<String, Object> toCanonicalMetric(MetricDslSpec metric) {
+    private Map<String, Object> toCanonicalMetric(MetricDSLDefinition metric) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("code", metric.code());
         result.put("valueShape", metric.valueShape().name());
@@ -905,7 +903,7 @@ public final class MetricDefinitionDslCodec {
         return result;
     }
 
-    private Map<String, Object> toCanonicalParameter(MetricQueryParameterDefinitionDsl parameter) {
+    private Map<String, Object> toCanonicalParameter(MetricQueryParameterDsl parameter) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("valueType", parameter.valueType().name());
         if (parameter.minimum() != null) {

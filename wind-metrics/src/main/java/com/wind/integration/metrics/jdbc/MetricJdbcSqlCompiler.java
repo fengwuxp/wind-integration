@@ -1,11 +1,11 @@
 package com.wind.integration.metrics.jdbc;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.dsl.definition.MetricDslSpec;
+import com.wind.integration.metrics.spec.MetricDSLDefinition;
 import com.wind.integration.metrics.dsl.definition.MetricJoinDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinOnDsl;
 import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
-import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDefinitionDsl;
+import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDsl;
 import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
 import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
 import com.wind.integration.metrics.dsl.definition.selection.MetricLimitDsl;
@@ -127,7 +127,7 @@ public final class MetricJdbcSqlCompiler {
      * @return SQL、占位符顺序参数以及 measure 投影
      * @throws MetricValidationException 定义形态、查询条件或字段值不受支持时抛出
      */
-    public CompiledMetricSql compile(MetricDslSpec definition, MetricQuery query, MetricJdbcBinding binding) {
+    public CompiledMetricSql compile(MetricDSLDefinition definition, MetricQuery query, MetricJdbcBinding binding) {
         validateQuery(definition, query);
         MetricRowSelectionDsl selection = definition.rowSelection();
         int rowSelectionLimit = selection == null
@@ -232,9 +232,9 @@ public final class MetricJdbcSqlCompiler {
         return DSL.aggregate(measure.aggregation().name(), SQLDataType.DECIMAL, argument);
     }
 
-    private List<Condition> predicates(MetricDslSpec definition, MetricQuery query, MetricJdbcBinding binding,
-                                      Function<String, Field<Object>> columns,
-                                      Map<String, MetricSqlBinding> parameters) {
+    private List<Condition> predicates(MetricDSLDefinition definition, MetricQuery query, MetricJdbcBinding binding,
+                                       Function<String, Field<Object>> columns,
+                                       Map<String, MetricSqlBinding> parameters) {
         List<Condition> result = new ArrayList<>();
         if (!MetricSubjectDsl.GLOBAL.equals(definition.subject().type())) {
             String field = definition.subject().field();
@@ -304,7 +304,7 @@ public final class MetricJdbcSqlCompiler {
         return result;
     }
 
-    private static Map<String, MetricMeasureDsl> measures(MetricDslSpec definition) {
+    private static Map<String, MetricMeasureDsl> measures(MetricDSLDefinition definition) {
         Map<String, MetricValueDsl> values = definition.valueShape() == MetricValueShape.SCALAR
                 ? Map.of("value", definition.value()) : new TreeMap<>(definition.fields());
         Map<String, MetricMeasureDsl> result = new LinkedHashMap<>();
@@ -354,7 +354,7 @@ public final class MetricJdbcSqlCompiler {
         }
     }
 
-    private static void validateQuery(MetricDslSpec definition, MetricQuery query) {
+    private static void validateQuery(MetricDSLDefinition definition, MetricQuery query) {
         if (definition == null || query == null) {
             throw error(MetricErrorCode.QUERY_INVALID, "", "Metric definition and query must not be null");
         }
@@ -380,7 +380,7 @@ public final class MetricJdbcSqlCompiler {
         }
     }
 
-    private static void validateParameters(Map<String, MetricQueryParameterDefinitionDsl> definitions,
+    private static void validateParameters(Map<String, MetricQueryParameterDsl> definitions,
                                            Map<String, Object> parameters) {
         for (String name : new TreeSet<>(parameters.keySet())) {
             if (!definitions.containsKey(name)) {
@@ -398,7 +398,7 @@ public final class MetricJdbcSqlCompiler {
                 throw error(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, path,
                         "Metric query parameter must be an integer");
             }
-            MetricQueryParameterDefinitionDsl contract = definitions.get(name);
+            MetricQueryParameterDsl contract = definitions.get(name);
             if (value < contract.minimum() || value > contract.maximum()) {
                 throw error(MetricErrorCode.METRIC_PARAMETER_OUT_OF_RANGE, path,
                         "Metric query parameter is outside the declared range");

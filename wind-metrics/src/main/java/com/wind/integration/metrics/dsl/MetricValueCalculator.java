@@ -1,8 +1,7 @@
 package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.dsl.definition.MetricDefinitionSpec;
-import com.wind.integration.metrics.dsl.definition.MetricDslSpec;
+import com.wind.integration.metrics.spec.MetricDSLDefinition;
 import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
 import com.wind.integration.metrics.dsl.literal.DecimalMetricLiteralDsl;
 import com.wind.integration.metrics.dsl.literal.IntegralMetricLiteralDsl;
@@ -36,7 +35,7 @@ public final class MetricValueCalculator {
      * @param definition 已校验的原始事实指标定义
      * @throws MetricValidationException 派生指标、无 measure、rowSelection 或 AVG 不支持分段合并
      */
-    public void validateMergeable(MetricDslSpec definition) {
+    public void validateMergeable(MetricDSLDefinition definition) {
         if (definition.fact() == null) {
             throw invalid("/metric/fact", "Derived metric has no fact measures to merge");
         }
@@ -69,7 +68,7 @@ public final class MetricValueCalculator {
      * @return 按字段名排序的不可修改 Map；COUNT 不为空，其余聚合允许全空结果
      */
     public Map<String, @Nullable Number> merge(
-            MetricDslSpec definition,
+            MetricDSLDefinition definition,
             List<? extends Map<String, ? extends @Nullable Number>> segments) {
         validateMergeable(definition);
         if (segments.isEmpty()) {
@@ -142,7 +141,7 @@ public final class MetricValueCalculator {
      * @return 完整指标字段结果；SCALAR 使用 value 字段，FIELD_SET 按字段名排序，容器不可修改
      */
     public Map<String, @Nullable Number> calculate(
-            MetricDslSpec definition,
+            MetricDSLDefinition definition,
             Map<String, ? extends @Nullable Number> rawMeasures,
             BiFunction<String, Map<String, @Nullable Number>, ?> expressionEvaluator) {
         Map<String, MetricValueDsl> values = values(definition);
@@ -257,13 +256,13 @@ public final class MetricValueCalculator {
         throw invalid(path, "Metric value must use an exact numeric type");
     }
 
-    private static Map<String, MetricValueDsl> values(MetricDslSpec definition) {
+    private static Map<String, MetricValueDsl> values(MetricDSLDefinition definition) {
         return definition.valueShape() == MetricValueShape.SCALAR
                 ? Map.of("value", definition.value())
                 : new TreeMap<>(definition.fields());
     }
 
-    private static Map<String, MetricValueDsl> measures(MetricDslSpec definition) {
+    private static Map<String, MetricValueDsl> measures(MetricDSLDefinition definition) {
         Map<String, MetricValueDsl> result = new LinkedHashMap<>();
         values(definition)
                 .forEach(
@@ -283,7 +282,7 @@ public final class MetricValueCalculator {
         }
     }
 
-    private static String path(MetricDslSpec definition, String field) {
+    private static String path(MetricDSLDefinition definition, String field) {
         return definition.valueShape() == MetricValueShape.SCALAR
                 ? "/metric/value"
                 : "/metric/fields/" + field.replace("~", "~0").replace("/", "~1");

@@ -108,7 +108,7 @@ class WindWindMetricsAggregatorFactoryTests {
         }
 
         @Override
-        public String getName() {
+        public String getCode() {
             return name;
         }
 

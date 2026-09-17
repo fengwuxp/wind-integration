@@ -1,4 +1,4 @@
-package com.wind.integration.metrics.dsl;
+package com.wind.integration.metrics.json;
 
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.enums.MetricErrorCode;

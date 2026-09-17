@@ -1,6 +1,6 @@
 package com.wind.integration.metrics.jdbc;
 
-import com.wind.integration.metrics.dsl.MetricDefinitionDslCodec;
+import com.wind.integration.metrics.json.MetricDefinitionDslCodec;
 import com.wind.integration.metrics.dsl.filter.ComparisonMetricFilterDsl;
 import com.wind.integration.metrics.dsl.literal.StringMetricLiteralDsl;
 import com.wind.integration.metrics.enums.MetricFilterOperator;
@@ -41,7 +41,7 @@ class MetricJdbcDialectTests {
                        "orderBy":[{"field":"occurredAt","direction":"ASC"},{"field":"id","direction":"ASC"}],
                        "limit":{"value":2}},"value":{"valueType":"LONG","measure":{"aggregation":"SUM",
                        "field":"amount"},"orElse":{"mode":"ZERO"}}}}
-                    """).metric();
+                    """).definition();
             CompiledMetricSql compiled = new MetricJdbcSqlCompiler(ZoneId.of("UTC"), 1000, dialect)
                     .compile(definition, new MetricQuery("customer-1", START, END, Map.of(), Map.of()),
                             MetricJdbcTestFixtures.binding(definition));
@@ -76,7 +76,7 @@ class MetricJdbcDialectTests {
 
     @Test
     void testDialectQuotesNamesAndRetainsJdbcTypes() {
-        var definition = MetricJdbcTestFixtures.scalarCountDefinition().metric();
+        var definition = MetricJdbcTestFixtures.scalarCountDefinition().definition();
         var query = new MetricQuery("customer-1", START, END, Map.of("region", "EU"), Map.of());
         var mysql = new MetricJdbcSqlCompiler(ZoneId.of("UTC"), 1000, SQLDialect.MYSQL)
                 .compile(definition, query, MetricJdbcTestFixtures.binding(definition));

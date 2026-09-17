@@ -18,6 +18,7 @@ public enum MetricSortDirection implements DescriptiveEnum {
 
     @Schema(description = "升序")
     ASC("升序"),
+
     @Schema(description = "降序")
     DESC("降序");
 

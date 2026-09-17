@@ -1,5 +1,6 @@
-package com.wind.integration.metrics.dsl.definition;
+package com.wind.integration.metrics.spec;
 
+import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDsl;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import org.jspecify.annotations.Nullable;
 
@@ -11,14 +12,14 @@ import java.util.Map;
  *
  * <p>sealed interface 允许两种形态：
  * <ul>
- *   <li>{@link MetricDslSpec} - 通过 DSL 定义的指标（支持实时查询和快照物化）</li>
- *   <li>{@link MetricSqlTemplateSpec} - 通过 SQL 模板定义的指标（仅支持实时查询）</li>
+ *   <li>{@link MetricDSLDefinition} - 通过 DSL 定义的指标（支持实时查询和快照物化）</li>
+ *   <li>{@link MetricSqlDefinition} - 通过 SQL 模板定义的指标（仅支持实时查询）</li>
  * </ul>
  *
  * @author wuxp
  * @date 2026-09-16
  */
-public sealed interface MetricDefinitionSpec permits MetricDslSpec, MetricSqlTemplateSpec {
+public sealed interface MetricDefinitionObject permits MetricDSLDefinition, MetricSqlDefinition {
 
     /**
      * 指标编码（全局唯一）
@@ -44,5 +45,5 @@ public sealed interface MetricDefinitionSpec permits MetricDslSpec, MetricSqlTem
      * 参数定义（用于参数化查询）
      */
     @Nullable
-    Map<String, MetricQueryParameterDefinitionDsl> parameters();
+    Map<String, MetricQueryParameterDsl> parameters();
 }

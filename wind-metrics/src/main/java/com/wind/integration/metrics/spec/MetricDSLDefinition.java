@@ -1,5 +1,10 @@
-package com.wind.integration.metrics.dsl.definition;
+package com.wind.integration.metrics.spec;
 
+import com.wind.integration.metrics.dsl.definition.MetricJoinDsl;
+import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDsl;
+import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
+import com.wind.integration.metrics.dsl.definition.MetricTimeDsl;
+import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
 import com.wind.integration.metrics.dsl.definition.selection.MetricRowSelectionDsl;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -34,7 +39,7 @@ import java.util.Objects;
  * @date 2026-07-21 17:51
  */
 @Schema(description = "通过 DSL 定义的指标")
-public record MetricDslSpec(
+public record MetricDSLDefinition(
         @Schema(description = "稳定且唯一的指标编码") String code,
         @Schema(description = "指标值结构") MetricValueShape valueShape,
         @Nullable @Schema(description = "主事实源编码；派生指标为空") String fact,
@@ -42,12 +47,12 @@ public record MetricDslSpec(
         @Schema(description = "被统计主体定义") MetricSubjectDsl subject,
         @Nullable @Schema(description = "主事实源时间字段；派生指标为空") MetricTimeDsl time,
         @Schema(description = "聚合维度字段引用") List<String> dimensions,
-        @Schema(description = "查询参数定义") Map<String, MetricQueryParameterDefinitionDsl> parameters,
+        @Schema(description = "查询参数定义") Map<String, MetricQueryParameterDsl> parameters,
         @Nullable @Schema(description = "所有 measure 共享的聚合前有限行集") MetricRowSelectionDsl rowSelection,
         @Nullable @Schema(description = "单值指标定义；多字段指标为空") MetricValueDsl value,
-        @Schema(description = "多字段指标定义；单值指标为空映射") Map<String, MetricValueDsl> fields) implements MetricDefinitionSpec {
+        @Schema(description = "多字段指标定义；单值指标为空映射") Map<String, MetricValueDsl> fields) implements MetricDefinitionObject {
 
-    public MetricDslSpec {
+    public MetricDSLDefinition {
         Objects.requireNonNull(code, "code must not be null");
         Objects.requireNonNull(valueShape, "valueShape must not be null");
         Objects.requireNonNull(subject, "subject must not be null");

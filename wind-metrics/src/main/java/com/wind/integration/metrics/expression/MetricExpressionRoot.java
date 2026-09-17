@@ -1,4 +1,4 @@
-package com.wind.integration.metrics.dsl.expression;
+package com.wind.integration.metrics.expression;
 
 import org.jspecify.annotations.Nullable;
 

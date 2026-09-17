@@ -18,6 +18,7 @@ public enum MetricSegmentSourceType implements DescriptiveEnum {
 
     @Schema(description = "实时聚合")
     REALTIME("实时聚合"),
+
     @Schema(description = "快照数据")
     SNAPSHOT("快照数据");
 

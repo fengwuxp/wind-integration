@@ -17,12 +17,12 @@ import java.util.Objects;
  * @date 2026-07-23 11:10
  */
 @Schema(description = "指标查询参数的取值范围定义")
-public record MetricQueryParameterDefinitionDsl(
+public record MetricQueryParameterDsl(
         @Schema(description = "参数类型") MetricValueType valueType,
         @Schema(description = "最小值，包含；空值表示无下限") @Nullable Integer minimum,
         @Schema(description = "最大值，包含；空值表示无上限") @Nullable Integer maximum) {
 
-    public MetricQueryParameterDefinitionDsl {
+    public MetricQueryParameterDsl {
         Objects.requireNonNull(valueType, "valueType must not be null");
     }
 }

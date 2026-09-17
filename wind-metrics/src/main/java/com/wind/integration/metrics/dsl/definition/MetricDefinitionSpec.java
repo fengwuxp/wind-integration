@@ -1,6 +1,8 @@
 package com.wind.integration.metrics.dsl.definition;
 
+import com.wind.integration.metrics.enums.MetricValueShape;
 import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.Map;
 
@@ -16,8 +18,7 @@ import java.util.Map;
  * @author wuxp
  * @date 2026-09-16
  */
-public sealed interface MetricDefinitionSpec
-    permits MetricDslSpec, MetricSqlTemplateSpec {
+public sealed interface MetricDefinitionSpec permits MetricDslSpec, MetricSqlTemplateSpec {
 
     /**
      * 指标编码（全局唯一）
@@ -27,7 +28,7 @@ public sealed interface MetricDefinitionSpec
     /**
      * 值形态
      */
-    com.wind.integration.metrics.enums.MetricValueShape valueShape();
+    MetricValueShape valueShape();
 
     /**
      * 主体类型

@@ -7,7 +7,7 @@ import java.util.Map;
 /**
  * 一个指标的结构化值及其具名字段读取能力。
  *
- * <p>{@link #getName()} 返回所属指标名称，{@link #getValue()} 返回整个指标的值，
+ * <p>{@link #getCode()} 返回所属指标编码，{@link #getValue()} 返回整个指标的值，
  * 可以是 Map 或业务对象。{@link #asFieldValues()} 的键是该指标内部的输出字段名，
  * 值是对应字段的实际结果；字段名只在所属指标内唯一，不表示维度键或物理列名。</p>
  *
@@ -38,11 +38,11 @@ public interface WindStructuredMetricsValue<M> extends WindMetricsValue<M> {
      * 返回对象的 {@code getValue()} 与 {@code asFieldValues()} 返回同一个只读 Map。
      * 字段值保留原对象引用，其可变性由调用方管理。</p>
      *
-     * @param metricName 非空白指标名称
+     * @param code 非空白指标编码
      * @param fieldValues 非空容器；键为非空白输出字段名，值为实际字段值
-     * @return 指标名称及字段容器固定的结果
+     * @return 指标编码及字段容器固定的结果
      */
-    static WindStructuredMetricsValue<Map<String, Object>> of(String metricName, Map<String, ?> fieldValues) {
-        return new ReadOnlyStructuredMetricsValue(metricName, fieldValues);
+    static WindStructuredMetricsValue<Map<String, Object>> of(String code, Map<String, ?> fieldValues) {
+        return new ReadOnlyStructuredMetricsValue(code, fieldValues);
     }
 }

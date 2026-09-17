@@ -44,7 +44,7 @@ class WindMetricsValueCapabilityTests {
         MetricResult detailed = result("income", mode, MetricValueShape.SCALAR, new BigDecimal("12.5000"), Map.of());
         WindMetricsValue<?> value = detailed.toMetricsValue();
 
-        assertEquals("income", value.getName());
+        assertEquals("income", value.getCode());
         assertEquals(new BigDecimal("12.5000"), value.getValue());
         assertEquals(7, detailed.definitionRevision());
         assertEquals(mode, detailed.executionMode());
@@ -72,7 +72,7 @@ class WindMetricsValueCapabilityTests {
         WindStructuredMetricsValue<?> value = assertInstanceOf(WindStructuredMetricsValue.class,
                 result("summary", mode, MetricValueShape.FIELD_SET, null, fields).toMetricsValue());
 
-        assertEquals("summary", value.getName());
+        assertEquals("summary", value.getCode());
         assertSame(value.getValue(), value.asFieldValues());
         assertEquals(List.of("amount", "count", "average"), List.copyOf(value.asFieldValues().keySet()));
         assertEquals(new BigDecimal("12.5000"), value.asFieldValues().get("amount"));
@@ -100,15 +100,15 @@ class WindMetricsValueCapabilityTests {
 
         assertEquals(Map.of("value", 100L), first.asFieldValues());
         assertEquals(Map.of("value", 5L), second.asFieldValues());
-        assertEquals("A", first.getName());
-        assertEquals("B", second.getName());
+        assertEquals("A", first.getCode());
+        assertEquals("B", second.getCode());
     }
 
     @Test
     void testExistingEvaluatedFieldsAreUsableThroughReadOnlyCapability() {
         MultipleValueMetricsField<Map<String, Object>> field = new MultipleValueMetricsField<>() {
             @Override
-            public String getName() {
+            public String getCode() {
                 return "codedSummary";
             }
 
@@ -129,7 +129,7 @@ class WindMetricsValueCapabilityTests {
             }
         };
         WindMetricsValue<?> view = field;
-        assertEquals("codedSummary", view.getName());
+        assertEquals("codedSummary", view.getCode());
         assertEquals(8L, field.asValues().get("count"));
         assertEquals(field.getValue(), field.asValues());
     }

@@ -1,7 +1,7 @@
 package com.wind.integration.metrics.query;
 
 import com.wind.integration.metrics.WindMetricsValue;
-import com.wind.integration.metrics.WindMetricsValueSet;
+import com.wind.integration.metrics.WindStructuredMetricsValue;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
@@ -125,7 +125,7 @@ public record MetricResult(
     /**
      * 将本次结果作为策略无关的公共指标值读取，不重新查询、合并或写回。
      *
-     * <p>SCALAR 返回具名数值，FIELD_SET 返回 {@link WindMetricsValueSet}，
+     * <p>SCALAR 返回具名数值，FIELD_SET 返回 {@link WindStructuredMetricsValue}，
      * 名称取 metricCode，子字段保留自身名称和正常空值。版本、覆盖、类型及路由信息
      * 仍由本对象承载；调用方需要这些信息时保留本对象，不从具名值重建存储身份。</p>
      *
@@ -137,7 +137,7 @@ public record MetricResult(
         }
         Map<String, Object> values = new LinkedHashMap<>();
         fields.forEach((name, field) -> values.put(name, field.value()));
-        return WindMetricsValueSet.of(metricCode, values);
+        return WindStructuredMetricsValue.of(metricCode, values);
     }
 
     private static Map<String, MetricFieldValue> immutableFields(Map<String, MetricFieldValue> source) {

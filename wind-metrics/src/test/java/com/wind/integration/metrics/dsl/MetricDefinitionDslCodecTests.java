@@ -2,7 +2,7 @@ package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.dsl.definition.MetricDefinitionDsl;
-import com.wind.integration.metrics.dsl.definition.MetricDefinitionSpec;
+import com.wind.integration.metrics.dsl.definition.MetricDslSpec;
 import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
 import com.wind.integration.metrics.dsl.definition.MetricOrElseDsl;
 import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
@@ -174,7 +174,7 @@ class MetricDefinitionDslCodecTests {
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
         MetricDefinitionDsl definition = new MetricDefinitionDsl(
                 1,
-                new MetricDefinitionSpec(
+                new MetricDslSpec(
                         "VCC_AMOUNT_MATCH_TOTAL",
                         MetricValueShape.SCALAR,
                         "VccTransaction",
@@ -318,7 +318,7 @@ class MetricDefinitionDslCodecTests {
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
         MetricDefinitionDsl definition = new MetricDefinitionDsl(
                 1,
-                new MetricDefinitionSpec(
+                new MetricDslSpec(
                         "VCC_APPROVED_TOTAL",
                         MetricValueShape.SCALAR,
                         "VccTransaction",

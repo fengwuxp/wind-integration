@@ -19,14 +19,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MetricArchitectureDependencyTests {
 
     @Test
-    void testPublicCapabilitiesAndJsonSupportDoNotDependOnDsl() throws IOException {
+    void testPublicCapabilitiesAndJsonSupportDoNotDependOnDslOrJdbc() throws IOException {
         Path root = Path.of("src/main/java/com/wind/integration/metrics");
-        Pattern dslDependency = Pattern.compile("\\bcom\\.wind\\.integration\\.metrics\\.dsl\\.");
+        Pattern implementationDependency = Pattern.compile("\\bcom\\.wind\\.integration\\.metrics\\.(dsl|jdbc)\\.");
         try (var paths = Files.walk(root)) {
             List<Path> violations = paths.filter(path -> path.toString().endsWith(".java"))
                     .filter(path -> !root.relativize(path).startsWith("dsl"))
-                    .filter(path -> references(path, dslDependency)).toList();
-            assertTrue(violations.isEmpty(), () -> "Public capabilities depend on DSL: " + violations);
+                    .filter(path -> !root.relativize(path).startsWith("jdbc"))
+                    .filter(path -> references(path, implementationDependency)).toList();
+            assertTrue(violations.isEmpty(), () -> "Public capabilities depend on DSL/JDBC: " + violations);
         }
     }
 

@@ -7,7 +7,6 @@ import com.wind.integration.metrics.enums.MetricExpressionType;
 import com.wind.integration.metrics.enums.MetricFilterOperator;
 import com.wind.integration.metrics.enums.MetricJoinCardinality;
 import com.wind.integration.metrics.enums.MetricJoinType;
-import com.wind.integration.metrics.enums.MetricMergeState;
 import com.wind.integration.metrics.enums.MetricOrElseMode;
 import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
@@ -39,7 +38,6 @@ class MetricEnumContractTests {
                 MetricFilterOperator.class,
                 MetricJoinCardinality.class,
                 MetricJoinType.class,
-                MetricMergeState.class,
                 MetricOrElseMode.class,
                 MetricSegmentCode.class,
                 MetricSegmentSourceType.class,

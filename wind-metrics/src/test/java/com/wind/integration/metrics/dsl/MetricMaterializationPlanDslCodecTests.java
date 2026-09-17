@@ -4,7 +4,6 @@ import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.dsl.materialization.MetricMaterializationPlanDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.materialization.MetricSnapshotTargetDsl;
-import com.wind.integration.metrics.dsl.materialization.MetricSnapshotTargetMappingDsl;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
@@ -32,26 +31,26 @@ class MetricMaterializationPlanDslCodecTests {
     void testDeclareMetricsWithExplicitRevisions() {
         String source = """
                 {
-                  "schemaVersion": 2,
+                  "schemaVersion": 3,
                   "executionMode": "SNAPSHOT",
                   "dimensionKeyProviderCode": "VCC_KEYS",
                   "metrics": [{"metricCode": "B", "definitionRevision": 7}, {"metricCode": "A", "definitionRevision": 2}],
                   "snapshotGranularity": "DAY",
                   "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                     "bucketTimeField": "bucketEndTime",
-                    "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}
+                    "objectTypeClassName": "com.example.SnapshotRow"}
                 }
                 """;
 
         MetricMaterializationPlanDsl plan = Assertions.assertDoesNotThrow(() -> codec.parse(source));
 
         Assertions.assertEquals(
-                "{\"schemaVersion\":2,\"executionMode\":\"SNAPSHOT\","
+                "{\"schemaVersion\":3,\"executionMode\":\"SNAPSHOT\","
                         + "\"dimensionKeyProviderCode\":\"VCC_KEYS\","
                         + "\"metrics\":[{\"metricCode\":\"A\",\"definitionRevision\":2},{\"metricCode\":\"B\",\"definitionRevision\":7}],"
                         + "\"snapshotGranularity\":\"DAY\",\"snapshotTarget\":{\"storageType\":\"METRIC_VALUE_TABLE\","
                         + "\"bucketTimeField\":\"bucketEndTime\","
-                        + "\"valueMappings\":[{\"metricCode\":\"A\",\"fieldName\":\"value\"}]}}",
+                        + "\"objectTypeClassName\":\"com.example.SnapshotRow\"}}",
                 codec.canonicalize(plan));
     }
 
@@ -62,11 +61,11 @@ class MetricMaterializationPlanDslCodecTests {
                 {
                   "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                     "bucketTimeField": "bucketEndTime",
-                    "valueMappings": [{"metricCode": "A", "fieldName": "value"}]},
+                    "objectTypeClassName": "com.example.SnapshotRow"},
                   "snapshotGranularity": "DAY",
                   "dimensionKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
                   "executionMode": "SNAPSHOT",
-                  "schemaVersion": 2,
+                  "schemaVersion": 3,
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}]
                 }
                 """;
@@ -75,19 +74,19 @@ class MetricMaterializationPlanDslCodecTests {
 
         Assertions.assertEquals(MetricQueryMode.SNAPSHOT, plan.executionMode());
         Assertions.assertEquals(
-                "{\"schemaVersion\":2,\"executionMode\":\"SNAPSHOT\","
+                "{\"schemaVersion\":3,\"executionMode\":\"SNAPSHOT\","
                         + "\"dimensionKeyProviderCode\":\"VCC_CUSTOMER_CURRENCY_KEYS\","
                         + "\"metrics\":[{\"metricCode\":\"A\",\"definitionRevision\":2}],"
                         + "\"snapshotGranularity\":\"DAY\",\"snapshotTarget\":{\"storageType\":\"METRIC_VALUE_TABLE\","
                         + "\"bucketTimeField\":\"bucketEndTime\","
-                        + "\"valueMappings\":[{\"metricCode\":\"A\",\"fieldName\":\"value\"}]}}",
+                        + "\"objectTypeClassName\":\"com.example.SnapshotRow\"}}",
                 codec.canonicalize(plan));
     }
 
     @Test
     void testRejectLegacySnapshotTargetCode() {
         String legacy = """
-                {"schemaVersion":2,"executionMode":"SNAPSHOT","dimensionKeyProviderCode":"VCC_KEYS",
+                {"schemaVersion":3,"executionMode":"SNAPSHOT","dimensionKeyProviderCode":"VCC_KEYS",
                  "metrics":[{"metricCode":"A","definitionRevision":2}],"snapshotGranularity":"DAY","snapshotTargetCode":"refundValue"}
                 """;
 
@@ -98,7 +97,7 @@ class MetricMaterializationPlanDslCodecTests {
     void testNormalizeSegmentedRecentWindow() {
         String source = """
                 {
-                  "schemaVersion": 2,
+                  "schemaVersion": 3,
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "recentWindow": "P090D",
@@ -110,7 +109,7 @@ class MetricMaterializationPlanDslCodecTests {
                       "snapshotGranularity": "DAY",
                       "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                         "bucketTimeField": "bucketEndTime",
-                        "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}
+                        "objectTypeClassName": "com.example.SnapshotRow"}
                     },
                     {"segmentCode": "recent", "sourceType": "REALTIME"}
                   ]
@@ -127,7 +126,7 @@ class MetricMaterializationPlanDslCodecTests {
     void testRejectInvalidRecentWindow() {
         String source = """
                 {
-                  "schemaVersion": 2,
+                  "schemaVersion": 3,
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "recentWindow": "PT0H",
@@ -148,7 +147,7 @@ class MetricMaterializationPlanDslCodecTests {
     void testParseDoubleSnapshotAndHourlyPlans() {
         String doubleSnapshot = """
                 {
-                  "schemaVersion": 2,
+                  "schemaVersion": 3,
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "recentWindow": "P90D",
@@ -160,7 +159,7 @@ class MetricMaterializationPlanDslCodecTests {
                       "snapshotGranularity": "DAY",
                       "snapshotTarget": {"storageType": "WIDE_TABLE",
                         "bucketTimeField": "bucketEndTime",
-                        "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}
+                        "objectTypeClassName": "com.example.SnapshotRow"}
                     },
                     {
                       "segmentCode": "recent",
@@ -168,14 +167,14 @@ class MetricMaterializationPlanDslCodecTests {
                       "snapshotGranularity": "DAY",
                       "snapshotTarget": {"storageType": "WIDE_TABLE",
                         "bucketTimeField": "bucketEndTime",
-                        "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}
+                        "objectTypeClassName": "com.example.SnapshotRow"}
                     }
                   ]
                 }
                 """;
         String hourly = """
                 {
-                  "schemaVersion": 2,
+                  "schemaVersion": 3,
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "recentWindow": "PT024H",
@@ -187,7 +186,7 @@ class MetricMaterializationPlanDslCodecTests {
                       "snapshotGranularity": "HOUR",
                       "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                         "bucketTimeField": "bucketEndTime",
-                        "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}
+                        "objectTypeClassName": "com.example.SnapshotRow"}
                     },
                     {"segmentCode": "recent", "sourceType": "REALTIME"}
                   ]
@@ -209,7 +208,7 @@ class MetricMaterializationPlanDslCodecTests {
     void testRejectRealtimeSegmentWithSnapshotTarget() {
         String source = """
                 {
-                  "schemaVersion": 2,
+                  "schemaVersion": 3,
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "recentWindow": "P90D",
@@ -221,14 +220,14 @@ class MetricMaterializationPlanDslCodecTests {
                       "snapshotGranularity": "DAY",
                       "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                         "bucketTimeField": "bucketEndTime",
-                        "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}
+                        "objectTypeClassName": "com.example.SnapshotRow"}
                     },
                     {
                       "segmentCode": "recent",
                       "sourceType": "REALTIME",
                       "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                         "bucketTimeField": "bucketEndTime",
-                        "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}
+                        "objectTypeClassName": "com.example.SnapshotRow"}
                     }
                   ]
                 }
@@ -246,7 +245,7 @@ class MetricMaterializationPlanDslCodecTests {
     void testRejectReversedSegmentOrder() {
         String source = """
                 {
-                  "schemaVersion": 2,
+                  "schemaVersion": 3,
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "recentWindow": "P90D",
@@ -259,7 +258,7 @@ class MetricMaterializationPlanDslCodecTests {
                       "snapshotGranularity": "DAY",
                       "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                         "bucketTimeField": "bucketEndTime",
-                        "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}
+                        "objectTypeClassName": "com.example.SnapshotRow"}
                     }
                   ]
                 }
@@ -275,7 +274,7 @@ class MetricMaterializationPlanDslCodecTests {
 
     @Test
     void testRejectUnsupportedSchemaVersionBeforePlanFields() {
-        for (int version : new int[]{1, 3}) {
+        for (int version : new int[]{1, 2, 4}) {
             assertViolation(
                     "{\"schemaVersion\":" + version + ",\"futureField\":true}",
                     MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion");
@@ -286,7 +285,7 @@ class MetricMaterializationPlanDslCodecTests {
     void testRejectTrailingComma() {
         assertInvalidJson("""
                 {"schemaVersion":1,"executionMode":"SNAPSHOT","dimensionKeyProviderCode":"VCC_KEYS",
-                 "snapshotGranularity":"DAY","snapshotTarget":{"storageType":"METRIC_VALUE_TABLE","bucketTimeField":"bucketEndTime","valueMappings":[{"metricCode":"A","fieldName":"value"}]},}
+                 "snapshotGranularity":"DAY","snapshotTarget":{"storageType":"METRIC_VALUE_TABLE","bucketTimeField":"bucketEndTime","objectTypeClassName":"com.example.SnapshotRow"},}
                 """);
     }
 
@@ -295,7 +294,7 @@ class MetricMaterializationPlanDslCodecTests {
         assertInvalidJson("""
                 {"schemaVersion":1,/* comment */"executionMode":"SNAPSHOT",
                  "dimensionKeyProviderCode":"VCC_KEYS","snapshotGranularity":"DAY",
-                 "snapshotTarget":{"storageType":"METRIC_VALUE_TABLE","bucketTimeField":"bucketEndTime","valueMappings":[{"metricCode":"A","fieldName":"value"}]}}
+                 "snapshotTarget":{"storageType":"METRIC_VALUE_TABLE","bucketTimeField":"bucketEndTime","objectTypeClassName":"com.example.SnapshotRow"}}
                 """);
     }
 
@@ -304,7 +303,7 @@ class MetricMaterializationPlanDslCodecTests {
         assertInvalidJson("""
                 {schemaVersion:1,executionMode:"SNAPSHOT",dimensionKeyProviderCode:"VCC_KEYS",
                  snapshotGranularity:"DAY",snapshotTarget:{storageType:"METRIC_VALUE_TABLE",bucketTimeField:"bucketEndTime",
-                 valueMappings:[{metricCode:"A",fieldName:"value"}]}}
+                 objectTypeClassName:"com.example.SnapshotRow"}}
                 """);
     }
 
@@ -318,7 +317,7 @@ class MetricMaterializationPlanDslCodecTests {
         for (String schemaVersion : new String[]{"+1", "0x1", "1."}) {
             assertInvalidJson("""
                     {"schemaVersion":%s,"executionMode":"SNAPSHOT","dimensionKeyProviderCode":"VCC_KEYS",
-                     "snapshotGranularity":"DAY","snapshotTarget":{"storageType":"METRIC_VALUE_TABLE","bucketTimeField":"bucketEndTime","valueMappings":[{"metricCode":"A","fieldName":"value"}]}}
+                     "snapshotGranularity":"DAY","snapshotTarget":{"storageType":"METRIC_VALUE_TABLE","bucketTimeField":"bucketEndTime","objectTypeClassName":"com.example.SnapshotRow"}}
                     """.formatted(schemaVersion));
         }
     }
@@ -327,14 +326,14 @@ class MetricMaterializationPlanDslCodecTests {
     void testRejectExplicitNullSegments() {
         String source = """
                 {
-                  "schemaVersion": 2,
+                  "schemaVersion": 3,
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SNAPSHOT",
                   "dimensionKeyProviderCode": "VCC_KEYS",
                   "snapshotGranularity": "DAY",
                   "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                     "bucketTimeField": "bucketEndTime",
-                    "valueMappings": [{"metricCode": "A", "fieldName": "value"}]},
+                    "objectTypeClassName": "com.example.SnapshotRow"},
                   "segments": null
                 }
                 """;
@@ -377,7 +376,7 @@ class MetricMaterializationPlanDslCodecTests {
     void testCanonicalizeSegmentedMetricReferences() {
         String source = """
                 {
-                  "schemaVersion": 2,
+                  "schemaVersion": 3,
                   "metrics": [{"metricCode": "B", "definitionRevision": 7}, {"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "dimensionKeyProviderCode": "VCC_KEYS",
@@ -386,7 +385,7 @@ class MetricMaterializationPlanDslCodecTests {
                     {"segmentCode": "archive", "sourceType": "SNAPSHOT",
                      "snapshotGranularity": "DAY", "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                        "bucketTimeField": "bucketEndTime",
-                       "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}},
+                       "objectTypeClassName": "com.example.SnapshotRow"}},
                     {"segmentCode": "recent", "sourceType": "REALTIME"}
                   ]
                 }
@@ -505,14 +504,14 @@ class MetricMaterializationPlanDslCodecTests {
                     MetricValidationException.class,
                     () -> codec.parse("""
                             {
-                              "schemaVersion": 2,
+                              "schemaVersion": 3,
                               "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                               "executionMode": "SNAPSHOT",
                               "dimensionKeyProviderCode": "VCC_KEYS",
                               "snapshotGranularity": "DAY",
                               "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                                 "bucketTimeField": "bucketEndTime",
-                                "valueMappings": [{"metricCode": "A", "fieldName": "value"}]},
+                                "objectTypeClassName": "com.example.SnapshotRow"},
                               "%s": {}
                             }
                             """.formatted(field)));
@@ -522,7 +521,7 @@ class MetricMaterializationPlanDslCodecTests {
 
         assertInvalidPlan("""
                 {
-                  "schemaVersion": 2,
+                  "schemaVersion": 3,
                   "metrics": [{"metricCode": "A", "definitionRevision": 2}],
                   "executionMode": "SEGMENTED",
                   "dimensionKeyProviderCode": "VCC_KEYS",
@@ -535,7 +534,7 @@ class MetricMaterializationPlanDslCodecTests {
                       "snapshotGranularity": "DAY",
                       "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                         "bucketTimeField": "bucketEndTime",
-                        "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}
+                        "objectTypeClassName": "com.example.SnapshotRow"}
                     },
                     {"segmentCode": "recent", "sourceType": "REALTIME"}
                   ]
@@ -546,23 +545,23 @@ class MetricMaterializationPlanDslCodecTests {
     private String snapshotPlanWithMetrics(String metrics) {
         return """
                 {
-                  "schemaVersion": 2,
+                  "schemaVersion": 3,
                   "executionMode": "SNAPSHOT",
                   "dimensionKeyProviderCode": "VCC_KEYS",
                   "metrics": [%s],
                   "snapshotGranularity": "DAY",
                   "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                     "bucketTimeField": "bucketEndTime",
-                    "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}
+                    "objectTypeClassName": "com.example.SnapshotRow"}
                 }
                 """.formatted(metrics);
     }
 
     private MetricMaterializationPlanDsl snapshotPlan(List<MetricReferenceDsl> metrics) {
-        return new MetricMaterializationPlanDsl(2, MetricQueryMode.SNAPSHOT, "VCC_KEYS", metrics,
+        return new MetricMaterializationPlanDsl(3, MetricQueryMode.SNAPSHOT, "VCC_KEYS", metrics,
                 SnapshotGranularity.DAY, new MetricSnapshotTargetDsl(
                         MetricSnapshotStorageType.METRIC_VALUE_TABLE, "bucketEndTime",
-                        List.of(new MetricSnapshotTargetMappingDsl("A", "value"))), null, List.of());
+                        "com.example.SnapshotRow"), null, List.of());
     }
 
     private void assertViolation(String source, MetricErrorCode errorCode, String fieldPath) {

@@ -21,7 +21,11 @@ public enum MetricValueType implements DescriptiveEnum {
     @Schema(description = "64 位整数")
     LONG("64 位整数"),
     @Schema(description = "高精度小数")
-    DECIMAL("高精度小数");
+    DECIMAL("高精度小数"),
+    @Schema(description = "字符串")
+    STRING("字符串"),
+    @Schema(description = "时间戳")
+    TIMESTAMP("时间戳");
 
     /** 枚举描述。 */
     private final String desc;

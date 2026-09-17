@@ -4,6 +4,7 @@ import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.json.MetricJsonSupport;
 import com.wind.integration.metrics.dsl.definition.MetricDefinitionDsl;
 import com.wind.integration.metrics.dsl.definition.MetricDefinitionSpec;
+import com.wind.integration.metrics.dsl.definition.MetricDslSpec;
 import com.wind.integration.metrics.dsl.definition.MetricExpressionDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinOnDsl;
@@ -129,7 +130,7 @@ public final class MetricDefinitionDslCodec {
         if (definition.schemaVersion() != SCHEMA_VERSION) {
             throw error(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion", "Unsupported schema version");
         }
-        MetricDefinitionSpec metric = definition.metric();
+        MetricDslSpec metric = definition.metric();
         validateIdentifier(metric.code(), 100, "/metric/code");
         validateIdentifier(metric.subject().type(), 64, "/metric/subject/type");
         validateMetricStructure(metric);
@@ -141,7 +142,7 @@ public final class MetricDefinitionDslCodec {
             if (metric.time() == null) {
                 throw error(MetricErrorCode.DSL_FIELD_REQUIRED, "/metric/time", "Fact-based metric requires time");
             }
-            if ("GLOBAL".equals(metric.subject().type())) {
+            if (MetricSubjectDsl.GLOBAL.equals(metric.subject().type())) {
                 if (metric.subject().field() != null) {
                     throw error(
                             MetricErrorCode.DSL_VALUE_BRANCH_INVALID,
@@ -164,7 +165,7 @@ public final class MetricDefinitionDslCodec {
         metric.fields().forEach((fieldName, value) -> validateValue(value, child("/metric/fields", fieldName)));
     }
 
-    private void validateMetricStructure(MetricDefinitionSpec metric) {
+    private void validateMetricStructure(MetricDslSpec metric) {
         if (metric.fact() != null) {
             validateIdentifier(metric.fact(), 100, "/metric/fact");
         }
@@ -229,7 +230,7 @@ public final class MetricDefinitionDslCodec {
         return MetricJsonSupport.toJson(toCanonicalMap(definition));
     }
 
-    private MetricDefinitionSpec parseMetric(Map<String, Object> source) {
+    private MetricDslSpec parseMetric(Map<String, Object> source) {
         MetricDslJson.rejectUnknown(source, "/metric", METRIC_FIELDS);
         String code = string(required(source, "code", "/metric"), "/metric/code");
         MetricValueShape valueShape = MetricDslJson.enumValue(
@@ -255,7 +256,7 @@ public final class MetricDefinitionDslCodec {
                 : null;
         Map<String, MetricValueDsl> fields = parseFields(
                 MetricDslJson.optionalValue(source, "fields", "/metric/fields"));
-        return new MetricDefinitionSpec(
+        return new MetricDslSpec(
                 code, valueShape, fact, joins, subject, time, dimensions, parameters, rowSelection, value, fields);
     }
 
@@ -278,8 +279,12 @@ public final class MetricDefinitionDslCodec {
                             required(parameter, "valueType", path),
                             MetricValueType.class,
                             child(path, "valueType")),
-                    MetricDslJson.integer(required(parameter, "minimum", path), child(path, "minimum")),
-                    MetricDslJson.integer(required(parameter, "maximum", path), child(path, "maximum"))));
+                    parameter.containsKey("minimum")
+                            ? MetricDslJson.integer(parameter.get("minimum"), child(path, "minimum"))
+                            : null,
+                    parameter.containsKey("maximum")
+                            ? MetricDslJson.integer(parameter.get("maximum"), child(path, "maximum"))
+                            : null));
         });
         return result;
     }
@@ -587,7 +592,7 @@ public final class MetricDefinitionDslCodec {
         throw error(MetricErrorCode.DSL_FIELD_TYPE_INVALID, path, "Expected numeric literal");
     }
 
-    private void validateParametersAndRowSelection(MetricDefinitionSpec metric, boolean factBased) {
+    private void validateParametersAndRowSelection(MetricDslSpec metric, boolean factBased) {
         if (!factBased && !metric.parameters().isEmpty()) {
             throw error(
                     MetricErrorCode.DSL_VALUE_BRANCH_INVALID,
@@ -609,7 +614,8 @@ public final class MetricDefinitionDslCodec {
                         child(path, "valueType"),
                         "Only INTEGER parameters are supported");
             }
-            if (parameter.maximum() < parameter.minimum()) {
+            if (parameter.minimum() != null && parameter.maximum() != null
+                    && parameter.maximum() < parameter.minimum()) {
                 throw error(MetricErrorCode.DSL_VALUE_INVALID, path, "Invalid parameter range");
             }
         });
@@ -672,7 +678,7 @@ public final class MetricDefinitionDslCodec {
         }
     }
 
-    private void validateValueShape(MetricDefinitionSpec metric, boolean factBased) {
+    private void validateValueShape(MetricDslSpec metric, boolean factBased) {
         List<MetricValueDsl> values;
         if (metric.valueShape() == MetricValueShape.SCALAR) {
             if (metric.value() == null || !metric.fields().isEmpty()) {
@@ -861,7 +867,7 @@ public final class MetricDefinitionDslCodec {
         return root;
     }
 
-    private Map<String, Object> toCanonicalMetric(MetricDefinitionSpec metric) {
+    private Map<String, Object> toCanonicalMetric(MetricDslSpec metric) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("code", metric.code());
         result.put("valueShape", metric.valueShape().name());
@@ -902,8 +908,12 @@ public final class MetricDefinitionDslCodec {
     private Map<String, Object> toCanonicalParameter(MetricQueryParameterDefinitionDsl parameter) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("valueType", parameter.valueType().name());
-        result.put("minimum", parameter.minimum());
-        result.put("maximum", parameter.maximum());
+        if (parameter.minimum() != null) {
+            result.put("minimum", parameter.minimum());
+        }
+        if (parameter.maximum() != null) {
+            result.put("maximum", parameter.maximum());
+        }
         return result;
     }
 

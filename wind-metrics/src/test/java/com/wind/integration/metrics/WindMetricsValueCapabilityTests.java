@@ -18,6 +18,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,15 +69,18 @@ class WindMetricsValueCapabilityTests {
         fields.put("amount", new MetricFieldValue(MetricValueType.DECIMAL, new BigDecimal("12.5000")));
         fields.put("count", new MetricFieldValue(MetricValueType.LONG, 3L));
         fields.put("average", new MetricFieldValue(MetricValueType.DECIMAL, null));
-        WindMetricsValueSet<?> value = assertInstanceOf(WindMetricsValueSet.class,
+        WindStructuredMetricsValue<?> value = assertInstanceOf(WindStructuredMetricsValue.class,
                 result("summary", mode, MetricValueShape.FIELD_SET, null, fields).toMetricsValue());
 
-        assertEquals(List.of("amount", "count", "average"), List.copyOf(value.asValues().keySet()));
-        assertEquals(3L, value.<Long>findByName("count").orElseThrow().getValue());
-        assertNull(value.findByName("average").orElseThrow().getValue());
-        assertTrue(value.findByName("missing").isEmpty());
-        assertThrows(UnsupportedOperationException.class, () -> value.asValues().put("count", 4L));
-        assertThrows(UnsupportedOperationException.class, () -> value.getMetricsFields().clear());
+        assertEquals("summary", value.getName());
+        assertSame(value.getValue(), value.asFieldValues());
+        assertEquals(List.of("amount", "count", "average"), List.copyOf(value.asFieldValues().keySet()));
+        assertEquals(new BigDecimal("12.5000"), value.asFieldValues().get("amount"));
+        assertEquals(3L, value.asFieldValues().get("count"));
+        assertTrue(value.asFieldValues().containsKey("average"));
+        assertNull(value.asFieldValues().get("average"));
+        assertFalse(value.asFieldValues().containsKey("missing"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asFieldValues().put("count", 4L));
     }
 
     @ParameterizedTest
@@ -89,13 +93,13 @@ class WindMetricsValueCapabilityTests {
     void testDifferentMetricsCanOwnTheSameFieldName() {
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("value", 100L);
-        WindMetricsValueSet<?> first = WindMetricsValueSet.of("A", fields);
+        WindStructuredMetricsValue<?> first = WindStructuredMetricsValue.of("A", fields);
         fields.put("value", 5L);
-        WindMetricsValueSet<?> second = WindMetricsValueSet.of("B", fields);
+        WindStructuredMetricsValue<?> second = WindStructuredMetricsValue.of("B", fields);
         fields.clear();
 
-        assertEquals(100L, first.findByName("value").orElseThrow().getValue());
-        assertEquals(5L, second.findByName("value").orElseThrow().getValue());
+        assertEquals(Map.of("value", 100L), first.asFieldValues());
+        assertEquals(Map.of("value", 5L), second.asFieldValues());
         assertEquals("A", first.getName());
         assertEquals("B", second.getName());
     }
@@ -114,25 +118,36 @@ class WindMetricsValueCapabilityTests {
             }
 
             @Override
-            public List<WindMetricsValue<Object>> getMetricsFields() {
-                return asValues().entrySet().stream()
-                        .map(entry -> WindMetricsValue.of(entry.getKey(), entry.getValue())).toList();
-            }
-
-            @Override
             public Map<String, Object> evaluate(WindMetricsAggregationQuery query) {
                 return getValue();
             }
         };
-        WindMetricsValueSet<?> view = field;
-        assertEquals(8L, view.findByName("count").orElseThrow().getValue());
-        assertEquals(field.getValue(), view.asValues());
+        WindStructuredMetricsValue<?> view = field;
+        assertEquals("codedSummary", view.getName());
+        assertEquals(8L, view.asFieldValues().get("count"));
+        assertEquals(field.getValue(), view.asFieldValues());
+    }
+
+    @Test
+    void testReadOnlyContainerRetainsMutableBusinessValues() {
+        List<String> businessValue = new ArrayList<>(List.of("created"));
+        WindStructuredMetricsValue<Map<String, Object>> value =
+                WindStructuredMetricsValue.of("history", Map.of("events", businessValue));
+
+        assertSame(businessValue, value.asFieldValues().get("events"));
+        businessValue.add("settled");
+        assertEquals(List.of("created", "settled"), value.asFieldValues().get("events"));
+        assertThrows(UnsupportedOperationException.class, () -> value.getValue().clear());
+        assertThrows(UnsupportedOperationException.class,
+                () -> value.asFieldValues().entrySet().iterator().next().setValue(List.of()));
     }
 
     @Test
     void testFixedValueFactoriesRejectUnnamedValues() {
         assertThrows(IllegalArgumentException.class, () -> WindMetricsValue.of(" ", 1L));
-        assertThrows(IllegalArgumentException.class, () -> WindMetricsValueSet.of("summary", Map.of(" ", 1L)));
+        assertThrows(IllegalArgumentException.class, () -> WindStructuredMetricsValue.of(" ", Map.of("count", 1L)));
+        assertThrows(IllegalArgumentException.class, () -> WindStructuredMetricsValue.of("summary", Map.of(" ", 1L)));
+        assertThrows(NullPointerException.class, () -> WindStructuredMetricsValue.of("summary", null));
     }
 
     private static MetricResult result(String name, MetricQueryMode mode, MetricValueShape shape,

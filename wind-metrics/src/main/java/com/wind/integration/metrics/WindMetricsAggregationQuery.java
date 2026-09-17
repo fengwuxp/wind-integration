@@ -2,7 +2,9 @@ package com.wind.integration.metrics;
 
 import com.wind.common.enums.DescriptiveEnum;
 import com.wind.common.exception.AssertUtils;
+import com.wind.integration.metrics.query.MetricQuery;
 import com.wind.integration.tag.WindTag;
+import org.jspecify.annotations.Nullable;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -18,7 +20,9 @@ import java.util.HashSet;
 import java.util.Map;
 
 /**
- * 聚合查询参数
+ * 聚合查询的兼容外观，旧模板属性、构造器和 builder 保持原语义。
+ *
+ * @deprecated 新计算入口使用 {@link MetricQuery}；旧调用通过 {@link #toCriteria()} 迁移
  * @author wuxp
  * @date 2024-09-12 16:55
  **/
@@ -27,6 +31,7 @@ import java.util.Map;
 @EqualsAndHashCode
 @ToString
 @Schema(description = "指标聚合查询参数")
+@Deprecated
 public final class WindMetricsAggregationQuery {
 
     /**
@@ -66,6 +71,38 @@ public final class WindMetricsAggregationQuery {
      */
     @Schema(description = "创建时间上界")
     private final LocalDateTime maxGmtCreate;
+
+    /**
+     * 提取通用条件，保持主体对象、可空时间、标签及任意业务变量。
+     *
+     * <p>旧 queryVariables 没有声明参数与维度的区分，全部作为通用变量承接，
+     * 不根据名称或数值类型猜测 DSL 维度。DSL 使用方必须另做定义级绑定。</p>
+     *
+     * @return 不带指标身份的条件
+     */
+    public MetricQuery toCriteria() {
+        return new MetricQuery(dimensionsId, minGmtCreate, maxGmtCreate,
+                Map.of(), queryVariables, dimensions, searchTags);
+    }
+
+    /**
+     * 为既有聚合实现提供兼容视图，不合并具名维度与业务变量。
+     *
+     * @param criteria 通用条件；null 保持既有默认查询语义
+     * @return 使用原属性名的查询对象；输入为空时返回空
+     * @throws IllegalArgumentException 条件包含旧查询无法表达的独立维度，需要实现方原生接入 criteria
+     */
+    public static @Nullable WindMetricsAggregationQuery fromCriteria(@Nullable MetricQuery criteria) {
+        if (criteria == null) {
+            return null;
+        }
+        Map<String, Object> values = criteria.dimensionValues();
+        if (values == null || !values.isEmpty()) {
+            throw new IllegalArgumentException("Legacy aggregation cannot represent dimensionValues; implement the criteria entry");
+        }
+        return new WindMetricsAggregationQuery(criteria.subjectType(), criteria.subjectId(), criteria.searchTags(),
+                criteria.parameterValues(), criteria.startTime(), criteria.endTime());
+    }
 
     public static MetricsAggregationQueryBuilder newBuilder(@NotNull String dimensions, @NotNull Object dimensionsId) {
         return new MetricsAggregationQueryBuilder(dimensions, dimensionsId);

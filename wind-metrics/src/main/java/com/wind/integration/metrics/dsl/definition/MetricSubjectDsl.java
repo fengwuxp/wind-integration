@@ -19,6 +19,9 @@ public record MetricSubjectDsl(
         @Schema(description = "主体类型；全局指标使用 GLOBAL") String type,
         @Nullable @Schema(description = "事实源中的主体字段；全局指标或派生指标为空") String field) {
 
+    /** 全局指标的主体类型哨兵值。 */
+    public static final String GLOBAL = "GLOBAL";
+
     public MetricSubjectDsl {
         Objects.requireNonNull(type, "type must not be null");
     }

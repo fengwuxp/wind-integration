@@ -3,206 +3,167 @@ package com.wind.integration.metrics.query;
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.jackson.WindJson;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.json.JsonMapper;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-/**
- * 指标正式查询 JSON 关闭世界合同测试。
- *
- * @author wuxp
- * @date 2026-07-22 16:01
- */
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** 新条件 JSON 与旧请求 JSON 的协议边界。 */
 class MetricQueryJsonParserTests {
 
-    private static final String QUERY_JSON = """
-            {
-              "metricCode": "VCC_AUTH_SUMMARY",
-              "subjectId": "cust_001",
-              "startTime": "2026-03-01T00:00:00",
-              "endTime": "2026-07-15T00:00:00",
-              "dimensionValues": {
-                "currency": "USD"
-              }
-            }
-            """;
-
-    private static final String BATCH_QUERY_JSON = """
-            {
-              "metricCodes": ["VCC_APPROVED_TOTAL", "VCC_TOTAL_AMOUNT"],
-              "subjectId": "cust_001",
-              "startTime": "2026-03-01T00:00:00",
-              "endTime": "2026-07-15T00:00:00",
-              "dimensionValues": {
-                "currency": "USD"
-              }
-            }
+    private static final String JSON = """
+            {"subjectId":"user-1","startTime":"2026-09-01T00:00:00",
+             "endTime":"2026-09-02T00:00:00","dimensionValues":{"currency":"USD"}}
             """;
 
     private final MetricQueryJsonParser parser = new MetricQueryJsonParser();
 
     @Test
-    void testDeserializeQueryThroughDefaultWindJsonMapper() {
-        MetricQuery query = WindJson.getJsonMapper().readValue(QUERY_JSON, MetricQuery.class);
+    void testDeserializeAndSerializeOnlyCommonConditions() {
+        MetricQuery criteria = WindJson.getJsonMapper().readValue(JSON, MetricQuery.class);
 
-        Assertions.assertEquals("VCC_AUTH_SUMMARY", query.metricCode());
-        Assertions.assertEquals(LocalDateTime.of(2026, 3, 1, 0, 0), query.startTime());
-        Assertions.assertEquals(Map.of(), query.parameterValues());
+        assertEquals("user-1", criteria.subjectId());
+        assertEquals(Map.of(), criteria.parameterValues());
+        assertEquals(Set.of("subjectId", "startTime", "endTime", "dimensionValues", "parameterValues", "subjectType", "searchTags"),
+                WindJson.getJsonMapper().readValue(WindJson.toJsonString(criteria), Map.class).keySet());
+        assertEquals(criteria, parser.parse(WindJson.toJsonString(criteria)));
     }
 
     @Test
-    void testDeserializeBatchQueryUsingConsumerJacksonConfiguration() {
-        JsonMapper jsonMapper = WindJson.getJsonMapper().rebuild()
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                .build();
+    void testAcceptSpaceSeparatedTimeAndIntegerLimits() {
+        MetricQuery criteria = parser.parse(extra(JSON.replace("T00:00:00", " 00:00:00"),
+                "parameterValues", "{\"min\":-2147483648,\"max\":2147483647}"));
 
-        MetricBatchQuery query = jsonMapper.readValue(
-                withExtraField(BATCH_QUERY_JSON.replace("T00:00:00", " 00:00:00"), "executionMode"),
-                MetricBatchQuery.class);
-
-        Assertions.assertEquals(
-                List.of("VCC_APPROVED_TOTAL", "VCC_TOTAL_AMOUNT"), query.metricCodes());
+        assertEquals(LocalDateTime.of(2026, 9, 1, 0, 0), criteria.startTime());
+        assertEquals(Map.of("min", Integer.MIN_VALUE, "max", Integer.MAX_VALUE), criteria.parameterValues());
     }
 
     @Test
-    void testDefaultWindJsonMapperRejectsForbiddenQueryField() {
-        MetricValidationException exception = Assertions.assertThrows(
-                MetricValidationException.class,
-                () -> WindJson.getJsonMapper().readValue(
-                        withExtraField(QUERY_JSON, "executionMode"), MetricQuery.class));
-
-        Assertions.assertEquals(MetricErrorCode.QUERY_INVALID, exception.errorCode());
-        Assertions.assertEquals("/executionMode", exception.fieldPath());
-    }
-
-    @Test
-    void testDefaultWindJsonMapperRejectsExplicitNullQuery() {
-        MetricValidationException exception = Assertions.assertThrows(
-                MetricValidationException.class,
-                () -> WindJson.getJsonMapper().readValue("null", MetricQuery.class));
-
-        Assertions.assertEquals(MetricErrorCode.QUERY_INVALID, exception.errorCode());
-        Assertions.assertEquals("", exception.fieldPath());
-    }
-
-    @Test
-    void testDefaultWindJsonMapperRejectsMalformedQueryAsDslJsonError() {
-        MetricValidationException exception = Assertions.assertThrows(
-                MetricValidationException.class,
-                () -> WindJson.getJsonMapper().readValue("{\"metricCode\":]", MetricQuery.class));
-
-        Assertions.assertEquals(MetricErrorCode.DSL_JSON_INVALID, exception.errorCode());
-        Assertions.assertEquals("", exception.fieldPath());
-    }
-
-    @Test
-    @DisplayName("DSL-T005 canonical 单查与批查映射公共 Query")
-    void testDslT005ParseCanonicalSingleAndBatchQueries() {
-        MetricQuery query = parser.parse(QUERY_JSON);
-        MetricBatchQuery batchQuery = parser.parseBatch(BATCH_QUERY_JSON);
-
-        Assertions.assertEquals("VCC_AUTH_SUMMARY", query.metricCode());
-        Assertions.assertEquals("USD", query.dimensionValues().get("currency"));
-        Assertions.assertEquals(
-                List.of("VCC_APPROVED_TOTAL", "VCC_TOTAL_AMOUNT"), batchQuery.metricCodes());
-    }
-
-    @Test
-    void testParseSpaceSeparatedDateTime() {
-        MetricQuery query = parser.parse(QUERY_JSON.replace("T00:00:00", " 00:00:00"));
-
-        Assertions.assertEquals(LocalDateTime.of(2026, 3, 1, 0, 0), query.startTime());
-    }
-
-    @Test
-    @DisplayName("DSL-T005 正式单查拒绝全部服务端字段")
-    void testDslT005RejectAllForbiddenSingleQueryFields() {
-        List<String> forbiddenFields = List.of(
-                "executionMode",
-                "definitionRevision",
-                "tableName",
-                "dimensionKey",
-                "dimensionSignature",
-                "filter",
-                "tenantIds");
-
-        for (String field : forbiddenFields) {
-            MetricValidationException exception = Assertions.assertThrows(
-                    MetricValidationException.class,
-                    () -> parser.parse(withExtraField(QUERY_JSON, field)));
-
-            Assertions.assertEquals(MetricErrorCode.QUERY_INVALID, exception.errorCode(), field);
-            Assertions.assertEquals("/" + field, exception.fieldPath(), field);
+    void testRejectMetricIdentityAndServerFieldsEvenWithLenientMapper() {
+        var mapper = WindJson.getJsonMapper().rebuild()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
+        for (String field : List.of("metricCode", "metricCodes", "definitionRevision", "executionMode",
+                "planCode", "tableName", "filter", "dimensionKey")) {
+            String json = extra(JSON, field, "\"unexpected\"");
+            MetricValidationException parsed = assertThrows(MetricValidationException.class, () -> parser.parse(json));
+            MetricValidationException bound = assertThrows(MetricValidationException.class,
+                    () -> mapper.readValue(json, MetricQuery.class));
+            assertEquals(MetricErrorCode.QUERY_INVALID, parsed.errorCode());
+            assertEquals("/" + field, parsed.fieldPath());
+            assertEquals(parsed.fieldPath(), bound.fieldPath());
         }
     }
 
     @Test
-    @DisplayName("DSL-T005 正式批查拒绝服务端字段")
-    void testDslT005RejectForbiddenBatchQueryField() {
-        MetricValidationException exception = Assertions.assertThrows(
-                MetricValidationException.class,
-                () -> parser.parseBatch(withExtraField(BATCH_QUERY_JSON, "executionMode")));
-
-        Assertions.assertEquals(MetricErrorCode.QUERY_INVALID, exception.errorCode());
-        Assertions.assertEquals("/executionMode", exception.fieldPath());
+    void testRejectMalformedDuplicateAndTrailingJson() {
+        assertEquals(MetricErrorCode.DSL_JSON_INVALID,
+                assertThrows(MetricValidationException.class, () -> parser.parse(JSON + "{}")).errorCode());
+        assertEquals(MetricErrorCode.DSL_JSON_INVALID,
+                assertThrows(MetricValidationException.class, () -> parser.parse("{\"subjectId\":]")).errorCode());
+        MetricValidationException duplicated = assertThrows(MetricValidationException.class,
+                () -> parser.parse(extra(JSON, "subjectId", "\"other\"")));
+        assertEquals(MetricErrorCode.DSL_FIELD_DUPLICATED, duplicated.errorCode());
+        assertEquals("/subjectId", duplicated.fieldPath());
+        assertEquals(MetricErrorCode.QUERY_INVALID, assertThrows(MetricValidationException.class,
+                () -> WindJson.getJsonMapper().readValue("null", MetricQuery.class)).errorCode());
     }
 
     @Test
-    @DisplayName("DSL-T106 单查接受整数 parameterValues，批查仍拒绝")
-    void testDslT106ParseSingleQueryParametersAndRejectBatchParameters() {
-        MetricQuery query = parser.parse(withExtraField(QUERY_JSON, "parameterValues", "{\"entryLimit\": 2}"));
-        Map<String, Object> parameterValues = query.parameterValues();
-        MetricValidationException batchException = Assertions.assertThrows(
-                MetricValidationException.class,
-                () -> parser.parseBatch(withExtraField(
-                        BATCH_QUERY_JSON, "parameterValues", "{\"entryLimit\": 2}")));
-
-        Assertions.assertEquals(Map.of("entryLimit", 2), parameterValues);
-        Assertions.assertThrows(UnsupportedOperationException.class, () -> parameterValues.put("entryLimit", 3));
-        Assertions.assertEquals(MetricErrorCode.QUERY_INVALID, batchException.errorCode());
-        Assertions.assertEquals("/parameterValues", batchException.fieldPath());
-    }
-
-    @Test
-    @DisplayName("DSL-T105 parameterValues 只允许非空整数值")
-    void testDslT105RejectInvalidQueryParameterValues() {
-        for (String invalidValue : List.of(
-                "null", "\"2\"", "2.0", "2147483648", "-2147483649", "{}", "[]")) {
-            MetricValidationException exception = Assertions.assertThrows(
-                    MetricValidationException.class,
-                    () -> parser.parse(withExtraField(
-                            QUERY_JSON, "parameterValues", "{\"entryLimit\": " + invalidValue + "}")),
-                    invalidValue);
-
-            Assertions.assertEquals("METRIC_PARAMETER_TYPE_MISMATCH", exception.errorCode().name());
-            Assertions.assertEquals("/parameterValues/entryLimit", exception.fieldPath());
+    void testRejectInvalidParameterValuesAndEscapeTheirPaths() {
+        for (String value : List.of("null", "\"2\"", "2.0", "2147483648", "-2147483649", "[]", "{}")) {
+            MetricValidationException error = assertThrows(MetricValidationException.class,
+                    () -> parser.parseDsl(extra(JSON, "parameterValues", "{\"a~/b\":" + value + "}")));
+            assertEquals(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, error.errorCode());
+            assertEquals("/parameterValues/a~0~1b", error.fieldPath());
         }
-
-        MetricValidationException blankName = Assertions.assertThrows(
-                MetricValidationException.class,
-                () -> parser.parse(withExtraField(QUERY_JSON, "parameterValues", "{\"\": 2}")));
-        Assertions.assertEquals(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, blankName.errorCode());
-        Assertions.assertEquals("/parameterValues", blankName.fieldPath());
-
-        MetricValidationException nullParameters = Assertions.assertThrows(
-                MetricValidationException.class,
-                () -> parser.parse(withExtraField(QUERY_JSON, "parameterValues", "null")));
-        Assertions.assertEquals(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, nullParameters.errorCode());
-        Assertions.assertEquals("/parameterValues", nullParameters.fieldPath());
+        assertEquals("/parameterValues", assertThrows(MetricValidationException.class,
+                () -> parser.parseDsl(extra(JSON, "parameterValues", "null"))).fieldPath());
     }
 
-    private static String withExtraField(String source, String field) {
-        return withExtraField(source, field, "\"forbidden\"");
+    @Test
+    void testPreserveDecimalDimensionPrecision() {
+        MetricQuery criteria = parser.parse(JSON.replace("\"USD\"", "12345678901234567890.123456789"));
+
+        assertEquals(new BigDecimal("12345678901234567890.123456789"), criteria.dimensionValues().get("currency"));
     }
 
-    private static String withExtraField(String source, String field, String value) {
-        int objectEnd = source.lastIndexOf('}');
-        return source.substring(0, objectEnd) + ",\n\"" + field + "\": " + value + "\n}";
+    @Test
+    void testBindNestedCriteriaWithoutReadingPastItsObject() {
+        Envelope envelope = WindJson.getJsonMapper().readValue(
+                "{\"criteria\":" + JSON + ",\"label\":\"after\"}", Envelope.class);
+
+        assertEquals("after", envelope.label());
+        assertEquals("user-1", envelope.criteria().subjectId());
     }
+
+    private static String extra(String source, String name, String value) {
+        return source.substring(0, source.lastIndexOf('}')) + ",\"" + name + "\":" + value + "}";
+    }
+
+    private record Envelope(MetricQuery criteria, String label) {
+    }
+
+    @Test
+    void testGeneralJsonKeepsLegacyConditionsAndDslParsingRejectsThem() {
+        String json = """
+                {"subjectType":"USER","subjectId":[11,12],"searchTags":[{"name":"region","value":"CN"}],
+                 "parameterValues":{"currency":"USD","ratio":1.25,"states":["SETTLED","PENDING"]}}
+                """;
+        MetricQuery criteria = parser.parse(json);
+        assertEquals(List.of(11, 12), criteria.subjectId());
+        assertEquals(Map.of(), criteria.dimensionValues());
+        assertEquals("CN", criteria.searchTags().iterator().next().value());
+        assertEquals(new BigDecimal("1.25"), criteria.parameterValues().get("ratio"));
+        assertEquals(criteria, parser.parse(WindJson.toJsonString(criteria)));
+        assertThrows(MetricValidationException.class, () -> parser.parseDsl(json));
+    }
+
+    @Test
+    void testDslParserPreservesInvalidParameterContainerError() {
+        for (String parameters : List.of("[]", "null", "2", "\"text\"", "{\"\":2}")) {
+            MetricValidationException failure = assertThrows(MetricValidationException.class,
+                    () -> parser.parseDsl(extra(JSON, "parameterValues", parameters)));
+            assertEquals(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, failure.errorCode());
+            assertEquals("/parameterValues", failure.fieldPath());
+        }
+    }
+    @Test
+    void testGeneralJsonPreservesExplicitNullContainers() {
+        MetricQuery criteria = parser.parse("""
+                {"dimensionValues":null,"parameterValues":null,"searchTags":null}
+                """);
+        assertNull(criteria.dimensionValues());
+        assertNull(criteria.parameterValues());
+        assertNull(criteria.searchTags());
+        assertEquals(criteria, parser.parse(WindJson.toJsonString(criteria)));
+    }
+
+    @Test
+    void testTagJsonRejectsUnknownAttributesAndInvalidShapes() {
+        for (String tags : List.of("{}", "[null]", "[{\"name\":\"region\",\"value\":\"CN\",\"unexpected\":true}]")) {
+            MetricValidationException failure = assertThrows(MetricValidationException.class,
+                    () -> parser.parse(extra(JSON, "searchTags", tags)));
+            assertEquals(MetricErrorCode.QUERY_INVALID, failure.errorCode());
+            assertTrue(failure.fieldPath().startsWith("/searchTags"));
+        }
+    }
+
+    @Test
+    void testSubjectTypeDoesNotCoerceNonStringJson() {
+        for (String value : List.of("true", "12", "{}")) {
+            MetricValidationException error = assertThrows(MetricValidationException.class,
+                    () -> parser.parse(extra(JSON, "subjectType", value)));
+            assertEquals("/subjectType", error.fieldPath());
+        }
+    }
+
 }

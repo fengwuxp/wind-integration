@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
  * <p>值可以由代码、SQL 或 DSL 实现提供。调用方无须区分实时、快照或分段查询；
  * 实现负责选择正确的数据来源并传播失败，不得将执行失败伪装成正常空值。
  * 本接口只提供读取能力，不承诺每次读取是否重新计算；固定查询结果可使用 {@link #of}。
- * 多字段结果可进一步实现 {@link WindMetricsValueSet}。</p>
+ * 多字段结果可进一步实现 {@link WindStructuredMetricsValue}。</p>
  *
  * @param <V> 值类型
  * @author wuxp
@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
 public interface WindMetricsValue<V> {
 
     /**
-     * @return 顶层指标名称，或所属多字段指标内的字段名称；字段名不要求跨指标唯一
+     * @return 指标名称
      */
     @NotBlank
     String getName();

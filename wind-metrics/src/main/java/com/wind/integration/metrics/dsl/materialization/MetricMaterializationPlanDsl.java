@@ -19,7 +19,7 @@ import java.util.Objects;
  * 覆盖范围、目标截止时间和已提交水位由宿主管理，不属于逻辑保存目标。
  * 初次物化从配置覆盖起点开始，后续从已提交水位继续处理已关闭桶，不因追赶目标重算已提交桶。</p>
  *
- * @param schemaVersion Plan DSL 结构版本，当前只支持 {@code 2}
+ * @param schemaVersion Plan DSL 结构版本，当前只支持 {@code 3}
  * @param executionMode 计划对应的顶层查询模式，只允许 {@code SNAPSHOT} 或 {@code SEGMENTED}
  * @param dimensionKeyProviderCode 业务维度键提供方的逻辑注册编码
  * @param metrics 计划关联的一个或多个独立指标，每项显式指定定义修订，不包含发布生成的依赖或原始度量
@@ -35,7 +35,7 @@ import java.util.Objects;
 @JsonDeserialize(using = MetricMaterializationPlanDslJsonBinding.Deserializer.class)
 @JsonSerialize(using = MetricMaterializationPlanDslJsonBinding.Serializer.class)
 public record MetricMaterializationPlanDsl(
-        @Schema(description = "Plan DSL 结构版本，当前只支持 2") Integer schemaVersion,
+        @Schema(description = "Plan DSL 结构版本，当前只支持 3") Integer schemaVersion,
         @Schema(description = "计划对应的顶层查询模式") MetricQueryMode executionMode,
         @Schema(description = "业务维度键提供方的逻辑注册编码") String dimensionKeyProviderCode,
         @Schema(description = "计划关联的独立指标，非空且指标编码唯一，每项定义修订必填") List<MetricReferenceDsl> metrics,

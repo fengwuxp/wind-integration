@@ -1,8 +1,5 @@
 package com.wind.integration.metrics;
 
-import com.wind.integration.metrics.fields.MultipleValueMetricsField;
-import com.wind.integration.metrics.fields.SingleValueMetricsField;
-
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -22,7 +19,7 @@ public interface WindMetricsAggregatorFactory {
      * @param objectType 对象类型
      * @param <T>        指标聚合对象类型
      * @return 指标对象工厂
-     * @see SingleValueMetricsField
+     * @see WindMetricsValue
      */
     <T> WindMetricsAggregator<T> factory(@NotNull Class<T> objectType);
 
@@ -33,7 +30,7 @@ public interface WindMetricsAggregatorFactory {
      * @param metricsName 指标名称
      * @param objectType  指标聚合对象类型
      * @return 指标对象工厂
-     * @see MultipleValueMetricsField
+     * @see WindStructuredMetricsValue
      */
     <T> WindMetricsAggregator<T> factory(@NotBlank String metricsName, @NotNull Class<T> objectType);
 

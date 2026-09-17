@@ -1,5 +1,8 @@
 package com.wind.integration.metrics;
 
+import com.wind.integration.metrics.query.MetricQuery;
+import org.jspecify.annotations.Nullable;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -27,7 +30,23 @@ public interface WindMetricsAggregator<T> {
     /**
      * @param query 查询条件
      * @return 获取聚合的指标对象
+     * @deprecated 新调用使用 {@link #aggregateWithCriteria(MetricQuery)}
      */
     @NotNull
+    @Deprecated
     T aggregate(WindMetricsAggregationQuery query);
+
+    /**
+     * 按通用条件取值并组装目标对象，沿用 named 的字段映射。
+     *
+     * <p>新实现直接消费完整条件；默认实现适配旧聚合器，不丢弃独立维度。
+     * 物化实现从宿主冻结的上下文读取已算值，不因此重新查询。</p>
+     *
+     * @param criteria 聚合条件；null 保持原默认查询语义
+     * @return 组装的指标对象
+     */
+    @NotNull
+    default T aggregateWithCriteria(@Nullable MetricQuery criteria) {
+        return aggregate(WindMetricsAggregationQuery.fromCriteria(criteria));
+    }
 }

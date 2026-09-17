@@ -22,7 +22,7 @@ class MetricMaterializationPlanDslJsonBindingTests {
 
     private static final String PLAN_JSON = """
             {
-              "schemaVersion": 2,
+              "schemaVersion": 3,
               "metrics": [{"metricCode": "B", "definitionRevision": 7}, {"metricCode": "A", "definitionRevision": 2}],
               "executionMode": "SEGMENTED",
               "dimensionKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
@@ -34,7 +34,7 @@ class MetricMaterializationPlanDslJsonBindingTests {
                   "snapshotGranularity": "DAY",
                   "snapshotTarget": {"storageType": "METRIC_VALUE_TABLE",
                     "bucketTimeField": "bucketEndTime",
-                    "valueMappings": [{"metricCode": "A", "fieldName": "value"}]}
+                    "objectTypeClassName": "com.example.SnapshotRow"}
                 },
                 {"segmentCode": "recent", "sourceType": "REALTIME"}
               ]
@@ -129,9 +129,9 @@ class MetricMaterializationPlanDslJsonBindingTests {
 
     @Test
     void testNestedBindingRejectsOldPlanDeclarations() {
-        assertInvalidNestedPlan(PLAN_JSON.replace("\"schemaVersion\": 2", "\"schemaVersion\": 1"),
+        assertInvalidNestedPlan(PLAN_JSON.replace("\"schemaVersion\": 3", "\"schemaVersion\": 1"),
                 MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, "/schemaVersion");
-        assertInvalidNestedPlan(PLAN_JSON.replace("\"schemaVersion\": 2", "\"schemaVersion\": 2, \"dependencies\": []"),
+        assertInvalidNestedPlan(PLAN_JSON.replace("\"schemaVersion\": 3", "\"schemaVersion\": 3, \"dependencies\": []"),
                 MetricErrorCode.DSL_FIELD_UNKNOWN, "/dependencies");
     }
 

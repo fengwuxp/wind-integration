@@ -21,7 +21,7 @@ import java.util.Objects;
 @Schema(description = "指标定义 DSL 的根对象")
 public record MetricDefinitionDsl(
         @Schema(description = "DSL 结构版本，当前只支持 1") Integer schemaVersion,
-        @Schema(description = "指标计算定义") MetricDefinitionSpec metric) {
+        @Schema(description = "指标计算定义") MetricDslSpec metric) {
 
     public MetricDefinitionDsl {
         Objects.requireNonNull(schemaVersion, "schemaVersion must not be null");

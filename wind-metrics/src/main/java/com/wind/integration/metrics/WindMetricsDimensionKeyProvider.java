@@ -2,8 +2,8 @@ package com.wind.integration.metrics;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import org.jspecify.annotations.NonNull;
 
 import java.io.Serializable;
 import java.util.List;
@@ -24,7 +24,6 @@ import java.util.Set;
  * @author wuxp
  * @since 2026-09-15
  */
-@FunctionalInterface
 public interface WindMetricsDimensionKeyProvider {
 
     /**
@@ -35,16 +34,23 @@ public interface WindMetricsDimensionKeyProvider {
      * 调用方继续递增页码直到空列表；空列表只表示遍历结束，不能表示不支持或执行失败。</p>
      *
      * @param dimensions 非空的业务逻辑维度名集合，名称非空白
-     * @param queryPage 从 1 开始的页码
-     * @param querySize 正整数页大小，按完整组合计数；实现可以限制最大值
+     * @param queryPage  从 1 开始的页码
+     * @param querySize  正整数页大小，按完整组合计数；实现可以限制最大值
      * @return 至多 querySize 个完整维度键，容器及元素非空；空列表表示结束
-     * @throws IllegalArgumentException 参数不合法或超出实现声明的分页范围
+     * @throws IllegalArgumentException      参数不合法或超出实现声明的分页范围
      * @throws UnsupportedOperationException 不支持请求的维度组合
-     * @throws RuntimeException 读取失败，不能将失败转成空页
+     * @throws RuntimeException              读取失败，不能将失败转成空页
      */
-    @NotNull
+    @NonNull
     List<Map<String, Serializable>> queryDimensionKeys(
             @NotEmpty Set<@NotBlank String> dimensions,
             @Positive int queryPage,
             @Positive int querySize);
+
+    /**
+     * @return 服务提供编码
+     */
+    @NonNull
+    String getProviderCode();
+
 }

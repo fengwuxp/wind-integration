@@ -4,15 +4,17 @@ import com.wind.integration.metrics.WindMetricsEvaluator;
 import com.wind.integration.metrics.WindMetricsValue;
 
 /**
- * 同时支持条件求值和数值修改的单值指标字段。
+ * 历史单值组合接口，同时声明读取、条件求值和数值修改。
  *
- * <p>只读单值结果使用 {@link WindMetricsValue}，不必实现本接口。
- * 本接口仅用于确实提供 {@link #increase}、{@link #decrease}、{@link #setValue} 的实现，
- * 这些修改不自动具有完整桶提交、幂等写回或快照水位推进语义。</p>
+ * <p>读取型消费者使用 {@link WindMetricsValue}，重新求值使用 {@link WindMetricsEvaluator}。
+ * 既有 SQL 实现不提供修改能力；保留本接口不表示所有实现都可修改。
+ * 修改方法不自动具有完整桶提交、幂等写回或快照水位推进语义。</p>
  *
  * @author wuxp
  * @date 2025-06-17 14:14
+ * @deprecated 按实际能力依赖只读值或求值接口；公共消费者迁移完成前保留历史签名。
  **/
+@Deprecated(since = "4.0.0", forRemoval = false)
 public interface SingleValueMetricsField<M extends Number> extends WindMetricsValue<M>, WindMetricsEvaluator<M> {
 
     /**

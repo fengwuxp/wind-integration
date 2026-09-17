@@ -94,6 +94,7 @@ final class MetricQueryValueSupport {
             case INTEGER -> value instanceof Integer;
             case LONG -> value instanceof Long;
             case DECIMAL -> value instanceof BigDecimal;
+            case STRING, TIMESTAMP -> false;
         };
         if (!valid) {
             throw error(MetricErrorCode.RESULT_INVALID, path, "Metric value type does not match valueType");

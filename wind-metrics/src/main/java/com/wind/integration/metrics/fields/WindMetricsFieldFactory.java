@@ -1,19 +1,27 @@
 package com.wind.integration.metrics.fields;
 
 import com.wind.integration.metrics.WindMetricsAggregationQuery;
+import com.wind.integration.metrics.WindMetricsValueFactory;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Null;
+
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 指标字段工厂
+ * 指标字段的历史组合工厂。
+ *
+ * <p>本接口不继承 {@link WindMetricsValueFactory}，也不提供 value/fieldValues 只读入口。
+ * 旧字段入口供尚未迁移或需要重新求值的调用方使用；工厂本身不执行查询。
+ * 新实现可以直接实现 WindMetricsValueFactory，无需提供历史 Field 方法。</p>
  *
  * @author wuxp
  * @date 2025-06-17 14:22
+ * @deprecated 只读取值使用 {@link WindMetricsValueFactory}；旧字段组合能力保留至消费者完成迁移
  **/
+@Deprecated(since = "2026-09-15", forRemoval = false)
 public interface WindMetricsFieldFactory {
 
     /**
@@ -47,6 +55,7 @@ public interface WindMetricsFieldFactory {
      * @return 指标字段
      */
     @NotNull
+    @Deprecated
     <M extends Number> SingleValueMetricsField<M> single(@NotBlank String name, @Null WindMetricsAggregationQuery query);
 
     /**
@@ -68,5 +77,6 @@ public interface WindMetricsFieldFactory {
      * @param <M>   指标值类型
      * @return 指标字段
      */
+    @Deprecated
     <M> MultipleValueMetricsField<M> multiple(@NotBlank String name, @Null WindMetricsAggregationQuery query);
 }

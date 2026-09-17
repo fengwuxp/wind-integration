@@ -1,11 +1,15 @@
 package com.wind.integration.metrics.fields;
 
 import com.wind.integration.metrics.WindMetricsEvaluator;
+import com.wind.integration.metrics.WindMetricsValue;
 import com.wind.integration.metrics.WindStructuredMetricsValue;
 import com.wind.jackson.WindJson;
 
 import jakarta.validation.constraints.NotNull;
+
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 历史多字段组合接口，同时声明读取、条件求值和对象转换。
@@ -19,7 +23,14 @@ import java.util.Map;
  * @deprecated 按实际能力依赖多字段值或求值接口；公共消费者迁移完成前保留历史签名与默认转换。
  **/
 @Deprecated(since = "4.0.0", forRemoval = false)
-public interface MultipleValueMetricsField<M> extends WindStructuredMetricsValue<M>, WindMetricsEvaluator<M> {
+public interface MultipleValueMetricsField<M> extends WindMetricsValue<M>, WindMetricsEvaluator<M> {
+
+    /**
+     * 获取所有子指标
+     *
+     * @return 子指标
+     */
+    List<WindMetricsValue<Object>> getMetricsFields();
 
     /**
      * 将整个指标的值转换为字段映射，键为所属指标内的输出字段名，值为实际字段值。
@@ -28,14 +39,29 @@ public interface MultipleValueMetricsField<M> extends WindStructuredMetricsValue
      * @return 字段名称与实际值
      */
     @NotNull
-    @Override
     @SuppressWarnings("unchecked")
-    default Map<String, Object> asFieldValues() {
-        M value = getValue();
-        if (value instanceof Map) {
-            return (Map<String, Object>) value;
+    default Map<String, Object> asValues() {
+        {
+            M value = getValue();
+            if (value instanceof Map) {
+                return (Map<String, Object>) value;
+            }
+            return (Map<String, Object>) WindJson.convertValue(value, Map.class);
         }
-        return (Map<String, Object>) WindJson.convertValue(value, Map.class);
     }
 
+    /**
+     * 通过名称获取子指标
+     *
+     * @param name 子指标名称
+     * @return 子指标值
+     */
+    @SuppressWarnings("unchecked")
+    default <V> Optional<WindMetricsValue<V>> findByName(String name) {
+        return getMetricsFields()
+                .stream()
+                .filter(v -> v.getName().equals(name))
+                .findFirst()
+                .map(value -> (WindMetricsValue<V>) value);
+    }
 }

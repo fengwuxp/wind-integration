@@ -24,6 +24,7 @@ import java.util.Objects;
  * {@code FIELD_SET} 只使用 {@code fields}。</p>
  *
  * @param code 稳定且唯一的指标编码
+ * @param revision 定义修订号，与编码共同唯一标识一个定义实例
  * @param valueShape 指标值结构
  * @param fact 主事实源编码；派生指标为空
  * @param joins 主事实源关联定义，最多两个
@@ -41,6 +42,7 @@ import java.util.Objects;
 @Schema(description = "通过 DSL 定义的指标")
 public record MetricDSLDefinition(
         @Schema(description = "稳定且唯一的指标编码") String code,
+        @Schema(description = "定义修订号，与编码共同唯一标识一个定义实例") int revision,
         @Schema(description = "指标值结构") MetricValueShape valueShape,
         @Nullable @Schema(description = "主事实源编码；派生指标为空") String fact,
         @Schema(description = "主事实源关联定义") List<MetricJoinDsl> joins,

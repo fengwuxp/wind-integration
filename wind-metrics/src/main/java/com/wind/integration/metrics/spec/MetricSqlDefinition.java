@@ -16,6 +16,7 @@ import java.util.Objects;
  * <p>SQL 模板指标不支持快照物化，适用于复杂查询逻辑或跨数据源场景。</p>
  *
  * @param code        稳定且唯一的指标编码
+ * @param revision    定义修订号，与编码共同唯一标识一个定义实例
  * @param valueShape  指标值结构
  * @param subjectType 主体类型
  * @param dimensions  聚合维度列表
@@ -27,6 +28,7 @@ import java.util.Objects;
 @Schema(description = "通过 SQL 定义的指标")
 public record MetricSqlDefinition(
         @Schema(description = "稳定且唯一的指标编码") String code,
+        @Schema(description = "定义修订号，与编码共同唯一标识一个定义实例") int revision,
         @Schema(description = "指标值结构") MetricValueShape valueShape,
         @Schema(description = "主体类型") String subjectType,
         @Schema(description = "聚合维度列表") List<String> dimensions,

@@ -27,6 +27,11 @@ public sealed interface MetricDefinitionObject permits MetricDSLDefinition, Metr
     String code();
 
     /**
+     * 定义修订号，与编码共同唯一标识一个定义实例
+     */
+    int revision();
+
+    /**
      * 值形态
      */
     MetricValueShape valueShape();

@@ -314,6 +314,7 @@ class MetricValueCalculatorTests {
         MetricDSLDefinition limited =
                 new MetricDSLDefinition(
                         original.code(),
+                        original.revision(),
                         original.valueShape(),
                         original.fact(),
                         original.joins(),
@@ -341,6 +342,7 @@ class MetricValueCalculatorTests {
         MetricDSLDefinition definition =
                 new MetricDSLDefinition(
                         "DERIVED",
+                        1,
                         MetricValueShape.SCALAR,
                         null,
                         List.of(),
@@ -530,6 +532,7 @@ class MetricValueCalculatorTests {
     private static MetricDSLDefinition scalar(MetricValueDsl value) {
         return new MetricDSLDefinition(
                 "TOTAL",
+                1,
                 MetricValueShape.SCALAR,
                 "ORDER",
                 List.of(),
@@ -545,6 +548,7 @@ class MetricValueCalculatorTests {
     private static MetricDSLDefinition fields(Map<String, MetricValueDsl> fields) {
         return new MetricDSLDefinition(
                 "SUMMARY",
+                1,
                 MetricValueShape.FIELD_SET,
                 "ORDER",
                 List.of(),

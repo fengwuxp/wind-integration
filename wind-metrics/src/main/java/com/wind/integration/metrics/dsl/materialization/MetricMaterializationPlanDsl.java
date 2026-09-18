@@ -1,12 +1,9 @@
 package com.wind.integration.metrics.dsl.materialization;
 
-import com.wind.integration.metrics.json.MetricMaterializationPlanDslJsonBinding;
 import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
-import tools.jackson.databind.annotation.JsonDeserialize;
-import tools.jackson.databind.annotation.JsonSerialize;
 
 import java.util.List;
 import java.util.Objects;
@@ -32,8 +29,6 @@ import java.util.Objects;
  * @date 2026-07-21 17:51
  */
 @Schema(description = "指标逻辑物化计划，不包含物理表或数据源绑定")
-@JsonDeserialize(using = MetricMaterializationPlanDslJsonBinding.Deserializer.class)
-@JsonSerialize(using = MetricMaterializationPlanDslJsonBinding.Serializer.class)
 public record MetricMaterializationPlanDsl(
         @Schema(description = "Plan DSL 结构版本，当前只支持 3") Integer schemaVersion,
         @Schema(description = "计划对应的顶层查询模式") MetricQueryMode executionMode,

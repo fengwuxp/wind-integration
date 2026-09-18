@@ -2,7 +2,6 @@ package com.wind.integration.metrics.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
@@ -15,7 +14,6 @@ import lombok.Getter;
  * @since 2026-08-24
  */
 @Getter
-@AllArgsConstructor
 @Schema(description = "指标由系统选定的顶层查询模式")
 public enum MetricQueryMode implements DescriptiveEnum {
 
@@ -28,4 +26,13 @@ public enum MetricQueryMode implements DescriptiveEnum {
 
     /** 枚举描述。 */
     private final String desc;
+
+    MetricQueryMode(String desc) {
+        this.desc = desc;
+    }
+    @Override
+    public String getDesc() {
+        return desc;
+    }
+
 }

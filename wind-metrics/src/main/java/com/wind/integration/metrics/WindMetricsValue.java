@@ -23,15 +23,16 @@ public interface WindMetricsValue<V> {
      * 获取指标名称
      */
     @NonNull
-    default String getName() {
-        return getCode();
-    }
+    @Deprecated(forRemoval = true)
+    String getName();
 
     /**
      * @return 指标编码
      */
     @NonNull
-    String getCode();
+    default String getCode() {
+        return getName();
+    }
 
     /**
      * @return 指标值；定义允许的正常空结果可以为空

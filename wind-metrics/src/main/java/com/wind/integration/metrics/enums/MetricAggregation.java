@@ -2,7 +2,6 @@ package com.wind.integration.metrics.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
@@ -12,7 +11,6 @@ import lombok.Getter;
  * @date 2026-07-21 17:51
  */
 @Getter
-@AllArgsConstructor
 @Schema(description = "指标事实字段支持的聚合函数")
 public enum MetricAggregation implements DescriptiveEnum {
 
@@ -29,4 +27,13 @@ public enum MetricAggregation implements DescriptiveEnum {
 
     /** 枚举描述。 */
     private final String desc;
+
+    MetricAggregation(String desc) {
+        this.desc = desc;
+    }
+    @Override
+    public String getDesc() {
+        return desc;
+    }
+
 }

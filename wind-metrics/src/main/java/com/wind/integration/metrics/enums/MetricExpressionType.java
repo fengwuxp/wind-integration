@@ -2,7 +2,6 @@ package com.wind.integration.metrics.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
@@ -12,7 +11,6 @@ import lombok.Getter;
  * @date 2026-07-21 17:51
  */
 @Getter
-@AllArgsConstructor
 @Schema(description = "指标派生计算支持的表达式类型")
 public enum MetricExpressionType implements DescriptiveEnum {
 
@@ -21,4 +19,13 @@ public enum MetricExpressionType implements DescriptiveEnum {
 
     /** 枚举描述。 */
     private final String desc;
+
+    MetricExpressionType(String desc) {
+        this.desc = desc;
+    }
+    @Override
+    public String getDesc() {
+        return desc;
+    }
+
 }

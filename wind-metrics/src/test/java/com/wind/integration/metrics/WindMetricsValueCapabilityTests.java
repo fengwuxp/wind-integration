@@ -11,6 +11,7 @@ import com.wind.integration.metrics.query.MetricFieldValue;
 import com.wind.integration.metrics.query.MetricResult;
 import com.wind.integration.metrics.query.MetricSegmentResult;
 import com.wind.jackson.WindJson;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -24,7 +25,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 从调用者视角验证公共值能力，不把值视图验证当作宿主执行或存储验收。
@@ -108,7 +115,7 @@ class WindMetricsValueCapabilityTests {
     void testExistingEvaluatedFieldsAreUsableThroughReadOnlyCapability() {
         MultipleValueMetricsField<Map<String, Object>> field = new MultipleValueMetricsField<>() {
             @Override
-            public String getCode() {
+            public @NonNull String getName() {
                 return "codedSummary";
             }
 

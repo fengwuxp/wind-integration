@@ -1,45 +1,51 @@
 package com.wind.integration.metrics.spec;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.wind.integration.metrics.enums.MetricDefinitionType;
-import com.wind.integration.metrics.json.MetricDefinitionDslJsonBinding;
-import com.wind.integration.metrics.json.MetricSqlJsonBinding;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NullMarked;
-import tools.jackson.databind.annotation.JsonDeserialize;
-import tools.jackson.databind.annotation.JsonSerialize;
 
 /**
  * 指标定义规范
  *
- * <p>{@link #definitionType()} 由实现类型派生，不是可写字段，也不进入规范 JSON：
- * 定义的声明方式已由 record 类型本身表达，宿主按该值选择 codec 或持久化列，
- * 不需要在载荷中重复同一事实。</p>
+ * <p>{@link #definitionType()} 标识定义的声明方式，Jackson 使用该字段进行多态反序列化。</p>
  *
  * @author wuxp
  * @date 2026-09-18 04:59
  **/
 @NullMarked
+@JsonTypeInfo(
+        use = JsonTypeInfo.Id.NAME,
+        property = "definitionType",
+        include = JsonTypeInfo.As.EXISTING_PROPERTY,
+        visible = true
+)
+@JsonSubTypes({
+        @JsonSubTypes.Type(value = MetricDefinitionSpec.MetricDSLDefinitionSpec.class, name = "DSL"),
+        @JsonSubTypes.Type(value = MetricDefinitionSpec.MetricSqlDefinitionSpec.class, name = "SQL")
+})
 public sealed interface MetricDefinitionSpec<O extends MetricDefinitionObject>
         permits MetricDefinitionSpec.MetricDSLDefinitionSpec, MetricDefinitionSpec.MetricSqlDefinitionSpec {
 
+    /**
+     * @return 规范版本
+     */
     @Schema(description = "规范版本")
     Integer schemaVersion();
 
+    /**
+     * @return 指标定义
+     */
     @Schema(description = "指标定义")
     O definition();
 
     /**
-     * 取得本规范的声明方式，由实现类型固定，不随载荷变化。
-     *
-     * @return 定义声明方式
+     * @return 指标定义类型
      */
-    @JsonIgnore
-    @Schema(description = "指标定义的声明方式")
+    @Schema(description = "指标定义类型")
     MetricDefinitionType definitionType();
 
-    @JsonDeserialize(using = MetricDefinitionDslJsonBinding.Deserializer.class)
-    @JsonSerialize(using = MetricDefinitionDslJsonBinding.Serializer.class)
     @Schema(description = "指标定义 DSL 的根对象")
     record MetricDSLDefinitionSpec(
             @Schema(description = "规范版本") Integer schemaVersion,
@@ -51,8 +57,6 @@ public sealed interface MetricDefinitionSpec<O extends MetricDefinitionObject>
         }
     }
 
-    @JsonDeserialize(using = MetricSqlJsonBinding.Deserializer.class)
-    @JsonSerialize(using = MetricSqlJsonBinding.Serializer.class)
     @Schema(description = "SQL 模板指标定义的根对象")
     record MetricSqlDefinitionSpec(
             @Schema(description = "规范版本") Integer schemaVersion,

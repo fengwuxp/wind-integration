@@ -2,7 +2,6 @@ package com.wind.integration.metrics.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
@@ -12,7 +11,6 @@ import lombok.Getter;
  * @date 2026-07-22 16:01
  */
 @Getter
-@AllArgsConstructor
 @Schema(description = "指标行选择支持的排序方向")
 public enum MetricSortDirection implements DescriptiveEnum {
 
@@ -24,4 +22,13 @@ public enum MetricSortDirection implements DescriptiveEnum {
 
     /** 枚举描述。 */
     private final String desc;
+
+    MetricSortDirection(String desc) {
+        this.desc = desc;
+    }
+    @Override
+    public String getDesc() {
+        return desc;
+    }
+
 }

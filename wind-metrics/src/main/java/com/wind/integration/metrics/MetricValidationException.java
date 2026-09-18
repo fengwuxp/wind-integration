@@ -1,5 +1,6 @@
 package com.wind.integration.metrics;
 
+import com.wind.common.exception.BaseException;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 
 import java.io.Serial;
@@ -13,13 +14,10 @@ import java.util.Objects;
  * @author wuxp
  * @date 2026-07-21 17:51
  */
-public class MetricValidationException extends IllegalArgumentException {
+public class MetricValidationException extends BaseException {
 
     @Serial
     private static final long serialVersionUID = 1L;
-
-    /** 校验失败的稳定错误码。 */
-    private final MetricErrorCode errorCode;
 
     /** 校验失败字段的 JSON Pointer。 */
     private final String fieldPath;
@@ -31,9 +29,9 @@ public class MetricValidationException extends IllegalArgumentException {
      * @param fieldPath 错误字段的 JSON Pointer
      * @param message 错误说明
      */
-    public MetricValidationException(MetricErrorCode errorCode, String fieldPath, String message) {
-        super(message);
-        this.errorCode = Objects.requireNonNull(errorCode, "errorCode must not be null");
+    public MetricValidationException(
+            MetricErrorCode errorCode, String fieldPath, String message) {
+        super(errorCode, message);
         this.fieldPath = Objects.requireNonNull(fieldPath, "fieldPath must not be null");
     }
 
@@ -47,8 +45,7 @@ public class MetricValidationException extends IllegalArgumentException {
      */
     public MetricValidationException(
             MetricErrorCode errorCode, String fieldPath, String message, Throwable cause) {
-        super(message, cause);
-        this.errorCode = Objects.requireNonNull(errorCode, "errorCode must not be null");
+        super(errorCode, message, cause);
         this.fieldPath = Objects.requireNonNull(fieldPath, "fieldPath must not be null");
     }
 
@@ -58,7 +55,7 @@ public class MetricValidationException extends IllegalArgumentException {
      * @return 校验错误码
      */
     public MetricErrorCode errorCode() {
-        return errorCode;
+        return (MetricErrorCode) getCode();
     }
 
     /**

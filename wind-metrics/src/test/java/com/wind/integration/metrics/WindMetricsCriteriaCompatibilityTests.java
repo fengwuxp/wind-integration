@@ -25,12 +25,12 @@ class WindMetricsCriteriaCompatibilityTests {
         Object context = new Object();
         WindMetricsAggregationQuery legacy = WindMetricsAggregationQuery.newBuilder("USER", Set.of(11L, 12L))
                 .tag("currency", "USD").queryVariable(Map.of("runtime", context, "state", "SETTLED")).build();
-        MetricQuery criteria = legacy.toCriteria();
+        MetricQuery criteria = legacy.asQuery();
 
         assertEquals(Set.of(11L, 12L), criteria.subjectId());
         assertEquals(Map.of(), criteria.dimensionValues());
         assertSame(context, criteria.parameterValues().get("runtime"));
-        assertEquals(legacy, WindMetricsAggregationQuery.fromCriteria(criteria));
+        assertEquals(legacy, WindMetricsAggregationQuery.fromQuery(criteria));
         assertNull(criteria.startTime());
         assertNull(criteria.endTime());
     }
@@ -38,14 +38,14 @@ class WindMetricsCriteriaCompatibilityTests {
     @Test
     void testLegacyNullValuesAndGetterMutabilityRemainAvailable() {
         WindMetricsAggregationQuery empty = new WindMetricsAggregationQuery(null, null, null, null, null, null);
-        assertEquals(empty, WindMetricsAggregationQuery.fromCriteria(empty.toCriteria()));
+        assertEquals(empty, WindMetricsAggregationQuery.fromQuery(empty.asQuery()));
         Map<String, Object> variables = new HashMap<>();
         WindMetricsAggregationQuery legacy = new WindMetricsAggregationQuery("USER", 1L,
                 new HashSet<>(), variables, null, null);
         legacy.getQueryVariables().put("state", "SETTLED");
         legacy.getSearchTags().add(WindTag.of("currency", "USD"));
-        assertEquals("SETTLED", legacy.toCriteria().parameterValues().get("state"));
-        assertEquals(1, legacy.toCriteria().searchTags().size());
+        assertEquals("SETTLED", legacy.asQuery().parameterValues().get("state"));
+        assertEquals(1, legacy.asQuery().searchTags().size());
     }
 
     @Test
@@ -77,7 +77,7 @@ class WindMetricsCriteriaCompatibilityTests {
         WindMetricsEvaluator<List<Object>> evaluator = new WindMetricsEvaluator<>() {
             @Override
             public List<Object> evaluate(WindMetricsAggregationQuery query) {
-                return evaluateWithCriteria(query.toCriteria());
+                return evaluateWithCriteria(query.asQuery());
             }
 
             @Override

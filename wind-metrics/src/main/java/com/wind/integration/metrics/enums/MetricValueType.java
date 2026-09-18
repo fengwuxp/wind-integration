@@ -2,7 +2,6 @@ package com.wind.integration.metrics.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
@@ -12,7 +11,6 @@ import lombok.Getter;
  * @date 2026-07-21 17:51
  */
 @Getter
-@AllArgsConstructor
 @Schema(description = "指标数值字段支持的 Java 数值类型")
 public enum MetricValueType implements DescriptiveEnum {
 
@@ -29,4 +27,13 @@ public enum MetricValueType implements DescriptiveEnum {
 
     /** 枚举描述。 */
     private final String desc;
+
+    MetricValueType(String desc) {
+        this.desc = desc;
+    }
+    @Override
+    public String getDesc() {
+        return desc;
+    }
+
 }

@@ -21,7 +21,35 @@ import java.util.Date;
 import java.util.UUID;
 
 /**
- * 归一 SQL 字段参数的逻辑值，再交给宿主 codec 编码；不持有字段声明副本。
+ * 指标 JDBC 值规范化器，将指标查询中的各种输入值转换为数据库字段期望的 Java 类型。
+ *
+ * <h2>核心职责</h2>
+ * <ul>
+ *   <li>类型转换：将查询条件中的值转换为对应数据库字段的 Java 类型</li>
+ *   <li>值校验：验证输入值的格式和范围是否符合字段要求</li>
+ *   <li>时区转换：将时间值按配置的时区转换为目标时间类型</li>
+ *   <li>编码委托：将规范化后的值委托给宿主 codec 进行 JDBC 编码</li>
+ * </ul>
+ *
+ * <h2>支持的值来源</h2>
+ * <ul>
+ *   <li>主体标识（subject）：字符串、整数、UUID</li>
+ *   <li>时间范围（time）：LocalDateTime → 目标时间类型</li>
+ *   <li>维度值（dimension）：任意维度字段的值</li>
+ *   <li>过滤字面量（literal）：DSL 中的比较值</li>
+ * </ul>
+ *
+ * <h2>支持的目标类型</h2>
+ * <ul>
+ *   <li>字符串：String, Character</li>
+ *   <li>整数：int, long, BigDecimal</li>
+ *   <li>枚举：任意枚举类型</li>
+ *   <li>UUID：标准 UUID</li>
+ *   <li>布尔：Boolean</li>
+ *   <li>时间：LocalDateTime, Instant, OffsetDateTime, ZonedDateTime, Timestamp, Date</li>
+ * </ul>
+ *
+ * <p><b>设计原则：</b>不持有字段声明副本，每次规范化都通过 {@link MetricJdbcBinding} 查询字段元信息。
  *
  * @author wuxp
  */

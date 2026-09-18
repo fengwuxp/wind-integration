@@ -1,8 +1,9 @@
 package com.wind.integration.metrics;
 
+import org.jspecify.annotations.NonNull;
+
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -15,7 +16,6 @@ import java.util.Objects;
  * @author wuxp
  * @since 2026-09-15
  */
-@SuppressWarnings("deprecation")
 final class ReadOnlyStructuredMetricsValue implements WindStructuredMetricsValue<Map<String, Object>> {
 
     private final String metricCode;
@@ -38,6 +38,12 @@ final class ReadOnlyStructuredMetricsValue implements WindStructuredMetricsValue
     }
 
     @Override
+    public @NonNull String getName() {
+        return getCode();
+    }
+
+    @Override
+    @NonNull
     public String getCode() {
         return metricCode;
     }

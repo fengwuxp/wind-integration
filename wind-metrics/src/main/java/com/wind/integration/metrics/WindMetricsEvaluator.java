@@ -31,6 +31,6 @@ public interface WindMetricsEvaluator<M> {
      * @return 指标值
      */
     default M evaluateWithCriteria(@Nullable MetricQuery criteria) {
-        return evaluate(WindMetricsAggregationQuery.fromCriteria(criteria));
+        return evaluate(WindMetricsAggregationQuery.fromQuery(criteria));
     }
 }

@@ -1,8 +1,8 @@
 package com.wind.integration.metrics.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import com.wind.common.exception.ExceptionCode;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
@@ -12,9 +12,8 @@ import lombok.Getter;
  * @date 2026-07-21 17:51
  */
 @Getter
-@AllArgsConstructor
 @Schema(description = "指标定义、查询和结果契约的稳定校验错误码")
-public enum MetricErrorCode implements DescriptiveEnum {
+public enum MetricErrorCode implements DescriptiveEnum, ExceptionCode {
 
     @Schema(description = "DSL JSON 格式无效")
     DSL_JSON_INVALID("DSL JSON 格式无效"),
@@ -61,4 +60,18 @@ public enum MetricErrorCode implements DescriptiveEnum {
 
     /** 枚举描述。 */
     private final String desc;
+
+    MetricErrorCode(String desc) {
+        this.desc = desc;
+    }
+
+    @Override
+    public String getDesc() {
+        return desc;
+    }
+
+    @Override
+    public String getCode() {
+        return name();
+    }
 }

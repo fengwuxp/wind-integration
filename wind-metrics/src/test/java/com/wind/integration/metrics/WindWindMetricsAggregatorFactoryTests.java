@@ -65,8 +65,8 @@ class WindWindMetricsAggregatorFactoryTests {
         }
 
         @Override
-        public WindMetricsAggregator<T> named(String filedName, String metricsName) {
-            fieldMappings.put(filedName, metricsName);
+        public WindMetricsAggregator<T> named(String filedName, String metricCode) {
+            fieldMappings.put(filedName, metricCode);
             return this;
         }
 
@@ -108,7 +108,7 @@ class WindWindMetricsAggregatorFactoryTests {
         }
 
         @Override
-        public String getCode() {
+        public String getName() {
             return name;
         }
 

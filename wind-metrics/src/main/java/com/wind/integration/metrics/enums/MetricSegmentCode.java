@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.wind.common.enums.DescriptiveEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
@@ -14,7 +13,6 @@ import lombok.Getter;
  * @date 2026-07-21 17:51
  */
 @Getter
-@AllArgsConstructor
 @Schema(description = "分段物化计划中固定的时间分段标识")
 public enum MetricSegmentCode implements DescriptiveEnum {
 
@@ -28,6 +26,16 @@ public enum MetricSegmentCode implements DescriptiveEnum {
 
     /** 枚举描述。 */
     private final String desc;
+
+    MetricSegmentCode(String code, String desc) {
+        this.code = code;
+        this.desc = desc;
+    }
+
+    @Override
+    public String getDesc() {
+        return desc;
+    }
 
     /**
      * 返回稳定协议编码。

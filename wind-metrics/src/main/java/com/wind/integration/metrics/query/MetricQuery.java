@@ -3,7 +3,6 @@ package com.wind.integration.metrics.query;
 import com.wind.integration.tag.WindTag;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
-import tools.jackson.databind.annotation.JsonDeserialize;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -33,7 +32,6 @@ import java.util.Set;
  * @since 2026-09-15
  */
 @Schema(description = "通用指标查询条件，不包含指标编码和定义修订")
-@JsonDeserialize(using = MetricQueryJsonParser.QueryDeserializer.class)
 public record MetricQuery(
         @Nullable @Schema(description = "单主体或主体集合，全局为空") Object subjectId,
         @Nullable @Schema(description = "时间下界；DSL 必填且包含") LocalDateTime startTime,
@@ -86,5 +84,210 @@ public record MetricQuery(
     private static <T> Collection<T> copyCollection(Collection<T> source) {
         return source instanceof Set<?> ? Collections.unmodifiableSet(new LinkedHashSet<>(source))
                 : Collections.unmodifiableList(new ArrayList<>(source));
+    }
+
+    /**
+     * 创建 MetricQuery 构建器。
+     *
+     * @return 新的构建器实例
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * MetricQuery 构建器，提供流式 API 构建查询条件。
+     */
+    public static class Builder {
+        private Object subjectId;
+        private LocalDateTime startTime;
+        private LocalDateTime endTime;
+        private Map<String, Object> dimensionValues;
+        private Map<String, Object> parameterValues;
+        private String subjectType;
+        private Collection<WindTag> searchTags;
+
+        private Builder() {
+        }
+
+        /**
+         * 设置单个主体标识。
+         *
+         * @param subjectId 主体标识
+         * @return this
+         */
+        public Builder subjectId(@Nullable Object subjectId) {
+            this.subjectId = subjectId;
+            return this;
+        }
+
+        /**
+         * 设置主体集合。
+         *
+         * @param subjectIds 主体集合
+         * @return this
+         */
+        public Builder subjectIds(@Nullable Collection<?> subjectIds) {
+            this.subjectId = subjectIds;
+            return this;
+        }
+
+        /**
+         * 设置时间下界。
+         *
+         * @param startTime 开始时间
+         * @return this
+         */
+        public Builder startTime(@Nullable LocalDateTime startTime) {
+            this.startTime = startTime;
+            return this;
+        }
+
+        /**
+         * 设置时间上界。
+         *
+         * @param endTime 结束时间
+         * @return this
+         */
+        public Builder endTime(@Nullable LocalDateTime endTime) {
+            this.endTime = endTime;
+            return this;
+        }
+
+        /**
+         * 设置时间范围。
+         *
+         * @param startTime 开始时间
+         * @param endTime 结束时间
+         * @return this
+         */
+        public Builder timeRange(@Nullable LocalDateTime startTime, @Nullable LocalDateTime endTime) {
+            this.startTime = startTime;
+            this.endTime = endTime;
+            return this;
+        }
+
+        /**
+         * 设置单个维度值。
+         *
+         * @param name 维度名称
+         * @param value 维度值
+         * @return this
+         */
+        public Builder dimension(String name, Object value) {
+            if (this.dimensionValues == null) {
+                this.dimensionValues = new java.util.HashMap<>();
+            }
+            this.dimensionValues.put(name, value);
+            return this;
+        }
+
+        /**
+         * 批量设置维度值。
+         *
+         * @param dimensions 维度映射
+         * @return this
+         */
+        public Builder dimensions(@Nullable Map<String, Object> dimensions) {
+            if (dimensions != null) {
+                if (this.dimensionValues == null) {
+                    this.dimensionValues = new java.util.HashMap<>(dimensions);
+                } else {
+                    this.dimensionValues.putAll(dimensions);
+                }
+            }
+            return this;
+        }
+
+        /**
+         * 设置单个参数值。
+         *
+         * @param name 参数名称
+         * @param value 参数值
+         * @return this
+         */
+        public Builder parameter(String name, Object value) {
+            if (this.parameterValues == null) {
+                this.parameterValues = new java.util.HashMap<>();
+            }
+            this.parameterValues.put(name, value);
+            return this;
+        }
+
+        /**
+         * 批量设置参数值。
+         *
+         * @param parameters 参数映射
+         * @return this
+         */
+        public Builder parameters(@Nullable Map<String, Object> parameters) {
+            if (parameters != null) {
+                if (this.parameterValues == null) {
+                    this.parameterValues = new java.util.HashMap<>(parameters);
+                } else {
+                    this.parameterValues.putAll(parameters);
+                }
+            }
+            return this;
+        }
+
+        /**
+         * 设置主体类型。
+         *
+         * @param subjectType 主体类型
+         * @return this
+         */
+        public Builder subjectType(@Nullable String subjectType) {
+            this.subjectType = subjectType;
+            return this;
+        }
+
+        /**
+         * 添加单个查询标签。
+         *
+         * @param tag 标签
+         * @return this
+         */
+        public Builder tag(WindTag tag) {
+            if (this.searchTags == null) {
+                this.searchTags = new ArrayList<>();
+            }
+            this.searchTags.add(tag);
+            return this;
+        }
+
+        /**
+         * 批量设置查询标签。
+         *
+         * @param tags 标签集合
+         * @return this
+         */
+        public Builder tags(@Nullable Collection<WindTag> tags) {
+            if (tags != null) {
+                if (this.searchTags == null) {
+                    this.searchTags = new ArrayList<>(tags);
+                } else {
+                    this.searchTags.addAll(tags);
+                }
+            }
+            return this;
+        }
+
+        /**
+         * 构建 MetricQuery 实例。
+         *
+         * @return 新的 MetricQuery 实例
+         */
+        public MetricQuery build() {
+            return new MetricQuery(
+                    subjectId,
+                    startTime,
+                    endTime,
+                    dimensionValues,
+                    parameterValues,
+                    subjectType,
+                    searchTags
+            );
+        }
     }
 }

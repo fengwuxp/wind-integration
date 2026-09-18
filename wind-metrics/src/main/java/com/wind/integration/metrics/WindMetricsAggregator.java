@@ -1,10 +1,9 @@
 package com.wind.integration.metrics;
 
 import com.wind.integration.metrics.query.MetricQuery;
-import org.jspecify.annotations.Nullable;
-
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * 聚合指标构建器，用于将一个或多个指标名称映射到目标对象字段，最终构建一个指标对象实例。
@@ -21,11 +20,11 @@ public interface WindMetricsAggregator<T> {
     /**
      * 指标对象名称和字段关系
      *
-     * @param filedName   指标对象字段名称
-     * @param metricsName 指标名称
+     * @param filedName  指标对象字段名称
+     * @param metricCode 指标编码
      * @return this
      */
-    WindMetricsAggregator<T> named(@NotBlank String filedName, @NotBlank String metricsName);
+    WindMetricsAggregator<T> named(@NotBlank String filedName, @NotBlank String metricCode);
 
     /**
      * 按通用条件取值并组装目标对象，沿用 named 的字段映射。
@@ -38,7 +37,7 @@ public interface WindMetricsAggregator<T> {
      */
     @NotNull
     default T aggregate(@Nullable MetricQuery query) {
-        return aggregate(WindMetricsAggregationQuery.fromCriteria(query));
+        return aggregate(WindMetricsAggregationQuery.fromQuery(query));
     }
 
     /**

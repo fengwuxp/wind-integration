@@ -32,11 +32,23 @@ class MetricResultContractTests {
 
     private static final LocalDateTime CALCULATED_TIME = LocalDateTime.of(2026, 7, 15, 0, 0, 0, 2_000_000);
 
+    /**
+     * 场景：分段结果标识使用封闭枚举契约。
+     * 输入：MetricSegmentResult 的 record 元信息。
+     * 流程：读取第一个组件类型。
+     * 预期：类型为 MetricSegmentCode，不能退回自由字符串。
+     */
     @Test
     void testSegmentResultUsesClosedSegmentCode() {
         Assertions.assertEquals(MetricSegmentCode.class, MetricSegmentResult.class.getRecordComponents()[0].getType());
     }
 
+    /**
+     * 场景：没有数据的标量结果允许正常 null。
+     * 输入：实时 LONG 指标、value=null、空字段集合。
+     * 流程：构造 MetricResult。
+     * 预期：value 保持 null，fields 为空。
+     */
     @Test
     void testScalarResultAllowsNormalNull() {
         MetricResult result = new MetricResult(
@@ -64,6 +76,12 @@ class MetricResultContractTests {
         Assertions.assertTrue(result.fields().isEmpty());
     }
 
+    /**
+     * 场景：结果字段集合必须独立于调用方后续修改。
+     * 输入：approvalRate=0.7500 的可变输入 Map。
+     * 流程：构造 FIELD_SET 结果后清空原 Map，并尝试修改结果字段。
+     * 预期：仍保留0.7500，结果字段不可修改。
+     */
     @Test
     void testFieldSetResultKeepsImmutableValues() {
         Map<String, MetricFieldValue> fields = new LinkedHashMap<>();
@@ -95,6 +113,12 @@ class MetricResultContractTests {
         Assertions.assertThrows(UnsupportedOperationException.class, () -> result.fields().clear());
     }
 
+    /**
+     * 场景：指标结果拒绝二进制浮点数。
+     * 输入：声明 DECIMAL，输入 Double 0.75。
+     * 流程：构造 MetricFieldValue。
+     * 预期：报 RESULT_INVALID，定位 /value。
+     */
     @Test
     void testRejectDoubleMetricValue() {
         MetricValidationException exception = Assertions.assertThrows(
@@ -105,6 +129,12 @@ class MetricResultContractTests {
         Assertions.assertEquals("/value", exception.fieldPath());
     }
 
+    /**
+     * 场景：快照分段必须说明可查询覆盖起点。
+     * 输入：DAY 快照分段缺 queryableStartTime。
+     * 流程：构造 MetricSegmentResult。
+     * 预期：报 RESULT_INVALID，定位 /queryableStartTime。
+     */
     @Test
     void testSnapshotSegmentRequiresCoverage() {
         MetricValidationException exception = Assertions.assertThrows(
@@ -123,6 +153,12 @@ class MetricResultContractTests {
         Assertions.assertEquals("/queryableStartTime", exception.fieldPath());
     }
 
+    /**
+     * 场景：组合分段不能隐含未覆盖的时间间隙。
+     * 输入：归档截至4月15日零点，实时从一小时后开始。
+     * 流程：构造覆盖3月1日至7月15日的 SEGMENTED 结果。
+     * 预期：报 RESULT_INVALID，定位第二段 startTime。
+     */
     @Test
     void testSegmentedResultRejectsCoverageGap() {
         LocalDateTime cutoverTime = LocalDateTime.of(2026, 4, 15, 0, 0);
@@ -173,6 +209,12 @@ class MetricResultContractTests {
         Assertions.assertEquals("/segments/1/startTime", exception.fieldPath());
     }
 
+    /**
+     * 场景：连续覆盖可由允许的分段形态表达。
+     * 输入：仅实时近期段、归档快照加实时近期段、归档快照加近期快照。
+     * 流程：分别构造 SEGMENTED 结果。
+     * 预期：均接受并保留分段数量和来源类型；此处只验证模型，不执行查询。
+     */
     @Test
     void testSegmentedResultAcceptsSupportedExecutionShapes() {
         LocalDateTime cutoverTime = LocalDateTime.of(2026, 4, 15, 0, 0);

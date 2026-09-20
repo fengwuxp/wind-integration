@@ -1,5 +1,8 @@
 package com.wind.integration.metrics.dsl.materialization;
 
+import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
+import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.SnapshotGranularity;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -45,5 +48,13 @@ public record MetricMaterializationPlanDsl(
         Objects.requireNonNull(dimensionKeyProviderCode, "dimensionKeyProviderCode must not be null");
         metrics = List.copyOf(metrics);
         segments = List.copyOf(segments);
+        if (schemaVersion != 3) {
+            throw new MetricValidationException(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED,
+                    "/schemaVersion", "Plan DSL supports schema 3");
+        }
+        if (metrics.isEmpty() || metrics.stream().map(MetricReferenceDsl::metricCode).distinct().count() != metrics.size()) {
+            throw new MetricValidationException(MetricErrorCode.DSL_PLAN_INVALID,
+                    "/metrics", "Plan metrics must be nonempty and unique by metricCode");
+        }
     }
 }

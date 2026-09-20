@@ -1,6 +1,8 @@
 package com.wind.integration.metrics.jdbc;
 
 import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.dsl.definition.MetricExpressionDsl;
+import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinOnDsl;
 import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
@@ -20,6 +22,7 @@ import com.wind.integration.metrics.dsl.literal.MetricLiteralDsl;
 import com.wind.integration.metrics.dsl.literal.StringMetricLiteralDsl;
 import com.wind.integration.metrics.enums.MetricAggregation;
 import com.wind.integration.metrics.enums.MetricErrorCode;
+import com.wind.integration.metrics.enums.MetricExpressionType;
 import com.wind.integration.metrics.enums.MetricFilterOperator;
 import com.wind.integration.metrics.enums.MetricJoinCardinality;
 import com.wind.integration.metrics.enums.MetricJoinType;
@@ -33,6 +36,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -48,20 +52,20 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * 以 {@code docs/metrics/legacy-sit-2026-09-16/SCENARIOS.md} 的真实指标为输入，
  * 验证 {@link MetricJdbcSqlCompiler} 对复杂场景的当前覆盖边界。
  *
- * <p>定义经 {@link com.wind.integration.metrics.spec.MetricDefinitionSpec.MetricDSLDefinitionSpec}
- * 承载后以 {@link MetricDSLDefinition} 进入编译器，与冻结的 {@link MetricJdbcBinding}、
- * 已验证的 {@link MetricQuery} 一起产出参数化 SQL。以下为 DSL 模式相对 18 组场景的可表达性，
+ * <p>用例直接将 {@link MetricDSLDefinition} 交给编译器，与夹具提供的冻结 {@link MetricJdbcBinding}、
+ * {@link MetricQuery} 一起产出参数化 SQL，断言文本、有序绑定及拒绝边界；不连接数据库，
+ * 也不验证定义版本服务。以下为 DSL 模式相对 18 组场景的可表达性，
  * 其余未列出者需 SQL 模式或业务事实适配：</p>
  *
  * <table>
  *   <caption>DSL 模式可表达性矩阵（本测试可执行断言的部分）</caption>
  *   <tr><th>场景</th><th>形态</th><th>DSL 表达</th></tr>
- *   <tr><td>S02</td><td>前 N 笔金额</td><td>rowSelection(过滤+稳定排序+limit) + SUM，见 {@link #s02TopNRefundAmountByParameterizedLimit}</td></tr>
- *   <tr><td>S09</td><td>固定币种付款总额</td><td>subject + 全窗 + measure.filter，见 {@link #s09FixedCurrencyPaymentTotalWithinWindow}</td></tr>
- *   <tr><td>S14</td><td>内外用户 ID JOIN</td><td>受控等值 JOIN + 主体经 join 别名，见 {@link #s14JoinResolvesSubjectIdentity}</td></tr>
- *   <tr><td>S16</td><td>标签记录计数</td><td>COUNT + measure.filter，见 {@link #s16TaggedTransactionCount}</td></tr>
- *   <tr><td>S03/S04/S08</td><td>比率 / 净额 / 特例</td><td>派生指标，{@link #derivedRatioMetricIsRejected} 断言拒绝</td></tr>
- *   <tr><td>S01/S05/S06</td><td>可选端点 / 无时间 / 相对窗</td><td>当前编译器要求完整半开窗，{@link #windowlessMetricIsRejected} 断言拒绝</td></tr>
+ *   <tr><td>S02</td><td>前 N 笔金额</td><td>rowSelection(过滤+排序+limit) + SUM，见 {@link #testS02TopNRefundAmountByParameterizedLimit}</td></tr>
+ *   <tr><td>S09</td><td>固定币种付款总额</td><td>subject + 全窗 + measure.filter，见 {@link #testS09FixedCurrencyPaymentTotalWithinWindow}</td></tr>
+ *   <tr><td>S14</td><td>内外用户 ID JOIN</td><td>受控等值 JOIN + 主体经 join 别名，见 {@link #testS14JoinResolvesSubjectIdentity}</td></tr>
+ *   <tr><td>S16</td><td>标签记录计数</td><td>COUNT + measure.filter，见 {@link #testS16TaggedTransactionCount}</td></tr>
+ *   <tr><td>S03/S04/S08</td><td>比率 / 净额 / 特例</td><td>派生指标，{@link #testDerivedRatioMetricIsRejected} 断言拒绝</td></tr>
+ *   <tr><td>S01/S05/S06</td><td>可选端点 / 无时间 / 相对窗</td><td>当前编译器要求完整半开窗，{@link #testWindowlessMetricIsRejected} 断言拒绝</td></tr>
  * </table>
  *
  * <p>COUNT DISTINCT(S11/S12)、UNION(S12/S13)、多事件时间列(S13)、相关子查询/去重关联(S15)
@@ -82,8 +86,14 @@ class MetricJdbcSqlCompilerScenarioTests {
 
     private static final Instant END_INSTANT = END.atZone(UTC).toInstant();
 
+    /**
+     * 场景：旧系统 S09：按租户统计窗口内固定币种的成功付款总额。
+     * 输入：tenant-1、USD、Success、2026-09-01至09-02，金额与时间映射已冻结。
+     * 流程：编译 SUM 加度量过滤的 DSL。
+     * 预期：生成 CASE 条件汇总及租户/半开窗谓词，5个参数的顺序和 JDBC 类型精确匹配。
+     */
     @Test
-    void s09FixedCurrencyPaymentTotalWithinWindow() {
+    void testS09FixedCurrencyPaymentTotalWithinWindow() {
         MetricMeasureDsl measure = measure(MetricAggregation.SUM, "pay_amount",
                 and(eq("payment_order_state", str("Success")), eq("pay_currency", str("USD"))));
         MetricDSLDefinition definition = definition()
@@ -112,8 +122,14 @@ class MetricJdbcSqlCompilerScenarioTests {
                 END_INSTANT, Types.TIMESTAMP);
     }
 
+    /**
+     * 场景：旧系统 S02：筛选窗口内符合状态的前 N 笔退款后求金额和。
+     * 输入：vcc-1、firstNPens=2，category/business_scene=6、state=7、hide=0，按授权时间升序。
+     * 流程：编译 rowSelection 加 SUM。
+     * 预期：过滤/排序/LIMIT 位于内层，SUM 位于外层，8个有序参数与类型匹配；不验证同时间的稳定次序。
+     */
     @Test
-    void s02TopNRefundAmountByParameterizedLimit() {
+    void testS02TopNRefundAmountByParameterizedLimit() {
         MetricRowSelectionDsl selection = new MetricRowSelectionDsl(
                 and(eq("category", intLit(6)), eq("business_scene", intLit(6)),
                         eq("state", intLit(7)), eq("hide_to_customer", intLit(0))),
@@ -155,8 +171,14 @@ class MetricJdbcSqlCompilerScenarioTests {
                 2, Types.INTEGER);
     }
 
+    /**
+     * 场景：旧系统 S14：通过受控关联将外部用户身份映射到充值事实。
+     * 输入：external-id-101，按 u_id 关联用户表；USD、补扣场景、state=2。
+     * 流程：编译 MANY_TO_ONE INNER JOIN 与条件 SUM。
+     * 预期：JOIN 使用内部 u_id，主体谓词使用关联表 id；6个参数的值与类型匹配。
+     */
     @Test
-    void s14JoinResolvesSubjectIdentity() {
+    void testS14JoinResolvesSubjectIdentity() {
         MetricMeasureDsl measure = measure(MetricAggregation.SUM, "recharge_amount",
                 and(eq("business_scene", str("FEE_SUPPLEMENTARY_DEDUCTION")),
                         eq("recharge_currency", str("USD")), eq("state", intLit(2))));
@@ -195,8 +217,14 @@ class MetricJdbcSqlCompilerScenarioTests {
                 END_INSTANT, Types.TIMESTAMP);
     }
 
+    /**
+     * 场景：旧系统 S16：按用户统计窗口内指定标签记录数。
+     * 输入：user-1、tag_name=WISE_LE、tag_value=300，完整时间窗口。
+     * 流程：编译带度量过滤的 COUNT。
+     * 预期：生成条件 COUNT 及主体/时间谓词，标签、主体和时间的5个绑定保持顺序与类型。
+     */
     @Test
-    void s16TaggedTransactionCount() {
+    void testS16TaggedTransactionCount() {
         MetricMeasureDsl measure = measure(MetricAggregation.COUNT, null,
                 and(eq("tag_name", str("WISE_LE")), eq("tag_value", str("300"))));
         MetricDSLDefinition definition = definition()
@@ -224,10 +252,21 @@ class MetricJdbcSqlCompilerScenarioTests {
                 END_INSTANT, Types.TIMESTAMP);
     }
 
+    /**
+     * 场景：S03/S04/S08 类派生公式不由事实 SQL 编译器直接执行。
+     * 输入：无 fact 的 ratio 定义，绑定 APPROVED@1 和 TOTAL@2。
+     * 流程：将合法派生定义交给事实 compile。
+     * 预期：在 /metric/fact 报执行模式不支持；该拒绝不代表派生查询服务不支持表达式。
+     */
     @Test
-    void derivedRatioMetricIsRejected() {
-        // S03/S04/S08 的比率、净额、特例公式需要派生表达式，事实为空时编译器拒绝。
-        MetricDSLDefinition definition = definition().fact(null).build();
+    void testDerivedRatioMetricIsRejected() {
+        MetricValueDsl value = new MetricValueDsl(MetricValueType.DECIMAL, 6, RoundingMode.HALF_UP, null,
+                new MetricExpressionDsl(MetricExpressionType.SPEL,
+                        "ratio(metric('APPROVED', 'value'), metric('TOTAL', 'value'))"),
+                new MetricOrElseDsl(MetricOrElseMode.NULL, null));
+        MetricDSLDefinition definition = new MetricDSLDefinition("RATIO", 1, MetricValueShape.SCALAR,
+                null, List.of(), new MetricSubjectDsl("GLOBAL", null), null, List.of(), Map.of(),
+                null, value, Map.of(), List.of(new MetricReferenceDsl("APPROVED", 1), new MetricReferenceDsl("TOTAL", 2)));
 
         assertValidation(MetricErrorCode.METRIC_EXECUTION_MODE_UNSUPPORTED, "/metric/fact",
                 () -> compiler().compile(definition, query(), binding(
@@ -235,9 +274,14 @@ class MetricJdbcSqlCompilerScenarioTests {
                         column("gmt_create", "gmt_create", Instant.class, Types.TIMESTAMP))));
     }
 
+    /**
+     * 场景：旧场景的无界/可选时间窗不能直接进入当前 DSL 事实编译器。
+     * 输入：VCC 定义分别传入起止均空或仅起点。
+     * 流程：调用 compile。
+     * 预期：报 QUERY_INVALID，分别定位 startTime 与 endTime；不推断 SQL 模板也受此限制。
+     */
     @Test
-    void windowlessMetricIsRejected() {
-        // S01/S05/S06/S08 的可选端点、无时间、相对滚动窗，当前编译器仍要求完整半开窗。
+    void testWindowlessMetricIsRejected() {
         MetricDSLDefinition definition = definition()
                 .subject(new MetricSubjectDsl("VCC", "vcc_id"))
                 .time(new MetricTimeDsl("gmt_create"))

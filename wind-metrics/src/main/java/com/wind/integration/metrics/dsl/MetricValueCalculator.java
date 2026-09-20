@@ -36,7 +36,7 @@ public final class MetricValueCalculator {
      * @throws MetricValidationException 派生指标、无 measure、rowSelection 或 AVG 不支持分段合并
      */
     public void validateMergeable(MetricDSLDefinition definition) {
-        if (definition.fact() == null) {
+        if (definition.derivationType().isDerived()) {
             throw invalid("/metric/fact", "Derived metric has no fact measures to merge");
         }
         if (definition.rowSelection() != null) {
@@ -146,7 +146,7 @@ public final class MetricValueCalculator {
             BiFunction<String, Map<String, @Nullable Number>, ?> expressionEvaluator) {
         Map<String, MetricValueDsl> values = values(definition);
         Map<String, MetricValueDsl> measures = measures(definition);
-        if (definition.fact() == null && !measures.isEmpty()) {
+        if (definition.derivationType().isDerived() && !measures.isEmpty()) {
             throw invalid("/metric/value", "Derived metric must use expressions only");
         }
         requireFields(measures, rawMeasures);

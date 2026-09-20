@@ -38,6 +38,12 @@ class MetricExpressionTests {
 
     private final MetricExpressionCompiler compiler = new MetricExpressionCompiler();
 
+    /**
+     * 场景：原生指标在聚合后计算本地表达式。
+     * 输入：count=7，表达式 count * 2，声明 LONG。
+     * 流程：真实编译、求值，再交计算器归一化。
+     * 预期：中间值为精确 BigDecimal 14，最终值为 Long 14。
+     */
     @Test
     void testLocalExpressionReturnsExactRawResultBeforeFinalNormalization() {
         MetricValueDsl value = value("count * 2", MetricValueType.LONG, null);
@@ -47,6 +53,12 @@ class MetricExpressionTests {
         Assertions.assertEquals(14L, new MetricValueCalculator().normalize(value, raw, VALUE_PATH));
     }
 
+    /**
+     * 场景：多个请求并发复用同一个表达式句柄。
+     * 输入：100 组 count=0..99，共用 count * 2。
+     * 流程：并行调用同一句柄求值。
+     * 预期：每次只使用本次 count，返回对应的两倍值。
+     */
     @Test
     void testCompiledHandleDoesNotReusePreviousRequestValues() {
         MetricValueDsl value = value("count * 2", MetricValueType.LONG, null);
@@ -64,6 +76,12 @@ class MetricExpressionTests {
                                                 VALUE_PATH)));
     }
 
+    /**
+     * 场景：派生比例并发计算时隔离请求值和输出精度。
+     * 输入：PAYMENT.approved=0..99、total=3，交替使用4位与6位小数。
+     * 流程：共用编译句柄并行求值。
+     * 预期：每项均按本次精度 HALF_UP 计算 count/3，不串值或精度。
+     */
     @Test
     void testDerivedRatioKeepsRequestValuesAndPrecisionIsolated() {
         String source = "ratio(metric('PAYMENT', 'approved'), metric('PAYMENT', 'total'))";
@@ -90,6 +108,12 @@ class MetricExpressionTests {
                         });
     }
 
+    /**
+     * 场景：本地比例支持负数与指定精度。
+     * 输入：1/3、-1/4、2/3 配置4位，另将1/3配置为6位。
+     * 流程：编译 ratio 后分别求值。
+     * 预期：得到0.3333、-0.2500、0.6667和0.333333。
+     */
     @Test
     void testRatioPrecisionAtFourAndSixPlaces() {
         MetricValueDsl four = value("ratio(approvedCount, totalCount)", MetricValueType.DECIMAL, 4);
@@ -119,6 +143,12 @@ class MetricExpressionTests {
                                 VALUE_PATH));
     }
 
+    /**
+     * 场景：比例的零分母不能伪装成正常结果。
+     * 输入：approvedCount=1、totalCount=0。
+     * 流程：编译并执行本地 ratio。
+     * 预期：抛出 ArithmeticException，说明分母不能为零。
+     */
     @Test
     void testZeroDenominatorPropagatesArithmeticError() {
         MetricValueDsl value =
@@ -137,6 +167,12 @@ class MetricExpressionTests {
                 "Metric ratio denominator must not be zero", exception.getMessage());
     }
 
+    /**
+     * 场景：配置表达式必须留在允许的语法与字段范围内。
+     * 输入：除法、嵌套 ratio 运算、类型/构造器/Bean/方法访问、赋值等非法表达式。
+     * 流程：以仅含 approvedCount、totalCount 的本地字段白名单编译。
+     * 预期：均返回 DSL_VALUE_INVALID，并定位到 expression/value。
+     */
     @Test
     void testCompileRejectsSandboxEscapes() {
         for (String source :
@@ -167,6 +203,12 @@ class MetricExpressionTests {
         }
     }
 
+    /**
+     * 场景：编译入口拒绝超限或不完整的表达式。
+     * 输入：重复512次加法、33层嵌套和未闭合括号。
+     * 流程：分别编译 LONG 本地表达式。
+     * 预期：均抛出 MetricValidationException。
+     */
     @Test
     void testResourceLimitsAndMalformedSyntax() {
         for (String source :
@@ -180,6 +222,12 @@ class MetricExpressionTests {
         }
     }
 
+    /**
+     * 场景：指标表达式输出必须为数值或允许的空值。
+     * 输入：布尔比较、布尔条件分支、布尔兜底及字符串常量。
+     * 流程：分别编译为 LONG 指标表达式。
+     * 预期：均在编译时拒绝非数值输出。
+     */
     @Test
     void testCompileRejectsNonNumericResults() {
         for (String source :
@@ -190,6 +238,12 @@ class MetricExpressionTests {
         }
     }
 
+    /**
+     * 场景：整数字面量及条件分支不能在求值前发生整数溢出。
+     * 输入：INT/LONG 边界加法、乘法及条件/Elvis 分支溢出表达式。
+     * 流程：编译这些包含整数运算的本地表达式。
+     * 预期：均在编译时抛出校验异常。
+     */
     @Test
     void testCompileRejectsIntegralLiteralAndConditionalOverflow() {
         for (String source :
@@ -205,6 +259,12 @@ class MetricExpressionTests {
         }
     }
 
+    /**
+     * 场景：中间算术保持精确，声明类型的范围由最终归一化校验。
+     * 输入：count=Long.MAX_VALUE，表达式 count * 2，输出 LONG。
+     * 流程：先真实求值，再调用 normalize。
+     * 预期：中间 BigDecimal 等于精确两倍值；归一化报 RESULT_INVALID。
+     */
     @Test
     void testRawArithmeticDoesNotOverflowBeforeCalculatorChecksDeclaredRange() {
         MetricValueDsl value = value("count * 2", MetricValueType.LONG, null);
@@ -220,6 +280,12 @@ class MetricExpressionTests {
         Assertions.assertEquals(MetricErrorCode.RESULT_INVALID, exception.errorCode());
     }
 
+    /**
+     * 场景：本地及依赖数值都不能引入二进制浮点误差。
+     * 输入：本地 count 和依赖 TOTAL.value 分别传入 Double 0.1。
+     * 流程：执行本地乘法及派生引用。
+     * 预期：两条路径均拒绝不精确的浮点输入。
+     */
     @Test
     void testInexactInputRejectedForLocalAndDependencyValues() {
         MetricValueDsl local = value("count * 2", MetricValueType.LONG, null);
@@ -240,6 +306,12 @@ class MetricExpressionTests {
                                         VALUE_PATH));
     }
 
+    /**
+     * 场景：多指标表达式提取直接依赖并保留重复引用的计算语义。
+     * 输入：B.value + A.amount + B.value，A=2、B=3。
+     * 流程：编译、读取依赖集合，再求值并尝试修改集合。
+     * 预期：依赖按 A、B 排序去重且不可修改；结果为8。
+     */
     @Test
     void testDerivedReferencesAreSortedUniqueAndImmutable() {
         MetricValueDsl value =
@@ -271,6 +343,12 @@ class MetricExpressionTests {
                         VALUE_PATH));
     }
 
+    /**
+     * 场景：派生指标从已加载的依赖结果计算比例。
+     * 输入：SUMMARY.approved=1、total=3，ratio 输出6位小数。
+     * 流程：真实编译派生表达式并传入两个字段值。
+     * 预期：结果为0.333333。
+     */
     @Test
     void testDerivedRatioUsesPreloadedDependencyResults() {
         MetricValueDsl value =
@@ -291,6 +369,12 @@ class MetricExpressionTests {
                         VALUE_PATH));
     }
 
+    /**
+     * 场景：派生定义必须包含静态可识别的指标引用。
+     * 输入：动态拼接 code/field、空名称、纯常量及本地变量表达式。
+     * 流程：调用 compileDerived。
+     * 预期：均拒绝，不能生成动态或无依赖的派生句柄。
+     */
     @Test
     void testDynamicOrMissingMetricReferencesAreRejected() {
         for (String source :
@@ -310,6 +394,12 @@ class MetricExpressionTests {
         }
     }
 
+    /**
+     * 场景：空值兜底不能掩盖缺失的输入字段或依赖。
+     * 输入：本地 count 和依赖 COUNT.value 分别为显式 null 或缺少键。
+     * 流程：执行条件表达式及 Elvis 兜底。
+     * 预期：显式 null 可返回 null/0；缺少键必须抛出校验异常。
+     */
     @Test
     void testNormalNullDiffersFromMissingMeasureOrDependency() {
         MetricValueDsl local =
@@ -336,6 +426,12 @@ class MetricExpressionTests {
                 () -> dependency.evaluate(derived, Map.of(), Map.of(), VALUE_PATH));
     }
 
+    /**
+     * 场景：表达式语义比较忽略无意义排版，同时保留实际运算差异。
+     * 输入：count * 2、带空格括号的等价式以及 count * 3。
+     * 流程：编译并比较 canonicalAst，检查本地字段集合。
+     * 预期：前两者一致，乘3不同；字段只有 count 且不可修改。
+     */
     @Test
     void testCanonicalAstPreservesSemanticComparisonWithoutExposingSpringTypes() {
         MetricValueDsl first = value("count * 2", MetricValueType.LONG, null);
@@ -351,6 +447,12 @@ class MetricExpressionTests {
                 UnsupportedOperationException.class, () -> compiled.localValueFields().clear());
     }
 
+    /**
+     * 场景：运行时仍防御内部错误构造的未校验句柄。
+     * 输入：手动注入方法调用、布尔结果、类型访问及构造器 AST。
+     * 流程：绕过编译入口构造句柄后 evaluate。
+     * 预期：均报 RESULT_INVALID，并定位 expression；不把此夹具当公共配置入口。
+     */
     @Test
     void testRuntimeSandboxRejectsInternallyMalformedHandles() {
         MetricValueDsl value = value("count * 2", MetricValueType.LONG, null);
@@ -373,6 +475,12 @@ class MetricExpressionTests {
         }
     }
 
+    /**
+     * 场景：内部错误句柄不能读取校验集合以外的依赖。
+     * 输入：声明 DECLARED.value，但 AST 读取 OTHER.value；输入同时含两者。
+     * 流程：直接构造不一致句柄并求值。
+     * 预期：即使输入已有 OTHER，也必须拒绝越界引用。
+     */
     @Test
     void testRuntimeCannotReadOutsideValidatedMetricReferences() {
         MetricValueDsl value = value("metric('DECLARED', 'value')", MetricValueType.LONG, null);
@@ -388,6 +496,12 @@ class MetricExpressionTests {
                                 value, Map.of(), Map.of(declared, 1L, undeclared, 2L), VALUE_PATH));
     }
 
+    /**
+     * 场景：内部错误句柄不能读取校验集合以外的本地字段。
+     * 输入：只声明 count，AST 使用 extra + 1，输入含 extra=99。
+     * 流程：直接构造不一致句柄并求值。
+     * 预期：拒绝读取未声明的 extra。
+     */
     @Test
     void testRuntimeCannotReadOutsideValidatedLocalFields() {
         MetricValueDsl value = value("count * 2", MetricValueType.LONG, null);

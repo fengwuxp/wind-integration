@@ -18,6 +18,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class MetricArchitectureDependencyTests {
 
+    /**
+     * 场景：公共能力源码保持与 DSL/JDBC 实现的依赖隔离。
+     * 输入：当前 metrics 生产源码，排除 dsl、jdbc、json、spec、expression 包。
+     * 流程：扫描剩余 Java 文件中的 DSL/JDBC 全限定引用。
+     * 预期：违规列表为空；此源码规则不证明运行时装配，也不检查已排除的 json 包。
+     */
     @Test
     void testPublicCapabilitiesAndJsonSupportDoNotDependOnDslOrJdbc() throws IOException {
         Path root = Path.of("src/main/java/com/wind/integration/metrics");

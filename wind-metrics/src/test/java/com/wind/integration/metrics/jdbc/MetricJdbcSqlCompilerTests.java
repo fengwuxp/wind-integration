@@ -1,6 +1,8 @@
 package com.wind.integration.metrics.jdbc;
 
 import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.dsl.definition.MetricExpressionDsl;
+import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinOnDsl;
 import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
@@ -21,6 +23,7 @@ import com.wind.integration.metrics.dsl.literal.IntegralMetricLiteralDsl;
 import com.wind.integration.metrics.dsl.literal.StringMetricLiteralDsl;
 import com.wind.integration.metrics.enums.MetricAggregation;
 import com.wind.integration.metrics.enums.MetricErrorCode;
+import com.wind.integration.metrics.enums.MetricExpressionType;
 import com.wind.integration.metrics.enums.MetricFilterOperator;
 import com.wind.integration.metrics.enums.MetricJoinCardinality;
 import com.wind.integration.metrics.enums.MetricJoinType;
@@ -70,24 +73,48 @@ class MetricJdbcSqlCompilerTests {
 
     // 构造器契约
 
+    /**
+     * 场景：编译器必须显式确定 SQL 方言。
+     * 输入：UTC、行数上限1000、dialect=null。
+     * 流程：构造 MetricJdbcSqlCompiler。
+     * 预期：抛出 NullPointerException。
+     */
     @Test
     void testConstructorRejectsNullDialect() {
         assertThrows(NullPointerException.class,
                 () -> new MetricJdbcSqlCompiler(UTC, 1000, null));
     }
 
+    /**
+     * 场景：时间参数转换必须有明确时区。
+     * 输入：timeZone=null。
+     * 流程：构造 MetricJdbcSqlCompiler。
+     * 预期：抛出 NullPointerException。
+     */
     @Test
     void testConstructorRejectsNullTimeZone() {
         assertThrows(NullPointerException.class,
                 () -> new MetricJdbcSqlCompiler(null));
     }
 
+    /**
+     * 场景：编译器不能接受尚未支持的方言。
+     * 输入：UTC、上限1000、SQLITE。
+     * 流程：构造 MetricJdbcSqlCompiler。
+     * 预期：抛出 IllegalArgumentException。
+     */
     @Test
     void testConstructorRejectsUnsupportedDialect() {
         assertThrows(IllegalArgumentException.class,
                 () -> new MetricJdbcSqlCompiler(UTC, 1000, SQLDialect.SQLITE));
     }
 
+    /**
+     * 场景：行选择的全局上限必须为正数。
+     * 输入：上限0与-1。
+     * 流程：分别构造编译器。
+     * 预期：均抛出 IllegalArgumentException。
+     */
     @Test
     void testConstructorRejectsNonPositiveRowSelectionLimit() {
         for (int limit : List.of(0, -1)) {
@@ -96,6 +123,12 @@ class MetricJdbcSqlCompilerTests {
         }
     }
 
+    /**
+     * 场景：声明支持的方言可以正常初始化。
+     * 输入：MYSQL、POSTGRES、H2，UTC 与上限1000。
+     * 流程：逐一构造编译器。
+     * 预期：均成功；此用例仅验证初始化，不连接数据库执行 SQL。
+     */
     @Test
     void testConstructorAcceptsSupportedDialects() {
         for (SQLDialect dialect : List.of(SQLDialect.MYSQL, SQLDialect.POSTGRES, SQLDialect.H2)) {
@@ -105,6 +138,12 @@ class MetricJdbcSqlCompilerTests {
 
     // 实时查询：投影、谓词、关联与有限行集
 
+    /**
+     * 场景：全局 COUNT 只按窗口过滤。
+     * 输入：全局 order_fact 指标，2026-09-01至09-02 UTC，无主体。
+     * 流程：编译定义和冻结 mapping。
+     * 预期：生成 count(*)、value 投影及半开窗两个 TIMESTAMP 绑定，无主体谓词。
+     */
     @Test
     void testGlobalCountRendersWithoutSubjectPredicate() {
         MetricSqlDescriptor result = compiler().compile(definition().build(), query(), binding());
@@ -117,6 +156,12 @@ class MetricJdbcSqlCompilerTests {
                 END_INSTANT, Types.TIMESTAMP);
     }
 
+    /**
+     * 场景：度量条件只影响对应汇总值。
+     * 输入：SUM(amount)，条件 amount 大于100，完整窗口。
+     * 流程：编译带 measure.filter 的定义。
+     * 预期：生成 CASE WHEN 条件 SUM，依次绑定 DECIMAL 100 和起止时间。
+     */
     @Test
     void testSumMeasureWithFilterRendersConditionalAggregate() {
         MetricMeasureDsl measure = measure(MetricAggregation.SUM, "amount",
@@ -135,6 +180,12 @@ class MetricJdbcSqlCompilerTests {
                 END_INSTANT, Types.TIMESTAMP);
     }
 
+    /**
+     * 场景：主体指标必须把主体限制编入 SQL。
+     * 输入：USER 指标，subjectId=user-1，完整窗口。
+     * 流程：编译 COUNT。
+     * 预期：WHERE 包含 user_id 与半开窗，按主体、起点、终点顺序绑定。
+     */
     @Test
     void testSubjectMetricFiltersBySubjectId() {
         MetricDSLDefinition definition = definition()
@@ -152,6 +203,12 @@ class MetricJdbcSqlCompilerTests {
                 END_INSTANT, Types.TIMESTAMP);
     }
 
+    /**
+     * 场景：维度过滤顺序稳定，不依赖输入 Map 顺序。
+     * 输入：声明 region/channel，输入 CN/APP。
+     * 流程：编译 COUNT。
+     * 预期：等值条件按 channel、region 排序，时间参数后绑定 APP、CN。
+     */
     @Test
     void testDimensionsRenderAsEqualityInSortedFieldOrder() {
         MetricDSLDefinition definition = definition().dimensions(List.of("region", "channel")).build();
@@ -169,6 +226,12 @@ class MetricJdbcSqlCompilerTests {
                 "CN", Types.VARCHAR);
     }
 
+    /**
+     * 场景：字段集合只投影真实度量并保持确定顺序。
+     * 输入：orders=COUNT、revenue=SUM(amount)。
+     * 流程：编译 FIELD_SET。
+     * 预期：SQL 按 orders、revenue 输出，投影映射一致且仅绑定起止时间。
+     */
     @Test
     void testFieldSetRendersMultipleMeasuresInFieldOrder() {
         MetricDSLDefinition definition = definition()
@@ -189,6 +252,12 @@ class MetricJdbcSqlCompilerTests {
                 END_INSTANT, Types.TIMESTAMP);
     }
 
+    /**
+     * 场景：受控内关联使用冻结字段映射。
+     * 输入：order_fact.customer_id 对 customer_fact.id 的 MANY_TO_ONE INNER JOIN。
+     * 流程：编译 COUNT。
+     * 预期：生成 j0 别名和正确等值 ON 条件，起止时间仍作用于主事实。
+     */
     @Test
     void testInnerJoinRendersJoinAliasAndConditions() {
         MetricDSLDefinition definition = definition()
@@ -205,6 +274,12 @@ class MetricJdbcSqlCompilerTests {
                 END_INSTANT, Types.TIMESTAMP);
     }
 
+    /**
+     * 场景：左关联保留指定 JOIN 类型。
+     * 输入：同一 customer_id/id 映射配置 LEFT。
+     * 流程：编译 COUNT。
+     * 预期：生成 LEFT OUTER JOIN 与正确 ON 条件，时间绑定保持顺序。
+     */
     @Test
     void testLeftJoinRendersOuterJoin() {
         MetricDSLDefinition definition = definition()
@@ -221,6 +296,12 @@ class MetricJdbcSqlCompilerTests {
                 END_INSTANT, Types.TIMESTAMP);
     }
 
+    /**
+     * 场景：先选行再聚合，LIMIT 不能作用于聚合结果行。
+     * 输入：按 created_at 降序选10行的 COUNT。
+     * 流程：编译 rowSelection。
+     * 预期：内层带窗口、ORDER BY、LIMIT ?，外层 count(*)；最后绑定 INTEGER 10。
+     */
     @Test
     void testRowSelectionRendersOrderedLimitedSubquery() {
         MetricRowSelectionDsl selection = new MetricRowSelectionDsl(null,
@@ -240,6 +321,12 @@ class MetricJdbcSqlCompilerTests {
                 10, Types.INTEGER);
     }
 
+    /**
+     * 场景：行数可由声明的查询参数提供。
+     * 输入：entryLimit 参数声明，查询值10，按创建时间降序。
+     * 流程：编译参数化 rowSelection。
+     * 预期：LIMIT 使用占位符，时间参数后绑定 INTEGER 10。
+     */
     @Test
     void testParameterizedRowSelectionLimitRendersBoundLimit() {
         MetricRowSelectionDsl selection = new MetricRowSelectionDsl(null,
@@ -263,6 +350,12 @@ class MetricJdbcSqlCompilerTests {
 
     // 校验错误
 
+    /**
+     * 场景：公开编译入口拒绝缺少定义或条件的请求。
+     * 输入：definition=null 或 query=null。
+     * 流程：分别调用 compile。
+     * 预期：均报 QUERY_INVALID，错误定位根路径。
+     */
     @Test
     void testCompileRejectsNullDefinitionOrQuery() {
         assertValidation(MetricErrorCode.QUERY_INVALID, "",
@@ -271,12 +364,30 @@ class MetricJdbcSqlCompilerTests {
                 () -> compiler().compile(definition().build(), null, binding()));
     }
 
+    /**
+     * 场景：事实 SQL 编译器不负责跨指标表达式求值。
+     * 输入：无 fact，BASE@1 的 value * 2 派生定义。
+     * 流程：调用事实 compile。
+     * 预期：报 METRIC_EXECUTION_MODE_UNSUPPORTED，定位 /metric/fact。
+     */
     @Test
     void testCompileRejectsDerivedMetric() {
+        MetricValueDsl value = new MetricValueDsl(MetricValueType.LONG, null, null, null,
+                new MetricExpressionDsl(MetricExpressionType.SPEL, "metric('BASE', 'value') * 2"),
+                new MetricOrElseDsl(MetricOrElseMode.NULL, null));
+        MetricDSLDefinition derived = new MetricDSLDefinition("DERIVED", 1, MetricValueShape.SCALAR,
+                null, List.of(), new MetricSubjectDsl("GLOBAL", null), null, List.of(), Map.of(),
+                null, value, Map.of(), List.of(new MetricReferenceDsl("BASE", 1)));
         assertValidation(MetricErrorCode.METRIC_EXECUTION_MODE_UNSUPPORTED, "/metric/fact",
-                () -> compiler().compile(definition().fact(null).build(), query(), binding()));
+                () -> compiler().compile(derived, query(), binding()));
     }
 
+    /**
+     * 场景：查询主体类型必须与定义一致。
+     * 输入：定义为 USER，查询声明 APP、subjectId=user-1。
+     * 流程：调用 compile。
+     * 预期：报 QUERY_INVALID，定位 /subjectType。
+     */
     @Test
     void testCompileRejectsSubjectTypeMismatch() {
         MetricDSLDefinition definition = definition()
@@ -294,12 +405,24 @@ class MetricJdbcSqlCompilerTests {
                 () -> compiler().compile(definition, query, binding()));
     }
 
+    /**
+     * 场景：全局指标不能暗中接受主体过滤。
+     * 输入：GLOBAL 定义却传 subjectId=user-1。
+     * 流程：调用 compile。
+     * 预期：报 QUERY_INVALID，定位 /subjectId。
+     */
     @Test
     void testCompileRejectsSubjectIdForGlobalMetric() {
         assertValidation(MetricErrorCode.QUERY_INVALID, "/subjectId",
                 () -> compiler().compile(definition().build(), query("user-1"), binding()));
     }
 
+    /**
+     * 场景：主体指标不能退化为全量查询。
+     * 输入：USER 定义，查询主体为空。
+     * 流程：调用 compile。
+     * 预期：报 QUERY_INVALID，定位 /subjectId。
+     */
     @Test
     void testCompileRejectsMissingSubjectIdForSubjectMetric() {
         MetricDSLDefinition definition = definition()
@@ -310,6 +433,12 @@ class MetricJdbcSqlCompilerTests {
                 () -> compiler().compile(definition, query(), binding()));
     }
 
+    /**
+     * 场景：查询维度必须与定义的集合精确一致。
+     * 输入：定义只含 region；查询缺 region 或额外带 channel。
+     * 流程：分别调用 compile。
+     * 预期：均报 QUERY_INVALID，定位 /dimensionValues。
+     */
     @Test
     void testCompileRejectsDimensionKeyMismatch() {
         MetricDSLDefinition definition = definition().dimensions(List.of("region")).build();
@@ -322,6 +451,12 @@ class MetricJdbcSqlCompilerTests {
                 () -> compiler.compile(definition, query(Map.of("region", "CN", "channel", "APP")), binding));
     }
 
+    /**
+     * 场景：调用方不能传入定义未声明的参数。
+     * 输入：无参数定义却传 entryLimit=2。
+     * 流程：调用 compile。
+     * 预期：报 METRIC_PARAMETER_UNEXPECTED，定位 entryLimit。
+     */
     @Test
     void testCompileRejectsUndeclaredParameter() {
         MetricQuery query = query(Map.of(), Map.of("entryLimit", 2));
@@ -330,6 +465,12 @@ class MetricJdbcSqlCompilerTests {
                 () -> compiler().compile(definition().build(), query, binding()));
     }
 
+    /**
+     * 场景：定义要求的参数不能缺失。
+     * 输入：声明 entryLimit 范围1至10，查询无参数。
+     * 流程：调用 compile。
+     * 预期：报 METRIC_PARAMETER_MISSING，定位 entryLimit。
+     */
     @Test
     void testCompileRejectsMissingParameter() {
         MetricDSLDefinition definition = definition()
@@ -340,6 +481,12 @@ class MetricJdbcSqlCompilerTests {
                 () -> compiler().compile(definition, query(), binding()));
     }
 
+    /**
+     * 场景：参数值必须满足定义约束。
+     * 输入：entryLimit 范围1至10，实际传11。
+     * 流程：调用 compile。
+     * 预期：报 METRIC_PARAMETER_OUT_OF_RANGE，定位 entryLimit。
+     */
     @Test
     void testCompileRejectsOutOfRangeParameter() {
         MetricDSLDefinition definition = definition()
@@ -350,6 +497,12 @@ class MetricJdbcSqlCompilerTests {
                 () -> compiler().compile(definition, query(Map.of(), Map.of("entryLimit", 11)), binding()));
     }
 
+    /**
+     * 场景：固定选行数量不能绕过编译器上限。
+     * 输入：rowSelection 固定 limit=5000，使用默认编译器上限。
+     * 流程：调用 compile。
+     * 预期：报 DSL_VALUE_INVALID，定位 /metric/rowSelection/limit/value。
+     */
     @Test
     void testCompileRejectsFixedRowSelectionLimitOutOfRange() {
         MetricRowSelectionDsl selection = new MetricRowSelectionDsl(null,
@@ -361,6 +514,12 @@ class MetricJdbcSqlCompilerTests {
                 () -> compiler().compile(definition, query(), binding()));
     }
 
+    /**
+     * 场景：参数化选行数量也必须受编译器上限约束。
+     * 输入：entryLimit 定义无额外范围，查询传5000。
+     * 流程：编译以该参数为 limit 的定义。
+     * 预期：报 METRIC_PARAMETER_OUT_OF_RANGE，定位 entryLimit。
+     */
     @Test
     void testCompileRejectsParameterizedRowSelectionLimitOutOfRange() {
         MetricRowSelectionDsl selection = new MetricRowSelectionDsl(null,
@@ -375,6 +534,12 @@ class MetricJdbcSqlCompilerTests {
                 () -> compiler().compile(definition, query(Map.of(), Map.of("entryLimit", 5000)), binding()));
     }
 
+    /**
+     * 场景：事实查询至少要有可执行度量。
+     * 输入：FIELD_SET 的 fields 为空。
+     * 流程：调用 compile。
+     * 预期：报 DSL_VALUE_INVALID，定位 /metric/value。
+     */
     @Test
     void testCompileRejectsMetricWithoutMeasures() {
         MetricDSLDefinition definition = definition()
@@ -388,6 +553,12 @@ class MetricJdbcSqlCompilerTests {
 
     // 过滤条件渲染
 
+    /**
+     * 场景：已校验比较条件渲染为占位符与有类型绑定。
+     * 输入：status EQ APPROVED，受控字段前缀 p。
+     * 流程：调用 renderValidatedFilter。
+     * 预期：SQL 为 p.status = ?，绑定 APPROVED/VARCHAR。
+     */
     @Test
     void testRenderValidatedFilterComparison() {
         MetricJdbcSqlCompiler compiler = compiler();
@@ -401,6 +572,12 @@ class MetricJdbcSqlCompilerTests {
         assertBindings(bindings, "APPROVED", Types.VARCHAR);
     }
 
+    /**
+     * 场景：集合条件保留值顺序与绑定类型。
+     * 输入：status IN APPROVED、PENDING。
+     * 流程：调用 renderValidatedFilter。
+     * 预期：生成两个占位符，按输入顺序绑定两个 VARCHAR 值。
+     */
     @Test
     void testRenderValidatedFilterSetMembership() {
         MetricJdbcSqlCompiler compiler = compiler();
@@ -416,6 +593,12 @@ class MetricJdbcSqlCompilerTests {
                 "PENDING", Types.VARCHAR);
     }
 
+    /**
+     * 场景：空值谓词不引入无意义参数。
+     * 输入：status IS_NULL。
+     * 流程：调用 renderValidatedFilter。
+     * 预期：生成 p.status IS NULL，绑定列表为空。
+     */
     @Test
     void testRenderValidatedFilterNullPredicate() {
         MetricJdbcSqlCompiler compiler = compiler();
@@ -428,6 +611,12 @@ class MetricJdbcSqlCompilerTests {
         assertEquals(List.of(), bindings);
     }
 
+    /**
+     * 场景：逻辑组合保留括号和各子条件参数。
+     * 输入：status=APPROVED 与 region IS_NULL，以 AND 组合。
+     * 流程：调用 renderValidatedFilter。
+     * 预期：生成带括号的 AND 表达式，仅绑定 APPROVED/VARCHAR。
+     */
     @Test
     void testRenderValidatedFilterLogicalCombination() {
         MetricJdbcSqlCompiler compiler = compiler();
@@ -443,6 +632,12 @@ class MetricJdbcSqlCompilerTests {
         assertBindings(bindings, "APPROVED", Types.VARCHAR);
     }
 
+    /**
+     * 场景：过滤渲染所需协作者和输出容器必须存在。
+     * 输入：binding、filter、bindings、字段渲染函数依次为 null。
+     * 流程：分别调用 renderValidatedFilter。
+     * 预期：四种情况均抛出 NullPointerException。
+     */
     @Test
     void testRenderValidatedFilterRejectsNullArguments() {
         MetricJdbcSqlCompiler compiler = compiler();

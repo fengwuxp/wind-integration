@@ -24,6 +24,12 @@ class MetricQueryTests {
 
     private static final LocalDateTime END = START.plusDays(1);
 
+    /**
+     * 场景：全局查询条件不强制携带主体或指标身份。
+     * 输入：subjectId=null，2026-09-01至09-02，空维度和参数。
+     * 流程：构造 MetricQuery。
+     * 预期：主体仍为空，起止时间原样保留。
+     */
     @Test
     void testGlobalCriteriaDoesNotRequireMetricIdentity() {
         MetricQuery criteria = new MetricQuery(null, START, END, Map.of(), Map.of());
@@ -33,6 +39,12 @@ class MetricQueryTests {
         assertEquals(END, criteria.endTime());
     }
 
+    /**
+     * 场景：正式 DSL 查询必须有合法主体表示与正向时间窗口。
+     * 输入：空白主体、缺起止时间、终点等于或早于起点。
+     * 流程：通过 MetricQueryValidator.validateDsl 校验。
+     * 预期：分别定位 subjectId/startTime/endTime；非法窗口报 QUERY_INVALID。
+     */
     @Test
     void testDslEntryRejectsInvalidSubjectAndWindow() {
         assertEquals("/subjectId", assertThrows(MetricValidationException.class,
@@ -49,6 +61,12 @@ class MetricQueryTests {
         }
     }
 
+    /**
+     * 场景：查询条件对输入 Map 和可变日期做防御性隔离。
+     * 输入：Date、纳秒级 Timestamp 与 entryLimit=3。
+     * 流程：构造后修改原容器/日期和 getter 返回的日期，再尝试改查询 Map。
+     * 预期：原时间与纳秒精度、参数保持不变，查询 Map 不可修改。
+     */
     @Test
     void testConditionsStayStableWhenCallerMutatesMapsAndDates() {
         Date date = new Date(1_720_000_000_000L);
@@ -72,6 +90,12 @@ class MetricQueryTests {
         assertThrows(UnsupportedOperationException.class, () -> criteria.parameterValues().clear());
     }
 
+    /**
+     * 场景：DSL 条件仅接受约定的维度值与整数参数。
+     * 输入：null 容器，集合/Map/Double 维度，字符串/Long/Double/列表参数。
+     * 流程：逐项进入 DSL 校验。
+     * 预期：错误定位具体容器或字段；参数类型不符报 METRIC_PARAMETER_TYPE_MISMATCH。
+     */
     @Test
     void testDslEntryRejectsUnsupportedDimensionsAndNonIntegerParameters() {
         assertEquals("/dimensionValues", assertThrows(MetricValidationException.class,
@@ -92,6 +116,12 @@ class MetricQueryTests {
     }
 
 
+    /**
+     * 场景：通用查询可承载比正式 DSL 更宽的旧调用条件。
+     * 输入：主体11/12、无界时间、runtime 对象、USER 类型和 region=CN 标签。
+     * 流程：构造并读取公共条件，再进入 DSL 校验。
+     * 预期：公共条件原样保留对象身份等信息；DSL 在 subjectId 处拒绝多主体。
+     */
     @Test
     void testGeneralCriteriaKeepsMultipleSubjectsUnboundedTimeAndRuntimeVariables() {
         Object context = new Object();
@@ -109,6 +139,12 @@ class MetricQueryTests {
                 () -> MetricQueryValidator.validateDsl(criteria)).fieldPath());
     }
 
+    /**
+     * 场景：正式 DSL 入口不能静默丢弃旧标签条件。
+     * 输入：合法单主体和时间窗口，额外 region=CN 标签。
+     * 流程：调用 validateDsl。
+     * 预期：在 /searchTags 处拒绝。
+     */
     @Test
     void testDslEntryDoesNotSilentlyIgnoreTags() {
         MetricQuery criteria = new MetricQuery("user-1", START, END, Map.of(), Map.of(),

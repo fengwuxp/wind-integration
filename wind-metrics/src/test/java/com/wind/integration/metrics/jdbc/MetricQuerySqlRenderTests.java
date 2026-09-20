@@ -47,8 +47,14 @@ class MetricQuerySqlRenderTests {
     private final MetricQuerySqlRender composite =
             new CompositeMetricQuerySqlRender(compiler, new MetricSqlTemplateRenderer());
 
+    /**
+     * 场景：统一 DSL 渲染入口使用已登记的事实映射。
+     * 输入：COUNT 定义、UTC 时间窗口及 order_fact 的冻结 binding。
+     * 流程：registerBinding 后比较 render 与直接 compile 的结果。
+     * 预期：SQL、参数与投影描述整体相等。
+     */
     @Test
-    void dslRenderResolvesRegisteredBindingAndDelegatesToCompiler() {
+    void testDslRenderResolvesRegisteredBindingAndDelegatesToCompiler() {
         MetricDSLDefinition definition = dslDefinition();
         MetricJdbcBinding binding = binding();
         compiler.registerBinding(definition, binding);
@@ -56,8 +62,14 @@ class MetricQuerySqlRenderTests {
         assertEquals(compiler.compile(definition, query(), binding), dsl.render(definition, query()));
     }
 
+    /**
+     * 场景：SQL 模板渲染保留既有直接插值契约。
+     * 输入：tenant_id 模板和 subjectId=tenant-1。
+     * 流程：通过 SQL 渲染接口处理定义。
+     * 预期：输出带 tenant-1 的 SQL，bindings 与 projections 为空；不证明参数化执行。
+     */
     @Test
-    void sqlRenderReturnsInterpolatedSqlWithoutBindings() {
+    void testSqlRenderReturnsInterpolatedSqlWithoutBindings() {
         MetricDefinitionObject definition = new MetricSqlDefinition("code", 1, MetricValueShape.SCALAR,
                 "TENANT", List.of(), Map.of(), "SELECT * FROM `t` WHERE `tenant_id` = '${subjectId}'");
 
@@ -68,21 +80,39 @@ class MetricQuerySqlRenderTests {
         assertEquals(Map.of(), result.projections());
     }
 
+    /**
+     * 场景：DSL 专用入口不接受 SQL 模板定义。
+     * 输入：SQL 类型的 SELECT 1 定义。
+     * 流程：调用 DSL render。
+     * 预期：抛出 IllegalArgumentException。
+     */
     @Test
-    void dslRenderRejectsSqlDefinition() {
+    void testDslRenderRejectsSqlDefinition() {
         MetricDefinitionObject definition = new MetricSqlDefinition("code", 1, MetricValueShape.SCALAR,
                 "TENANT", List.of(), Map.of(), "SELECT 1");
 
         assertThrows(IllegalArgumentException.class, () -> dsl.render(definition, query()));
     }
 
+    /**
+     * 场景：DSL render 必须先取得事实映射。
+     * 输入：合法 DSL COUNT 定义但未注册 binding。
+     * 流程：直接调用 render。
+     * 预期：抛出 IllegalStateException，不生成缺失映射的 SQL。
+     */
     @Test
-    void dslRenderRejectsMissingBinding() {
+    void testDslRenderRejectsMissingBinding() {
         assertThrows(IllegalStateException.class, () -> dsl.render(dslDefinition(), query()));
     }
 
+    /**
+     * 场景：组合渲染器按定义类型选择对应能力。
+     * 输入：已登记 binding 的 DSL COUNT，及读取 subjectId 的 SQL 模板。
+     * 流程：分别经 composite.render。
+     * 预期：DSL 与直接 compile 相等；SQL 输出 SELECT tenant-1 的字符串字面量。
+     */
     @Test
-    void compositeDispatchesByDefinitionType() {
+    void testCompositeDispatchesByDefinitionType() {
         MetricDSLDefinition definition = dslDefinition();
         compiler.registerBinding(definition, binding());
 

@@ -402,7 +402,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         if (definition == null || query == null) {
             throw error(MetricErrorCode.QUERY_INVALID, "", "Metric definition and query must not be null");
         }
-        if (definition.fact() == null) {
+        if (definition.derivationType().isDerived()) {
             throw error(MetricErrorCode.METRIC_EXECUTION_MODE_UNSUPPORTED, "/metric/fact",
                     "Derived metric is not supported by JDBC SQL compiler");
         }

@@ -45,6 +45,12 @@ class WindMetricsValueCapabilityTests {
 
     private static final LocalDateTime END = START.plusDays(2);
 
+    /**
+     * 场景：调用方在三种查询模式下都可用相同的标量值视图。
+     * 输入：各 MetricQueryMode 的 income@7 结果，金额12.5000。
+     * 流程：构造结果并转为 toMetricsValue，再序列化原结果。
+     * 预期：code/值/版本/模式保留；视图不成为求值器，JSON 仍只有原响应字段。
+     */
     @ParameterizedTest
     @EnumSource(MetricQueryMode.class)
     void testScalarDeveloperAccessDoesNotDependOnQueryMode(MetricQueryMode mode) {
@@ -69,6 +75,12 @@ class WindMetricsValueCapabilityTests {
         assertTrue(json.contains("12.5000"));
     }
 
+    /**
+     * 场景：字段集合的读取方式不随查询模式变化。
+     * 输入：各模式下 amount=12.5000、count=3、average=null。
+     * 流程：转为结构化值视图并尝试修改。
+     * 预期：顺序、数值类型和显式 null 保留，missing 不存在，容器不可修改。
+     */
     @ParameterizedTest
     @EnumSource(MetricQueryMode.class)
     void testFieldSetKeepsNamesTypesAndNullsAcrossQueryModes(MetricQueryMode mode) {
@@ -90,12 +102,24 @@ class WindMetricsValueCapabilityTests {
         assertThrows(UnsupportedOperationException.class, () -> value.asFieldValues().put("count", 4L));
     }
 
+    /**
+     * 场景：正常空标量在三种模式的只读视图中保持为空。
+     * 输入：各 MetricQueryMode 的 SCALAR 结果，value=null。
+     * 流程：调用 toMetricsValue().getValue()。
+     * 预期：返回 null，不编造零值。
+     */
     @ParameterizedTest
     @EnumSource(MetricQueryMode.class)
     void testNormalEmptyScalarRemainsNull(MetricQueryMode mode) {
         assertNull(result("empty", mode, MetricValueShape.SCALAR, null, Map.of()).toMetricsValue().getValue());
     }
 
+    /**
+     * 场景：不同指标可独立拥有同名结果字段。
+     * 输入：A.value=100、B.value=5，顺序复用并修改同一个输入 Map。
+     * 流程：分别构造结构化值，再清空原 Map。
+     * 预期：A、B 的 code 与各自快照值保持独立。
+     */
     @Test
     void testDifferentMetricsCanOwnTheSameFieldName() {
         Map<String, Object> fields = new LinkedHashMap<>();
@@ -111,6 +135,12 @@ class WindMetricsValueCapabilityTests {
         assertEquals("B", second.getCode());
     }
 
+    /**
+     * 场景：已有多字段实现可直接以只读能力读取。
+     * 输入：旧 MultipleValueMetricsField 夹具 codedSummary，count=8。
+     * 流程：转为 WindMetricsValue 并读取 asValues。
+     * 预期：code 为 codedSummary，值为8，字段视图与旧值一致。
+     */
     @Test
     void testExistingEvaluatedFieldsAreUsableThroughReadOnlyCapability() {
         MultipleValueMetricsField<Map<String, Object>> field = new MultipleValueMetricsField<>() {
@@ -141,6 +171,12 @@ class WindMetricsValueCapabilityTests {
         assertEquals(field.getValue(), field.asValues());
     }
 
+    /**
+     * 场景：结构化值只冻结容器，不深拷贝任意业务对象。
+     * 输入：events 指向可变列表 created。
+     * 流程：构造视图后向原列表加入 settled，并尝试修改容器及 entry。
+     * 预期：列表仍为同一对象且变更可见；容器与 entry 均不可改。
+     */
     @Test
     void testReadOnlyContainerRetainsMutableBusinessValues() {
         List<String> businessValue = new ArrayList<>(List.of("created"));
@@ -155,6 +191,12 @@ class WindMetricsValueCapabilityTests {
                 () -> value.asFieldValues().entrySet().iterator().next().setValue(List.of()));
     }
 
+    /**
+     * 场景：固定值工厂拒绝无法标识的值。
+     * 输入：空白指标 code、空白字段名或 null 字段集合。
+     * 流程：调用标量及结构化工厂。
+     * 预期：空白名称抛参数异常，null 集合抛空指针校验异常。
+     */
     @Test
     void testFixedValueFactoriesRejectUnnamedValues() {
         assertThrows(IllegalArgumentException.class, () -> WindMetricsValue.of(" ", 1L));

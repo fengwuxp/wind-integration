@@ -20,6 +20,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @SuppressWarnings("deprecation")
 class WindMetricsCriteriaCompatibilityTests {
 
+    /**
+     * 场景：旧条件转为公共条件后可无损返回。
+     * 输入：USER 主体集合11/12、USD 标签、SETTLED 参数及运行时对象。
+     * 流程：legacy.asQuery 后再 fromQuery。
+     * 预期：主体仍为集合、独立维度为空、上下文对象身份保留，时间为空且原查询相等。
+     */
     @Test
     void testLegacyConditionsRoundTripWithoutInventingDimensionsOrConvertingSubjects() {
         Object context = new Object();
@@ -35,6 +41,12 @@ class WindMetricsCriteriaCompatibilityTests {
         assertNull(criteria.endTime());
     }
 
+    /**
+     * 场景：兼容旧查询允许空属性与可变 getter 的行为。
+     * 输入：全 null 旧查询，及带可变变量/标签集合的 USER 查询。
+     * 流程：往返空查询，再经 getter 添加 state 和 currency 标签。
+     * 预期：空对象往返相等，新增变量与标签可从公共条件读取。
+     */
     @Test
     void testLegacyNullValuesAndGetterMutabilityRemainAvailable() {
         WindMetricsAggregationQuery empty = new WindMetricsAggregationQuery(null, null, null, null, null, null);
@@ -48,6 +60,12 @@ class WindMetricsCriteriaCompatibilityTests {
         assertEquals(1, legacy.asQuery().searchTags().size());
     }
 
+    /**
+     * 场景：公共条件适配旧求值入口时保留运行时对象。
+     * 输入：主体列表1/2及 runtime 对象，另传 null 查询。
+     * 流程：调用 evaluateWithCriteria 和旧 evaluate。
+     * 预期：返回同一 runtime 实例，null 入口仍返回 null。
+     */
     @Test
     void testCommonEvaluatorDelegatesWithoutSerializingRuntimeContext() {
         Object context = new Object();
@@ -60,6 +78,12 @@ class WindMetricsCriteriaCompatibilityTests {
         assertNull(evaluator.evaluate(null));
     }
 
+    /**
+     * 场景：旧入口不能表达独立维度时应明确拒绝。
+     * 输入：维度 currency=USD，参数同名 currency=EUR。
+     * 流程：经默认适配调用旧 evaluator。
+     * 预期：抛参数异常且不进入求值，避免丢弃或合并两个命名空间。
+     */
     @Test
     void testLegacyProjectionRejectsIndependentDimensionsWithoutDroppingOrMergingThem() {
         MetricQuery criteria = new MetricQuery("1", null, null,
@@ -70,6 +94,12 @@ class WindMetricsCriteriaCompatibilityTests {
         assertThrows(IllegalArgumentException.class, () -> evaluator.evaluateWithCriteria(criteria));
     }
 
+    /**
+     * 场景：原生公共条件入口可区分同名维度和参数。
+     * 输入：维度 currency=USD，参数 currency=EUR。
+     * 流程：调用重写的 evaluateWithCriteria 并分别读取两者。
+     * 预期：按顺序得到 USD、EUR。
+     */
     @Test
     void testNativeCriteriaEvaluatorReceivesDistinctNamespaces() {
         MetricQuery criteria = new MetricQuery("1", null, null,
@@ -88,6 +118,12 @@ class WindMetricsCriteriaCompatibilityTests {
         assertEquals(List.of("USD", "EUR"), evaluator.evaluateWithCriteria(criteria));
     }
 
+    /**
+     * 场景：旧模板查询 JSON 属性集合保持兼容。
+     * 输入：USER、主体1的旧查询。
+     * 流程：序列化并读取字段集合。
+     * 预期：只含历史6个模板属性，不因公共条件适配增加属性。
+     */
     @Test
     void testLegacyJsonStillContainsOnlyTheSixTemplateProperties() {
         WindMetricsAggregationQuery legacy = WindMetricsAggregationQuery.of("USER", 1L);

@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.spec;
 
 import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDsl;
+import com.wind.integration.metrics.enums.MetricDerivationType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -42,6 +43,11 @@ public record MetricSqlDefinition(
         Objects.requireNonNull(sqlTemplate, "sqlTemplate must not be null");
         dimensions = List.copyOf(dimensions);
         parameters = immutableMap(parameters);
+    }
+
+    @Override
+    public MetricDerivationType derivationType() {
+        return MetricDerivationType.RAW;
     }
 
     private static <T> Map<String, T> immutableMap(Map<String, T> source) {

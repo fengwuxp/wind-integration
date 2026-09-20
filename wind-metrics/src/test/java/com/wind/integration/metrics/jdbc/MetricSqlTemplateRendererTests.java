@@ -28,8 +28,14 @@ class MetricSqlTemplateRendererTests {
 
     private final MetricSqlTemplateRenderer renderer = new MetricSqlTemplateRenderer();
 
+    /**
+     * 场景：SQL 模板可读取主体、参数和完整时间窗口。
+     * 输入：tenant-1、currency=USD、2026-09-01至09-02。
+     * 流程：真实渲染金额汇总模板。
+     * 预期：SQL 精确包含主体、USD 及格式化后的半开时间条件。
+     */
     @Test
-    void rendersSubjectParameterAndWindowLiterals() {
+    void testRendersSubjectParameterAndWindowLiterals() {
         MetricSqlDefinition definition = definition(
                 "SELECT SUM(`pay_amount`) AS total FROM `t_global_payment_income_detail`"
                         + " WHERE `tenant_id` = '${subjectId}' AND `pay_currency` = '${parameters['currency']}'"
@@ -42,8 +48,14 @@ class MetricSqlTemplateRendererTests {
                 renderer.renderSql(definition, query("tenant-1")));
     }
 
+    /**
+     * 场景：SQL 模板自行控制可选时间条件。
+     * 输入：vcc-1，起止时间均为空，模板通过 if 判断 startTime。
+     * 流程：调用 renderSql。
+     * 预期：输出主体计数 SQL，不出现时间谓词。
+     */
     @Test
-    void omitsOptionalWindowWhenTimeIsAbsent() {
+    void testOmitsOptionalWindowWhenTimeIsAbsent() {
         MetricSqlDefinition definition = definition(
                 "SELECT COUNT(*) FROM `t_vcc` WHERE `vcc_id` = '${subjectId}'"
                         + "<#if startTime??> AND `gmt_create` >= '${startTime}'</#if>");
@@ -52,16 +64,28 @@ class MetricSqlTemplateRendererTests {
                 renderer.renderSql(definition, new MetricQuery("vcc-1", null, null, Map.of(), Map.of())));
     }
 
+    /**
+     * 场景：整数参数插值不受本地数字分组格式影响。
+     * 输入：firstNPens=2147483647 的 LIMIT 模板。
+     * 流程：调用 renderSql。
+     * 预期：输出 LIMIT 2147483647，不插入千位分隔符。
+     */
     @Test
-    void rendersIntegersWithoutLocaleGrouping() {
+    void testRendersIntegersWithoutLocaleGrouping() {
         MetricSqlDefinition definition = definition("SELECT * FROM `t_vcc` LIMIT ${parameters['firstNPens']}");
 
         assertEquals("SELECT * FROM `t_vcc` LIMIT 2147483647",
                 renderer.renderSql(definition, new MetricQuery(null, START, END, Map.of(), Map.of("firstNPens", 2147483647))));
     }
 
+    /**
+     * 场景：无效模板不能产出可执行 SQL。
+     * 输入：未闭合的 SELECT ${unclosed。
+     * 流程：调用 renderSql。
+     * 预期：抛出 IllegalArgumentException。
+     */
     @Test
-    void rejectsInvalidTemplateSyntax() {
+    void testRejectsInvalidTemplateSyntax() {
         MetricSqlDefinition definition = definition("SELECT ${unclosed");
 
         assertThrows(IllegalArgumentException.class, () -> renderer.renderSql(definition, query("tenant-1")));

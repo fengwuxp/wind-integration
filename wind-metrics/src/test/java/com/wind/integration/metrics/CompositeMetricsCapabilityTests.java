@@ -18,6 +18,12 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class CompositeMetricsCapabilityTests {
 
+    /**
+     * 场景：嵌套解析器按结果类型选择真正支持的实现。
+     * 输入：内层仅支持 String，外层另有返回12的 Long 解析器。
+     * 流程：分别解析 Long、String，并检查空组合。
+     * 预期：得到12及 text；空组合不宣称支持 Object。
+     */
     @Test
     void testNestedResolverDoesNotClaimUnsupportedValueTypes() {
         CompositeMetricsValueResolver text = new CompositeMetricsValueResolver(List.of(resolver(String.class, "text")));
@@ -27,6 +33,12 @@ class CompositeMetricsCapabilityTests {
         assertFalse(new CompositeMetricsValueResolver(List.of()).supports(Object.class));
     }
 
+    /**
+     * 场景：已选实现失败时不能悄悄切换为其他结果。
+     * 输入：首个解析器声明支持但抛 coverage missing，后续可返回12。
+     * 流程：通过组合解析 Long。
+     * 预期：原异常按同一对象传播，不返回后续实现的12。
+     */
     @Test
     void testSelectedResolverFailureIsNotReplacedWithAnotherResult() {
         IllegalStateException failure = new IllegalStateException("coverage missing");
@@ -45,6 +57,12 @@ class CompositeMetricsCapabilityTests {
         assertSame(failure, assertThrows(IllegalStateException.class, () -> composite.resolve(1L, Long.class)));
     }
 
+    /**
+     * 场景：统计组合需要执行所有匹配项。
+     * 输入：嵌套 first 与外层 second 均支持 String，不支持 Long。
+     * 流程：执行字符串 event 后再执行1L。
+     * 预期：记录 first:event、second:event 两项，Long 不产生记录。
+     */
     @Test
     void testStatisticsCompositionRetainsAllMatchingExecutors() {
         List<String> results = new ArrayList<>();

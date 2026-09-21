@@ -11,15 +11,16 @@ import java.util.List;
  * 按生效或指定 DSL 定义修订查询最终指标值，支持单查及共同条件下的批量查询。
  *
  * <p>宿主加载固定指标定义 DSL 和依赖，校验主体、完整维度、参数及时间区间，
- * 按已生效读取路线取数、合并必要原始状态并求表达式，返回完整 {@link MetricResult}。
+ * 按入口约定的实时能力或已生效读取路线取数、合并必要原始状态并求表达式，返回完整 {@link MetricResult}。
  * 调用方不传定义 DSL、物理目标或快照行键；本接口不要求另行调用存储 Reader。</p>
  *
  * <p>REALTIME 按定义计算事实；SNAPSHOT 要求获准查询区间全部被已提交快照覆盖；SEGMENTED
- * 按各 RAW 来源自身的已提交覆盖执行各段。查询消费生效读取绑定和稳定覆盖，不选择候选物化计划、
+ * 按各 RAW 来源自身的已提交覆盖执行各段。当前生效查询与批量查询消费生效读取绑定和稳定覆盖；
+ * 指定修订查询承接实时试算约定，整个依赖闭包按 REALTIME 执行。各入口均不选择候选物化计划、
  * 不重新解释 Plan DSL；已有计划标识只能作为结果溯源。快照必须匹配固定成员版本，并使用与写回相同的
  * 身份解释和绑定。查询不得触发物化、推进 Checkpoint、切换生效版本，或在失败时擅自改走其他取数路线。</p>
  *
- * <p>四个执行入口首先调用 {@link MetricQueryValidator#validateDsl(MetricQuery)}：
+ * <p>三个执行入口首先调用 {@link MetricQueryValidator#validateDsl(MetricQuery)}：
  * 只接收单个字符串主体或全局主体、必填半开窗口、标量维度及整数参数，不接收查询标签。
  * 通用条件中的 subjectType 非空时必须与所选定义一致；不能忽略不支持的条件后执行。
  * 编码、修订及批量列表也由入口校验，批量还须拒绝非空参数。注解不会自动拦截直接 Java 调用。</p>
@@ -49,21 +50,25 @@ public interface MetricValueQueryService {
     MetricResult query(@NotBlank String metricCode, @NotNull MetricQuery query);
 
     /**
-     * 按指定的已发布定义修订查询，不修改当前生效选择。
+     * 按指定已保存定义修订进行实时查询，承接草稿及已发布修订的试算职责。
      *
-     * <p>宿主加载该指标的精确修订及固定依赖，消费与该版本匹配且具有查询资格的生效读取绑定。
-     * 绑定或覆盖不可用时失败，不能使用其他修订的快照或自动回退实时；本方法不接收计划参数，
-     * 也不选择候选计划。草稿及其他预览继续由宿主已有预览能力承接，不属于本方法。</p>
+     * <p>宿主允许符合状态约束的 DRAFT/PUBLISHED 修订；不要求该修订已生效，不修改当前生效选择。
+     * 已发布修订使用持久化的精确依赖；草稿依赖在本次一致性读取边界内临时固定，
+     * 不回写草稿或依赖关系，不自动替换为依赖的当前修订。依赖必须满足宿主既有发布、启用和读取资格。</p>
+     *
+     * <p>整个依赖闭包按 REALTIME 能力执行，即使指标当前采用 SNAPSHOT 或 SEGMENTED 路线；
+     * 不读取快照、生效读取绑定或候选计划，不触发物化，不改变生效指针或水位。
+     * 不支持实时计算时明确失败，不回退到快照；未保存 DSL 不属于本入口。</p>
      *
      * @param metricCode         非空白指标编码
-     * @param definitionRevision 正整数定义修订，必须满足宿主已发布定义的查询资格
-     * @param query              完整查询条件
-     * @return 该精确修订的完整结果，definitionRevision 必须等于请求修订
-     * @throws IllegalArgumentException 查询条件或定义修订参数不合法
-     * @throws RuntimeException         指定修订或匹配路线不可用、覆盖不足，或任一依赖/分段查询失败
+     * @param definitionRevision 非空正整数保存修订，由宿主入口显式校验；null 不表示当前修订
+     * @param query              主体、半开时间区间、完整维度和声明参数
+     * @return 该精确修订的实时结果，definitionRevision 等于请求修订，保留完整值类型与实际 RAW 来源
+     * @throws IllegalArgumentException 编码、修订或条件不合法
+     * @throws RuntimeException         修订或依赖不符合查询资格、不支持实时计算，或任一查询失败
      */
     @NotNull
-    MetricResult query(@NotBlank String metricCode, @Positive int definitionRevision, @NotNull MetricQuery query);
+    MetricResult query(@NotBlank String metricCode, @NotNull @Positive Integer definitionRevision, @NotNull MetricQuery query);
 
     /**
      * 在相同主体、半开时间区间和完整维度条件下批量查询各指标的生效定义。
@@ -84,22 +89,5 @@ public interface MetricValueQueryService {
      */
     @NotNull
     List<MetricResult> batchQuery(@NotEmpty List<@NotBlank String> metricCodes, @NotNull MetricQuery query);
-
-    /**
-     * 按指定已保存定义修订进行实时试算，不修改正式查询状态。
-     *
-     * <p>宿主允许符合状态约束的 DRAFT/PUBLISHED 修订。已发布修订使用持久化的固定依赖；
-     * 草稿依赖在本次一致性读取边界内临时固定，不回写依赖关系。整个依赖闭包按实时能力执行，
-     * 不读取候选计划或快照，不改变生效指针、水位或物化状态；未保存 DSL 不属于本入口。</p>
-     *
-     * @param metricCode         非空白指标编码
-     * @param definitionRevision 指定的正整数保存修订
-     * @param query              主体、时间区间、完整维度和声明参数
-     * @return 该修订的实时试算结果，保留实际修订和完整类型信息
-     * @throws IllegalArgumentException 编码、修订或条件不合法
-     * @throws RuntimeException         修订或依赖不符合试算资格、不支持实时计算，或任一查询失败
-     */
-    @NotNull
-    MetricResult previewRealtime(@NotBlank String metricCode, @Positive int definitionRevision, @NotNull MetricQuery query);
 
 }

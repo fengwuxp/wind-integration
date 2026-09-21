@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -17,10 +18,9 @@ import java.util.Set;
 /**
  * 指标取值、求值和对象聚合共用的条件，不携带指标编码或定义修订。
  *
- * <p>通用计算可以使用集合主体、可空时间及任意业务变量。正式 DSL 查询必须在
- * 执行入口调用 {@link MetricQueryValidator#validateDsl}，再依据固定定义校验。
- * 条件容器被复制，Map 中的 Date/Timestamp 同时复制；任意业务对象仍由宿主维护其生命周期，
- * 不能据此宣称运行上下文可序列化或已被深度冻结。</p>
+ * <p>通用计算可以使用集合主体、可空时间及任意业务变量。执行入口依据所选定义和执行模式校验条件。
+ * 构造时仅对条件容器做一次只读浅复制，Date/Timestamp 和业务对象均保留原引用，
+ * 其生命周期由调用方维护；读取条件不再复制。</p>
  *
  * @param subjectId       单主体标识或主体集合；全局查询为空
  * @param subjectType     主体类型；省略时由已选指标定义确定
@@ -72,24 +72,8 @@ public record MetricQuery(
         throw new IllegalArgumentException("Unknown MetricQuery property: " + name);
     }
 
-    /**
-     * @return 隔离可变日期值后的只读维度容器，保留显式 null
-     */
-    @Override
-    public @Nullable Map<String, Object> dimensionValues() {
-        return copyValues(dimensionValues);
-    }
-
-    /**
-     * @return 隔离可变日期值后的只读变量容器，业务上下文对象保持原引用
-     */
-    @Override
-    public @Nullable Map<String, Object> parameterValues() {
-        return copyValues(parameterValues);
-    }
-
     private static @Nullable Map<String, Object> copyValues(@Nullable Map<String, Object> source) {
-        return source == null ? null : MetricQueryValueSupport.copyDimensions(source);
+        return source == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(source));
     }
 
     private static <T> Collection<T> copyCollection(Collection<T> source) {

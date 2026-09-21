@@ -1,5 +1,6 @@
 package com.wind.integration.metrics.query;
 
+import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.WindMetricsValue;
 import com.wind.integration.metrics.WindStructuredMetricsValue;
 import com.wind.integration.metrics.enums.MetricErrorCode;
@@ -22,8 +23,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
-import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
 
 /**
  * 指标查询结果及本次顶层查询模式与实际数据来源摘要。
@@ -83,31 +82,36 @@ public record MetricResult(
 
     public MetricResult {
         if (metricCode == null || metricCode.isBlank()) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/metricCode", "metricCode must not be blank");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/metricCode", "metricCode must not be blank");
         }
         if (definitionRevision == null || definitionRevision <= 0) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/definitionRevision", "definitionRevision must be positive");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/definitionRevision", "definitionRevision must be positive");
         }
         if (valueShape == null) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/valueShape", "valueShape must not be null");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/valueShape", "valueShape must not be null");
         }
         if (calculatedTime == null) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/calculatedTime", "calculatedTime must not be null");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/calculatedTime", "calculatedTime must not be null");
         }
         if (timeZone == null) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/timeZone", "timeZone must not be null");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/timeZone", "timeZone must not be null");
         }
-        MetricQueryValueSupport.validateWindow(startTime, endTime, MetricErrorCode.RESULT_INVALID);
+        if (startTime == null) {
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/startTime", "startTime must not be null");
+        }
+        if (endTime == null || !startTime.isBefore(endTime)) {
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/endTime", "endTime must be after startTime");
+        }
         fields = immutableFields(fields);
         if (segments == null) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/segments", "segments must not be null");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/segments", "segments must not be null");
         }
         segments = List.copyOf(segments);
         sources = sources == null ? List.of() : List.copyOf(sources);
         value = normalizeResultValue(metricCode, valueShape, value, fields);
         if (sources.isEmpty()) {
             if (executionMode == null) {
-                throw error(MetricErrorCode.RESULT_INVALID, "/executionMode", "executionMode must not be null");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/executionMode", "executionMode must not be null");
             }
             validateExecutionBranch(executionMode, snapshotGranularity, queryableStartTime, watermarkTime,
                     planCode, segments, startTime, endTime);
@@ -138,12 +142,12 @@ public record MetricResult(
 
     private static Map<String, MetricFieldValue> immutableFields(Map<String, MetricFieldValue> source) {
         if (source == null) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/fields", "fields must not be null");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/fields", "fields must not be null");
         }
         Map<String, MetricFieldValue> result = new LinkedHashMap<>();
         source.forEach((key, fieldValue) -> {
             if (key == null || key.isBlank() || fieldValue == null) {
-                throw error(MetricErrorCode.RESULT_INVALID, "/fields", "Field names and values must be present");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/fields", "Field names and values must be present");
             }
             result.put(key, fieldValue.withCode(key));
         });
@@ -155,18 +159,21 @@ public record MetricResult(
                                                             Map<String, MetricFieldValue> fields) {
         if (valueShape == MetricValueShape.SCALAR) {
             if (!fields.isEmpty()) {
-                throw error(MetricErrorCode.RESULT_INVALID, "/fields", "SCALAR fields must be empty");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/fields", "SCALAR fields must be empty");
             }
-            return MetricQueryValueSupport.normalizeMetricValue(metricCode, value);
+            if (value == null) {
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/value", "Metric value must not be null");
+            }
+            return WindMetricsValue.of(metricCode, value.getValueType(), value.getValue());
         }
         if (fields.isEmpty()) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/fields", "FIELD_SET requires only non-empty fields");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/fields", "FIELD_SET requires only non-empty fields");
         }
         Map<String, Object> values = new LinkedHashMap<>();
         fields.forEach((name, field) -> values.put(name, field.value().getValue()));
         if (value != null && (!(value instanceof WindStructuredMetricsValue<?> structured)
                 || !values.equals(structured.asFieldValues()))) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/value", "FIELD_SET value must match fields");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/value", "FIELD_SET value must match fields");
         }
         return WindStructuredMetricsValue.of(metricCode, values);
     }
@@ -180,35 +187,35 @@ public record MetricResult(
                                                 LocalDateTime startTime,
                                                 LocalDateTime endTime) {
         if (planCode != null && planCode.isBlank()) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/planCode", "planCode must not be blank");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/planCode", "planCode must not be blank");
         }
         if (executionMode == MetricQueryMode.REALTIME) {
             if (snapshotGranularity != null || queryableStartTime != null || watermarkTime != null
                     || planCode != null || !segments.isEmpty()) {
-                throw error(MetricErrorCode.RESULT_INVALID, "", "REALTIME contains snapshot execution fields");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "", "REALTIME contains snapshot execution fields");
             }
             return;
         }
         if (executionMode == MetricQueryMode.SNAPSHOT) {
             if (snapshotGranularity == null || queryableStartTime == null || watermarkTime == null) {
-                throw error(MetricErrorCode.RESULT_INVALID, "", "SNAPSHOT coverage fields are incomplete");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "", "SNAPSHOT coverage fields are incomplete");
             }
             if (queryableStartTime.isAfter(startTime) || watermarkTime.isBefore(endTime)) {
-                throw error(
+                throw new MetricValidationException(
                         MetricErrorCode.RESULT_INVALID,
                         "/watermarkTime",
                         "Snapshot coverage does not contain query");
             }
             if (!segments.isEmpty()) {
-                throw error(MetricErrorCode.RESULT_INVALID, "/segments", "SNAPSHOT segments must be empty");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/segments", "SNAPSHOT segments must be empty");
             }
             return;
         }
         if (snapshotGranularity != null || queryableStartTime != null || watermarkTime != null) {
-            throw error(MetricErrorCode.RESULT_INVALID, "", "SEGMENTED forbids root snapshot coverage");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "", "SEGMENTED forbids root snapshot coverage");
         }
         if (segments.isEmpty()) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/segments", "SEGMENTED requires executed segments");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/segments", "SEGMENTED requires executed segments");
         }
         validateSegmentCoverage(segments, startTime, endTime);
     }
@@ -219,7 +226,7 @@ public record MetricResult(
                 .distinct()
                 .count();
         if (distinctKeys != sourceList.size()) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/sources", "Sources must be unique by metricCode and revision");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/sources", "Sources must be unique by metricCode and revision");
         }
         MetricQueryMode commonMode = sourceList.stream().map(MetricResult::executionMode).distinct().count() == 1
                 ? sourceList.getFirst().executionMode() : null;
@@ -248,16 +255,16 @@ public record MetricResult(
             MetricResult source = sources.get(index);
             String path = "/sources/" + index;
             if (!source.sources().isEmpty()) {
-                throw error(MetricErrorCode.RESULT_INVALID, path + "/sources", "Sources must be flat RAW results");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, path + "/sources", "Sources must be flat RAW results");
             }
             if (!Objects.equals(subjectId, source.subjectId())) {
-                throw error(MetricErrorCode.RESULT_INVALID, path + "/subjectId", "Source subject must match query");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, path + "/subjectId", "Source subject must match query");
             }
             if (!startTime.equals(source.startTime()) || !endTime.equals(source.endTime())) {
-                throw error(MetricErrorCode.RESULT_INVALID, path, "Source window must match query");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, path, "Source window must match query");
             }
             if (!timeZone.equals(source.timeZone())) {
-                throw error(MetricErrorCode.RESULT_INVALID, path + "/timeZone", "Source time zone must match query");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, path + "/timeZone", "Source time zone must match query");
             }
         }
     }
@@ -266,27 +273,27 @@ public record MetricResult(
                                                 LocalDateTime startTime,
                                                 LocalDateTime endTime) {
         if (segments.size() > 2) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/segments", "SEGMENTED allows at most two segments");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/segments", "SEGMENTED allows at most two segments");
         }
         LocalDateTime expectedStartTime = startTime;
         for (int index = 0; index < segments.size(); index++) {
             MetricSegmentResult segment = segments.get(index);
             String path = "/segments/" + index;
             if (!segment.startTime().equals(expectedStartTime)) {
-                throw error(MetricErrorCode.RESULT_INVALID, path + "/startTime", "Segment coverage is not continuous");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, path + "/startTime", "Segment coverage is not continuous");
             }
             if (segment.segmentCode() == MetricSegmentCode.ARCHIVE
                     && segment.sourceType() != MetricSegmentSourceType.SNAPSHOT) {
-                throw error(MetricErrorCode.RESULT_INVALID, path + "/sourceType", "Archive segment must use snapshot");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, path + "/sourceType", "Archive segment must use snapshot");
             }
             if (index == 1 && (segments.getFirst().segmentCode() != MetricSegmentCode.ARCHIVE
                     || segment.segmentCode() != MetricSegmentCode.RECENT)) {
-                throw error(MetricErrorCode.RESULT_INVALID, "/segments", "Expected archive followed by recent");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/segments", "Expected archive followed by recent");
             }
             expectedStartTime = segment.endTime();
         }
         if (!expectedStartTime.equals(endTime)) {
-            throw error(
+            throw new MetricValidationException(
                     MetricErrorCode.RESULT_INVALID,
                     "/segments/" + (segments.size() - 1) + "/endTime",
                     "Segment coverage does not contain query end");

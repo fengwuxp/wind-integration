@@ -44,6 +44,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -349,6 +351,77 @@ class MetricJdbcSqlCompilerTests {
     }
 
     // 校验错误
+
+    /**
+     * 场景：SQL 编译必须使用单个非空字符串主体及正向半开窗口。
+     * 输入：空白、整数或集合主体；缺起止时间、相等或倒置窗口。
+     * 流程：为主体指标和全局指标分别调用公开 compile 入口。
+     * 预期：返回 QUERY_INVALID 并定位 subjectId/startTime/endTime，不生成 SQL。
+     */
+    @Test
+    void testCompileRejectsInvalidSubjectAndWindow() {
+        MetricDSLDefinition subject = definition().subject(new MetricSubjectDsl("USER", "user_id")).build();
+        for (Object subjectId : List.of(" ", 12L, List.of("user-1", "user-2"))) {
+            MetricQuery query = new MetricQuery(subjectId, START, END, Map.of(), Map.of());
+            assertValidation(MetricErrorCode.QUERY_INVALID, "/subjectId",
+                    () -> compiler().compile(subject, query, binding()));
+        }
+        MetricDSLDefinition global = definition().build();
+        assertValidation(MetricErrorCode.QUERY_INVALID, "/startTime",
+                () -> compiler().compile(global, new MetricQuery(null, null, END, Map.of(), Map.of()), binding()));
+        assertValidation(MetricErrorCode.QUERY_INVALID, "/endTime",
+                () -> compiler().compile(global, new MetricQuery(null, START, null, Map.of(), Map.of()), binding()));
+        for (LocalDateTime end : List.of(START, START.minusSeconds(1))) {
+            assertValidation(MetricErrorCode.QUERY_INVALID, "/endTime",
+                    () -> compiler().compile(global, new MetricQuery(null, START, end, Map.of(), Map.of()), binding()));
+        }
+    }
+
+    /**
+     * 场景：通用查询可以携带任意变量，但 SQL 编译必须遵守物理字段和声明参数类型。
+     * 输入：空容器；region 的集合、Map、Double 或 null；entryLimit 的非 Integer 或 null。
+     * 流程：按 String 维度映射和整数参数定义分别调用 compile。
+     * 预期：拒绝非法容器及字段值，保留 QUERY_INVALID 或 METRIC_PARAMETER_TYPE_MISMATCH 的准确路径。
+     */
+    @Test
+    void testCompileRejectsInvalidDimensionAndParameterValues() {
+        MetricDSLDefinition global = definition().build();
+        assertValidation(MetricErrorCode.QUERY_INVALID, "/dimensionValues",
+                () -> compiler().compile(global, query(null, Map.of()), binding()));
+        assertValidation(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, "/parameterValues",
+                () -> compiler().compile(global, query(Map.of(), null), binding()));
+        MetricDSLDefinition dimension = definition().dimensions(List.of("region")).build();
+        for (Object value : Arrays.asList(List.of("CN"), Map.of("code", "CN"), 1.5D, null)) {
+            Map<String, Object> dimensions = Collections.singletonMap("region", value);
+            assertValidation(MetricErrorCode.QUERY_INVALID, "/dimensionValues/region",
+                    () -> compiler().compile(dimension, query(dimensions), binding()));
+        }
+        MetricDSLDefinition parameter = definition().parameters(Map.of("entryLimit", parameter(1, 10))).build();
+        for (Object value : Arrays.asList("2", 2L, 2.0D, List.of(2), null)) {
+            Map<String, Object> parameters = Collections.singletonMap("entryLimit", value);
+            assertValidation(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, "/parameterValues/entryLimit",
+                    () -> compiler().compile(parameter, query(Map.of(), parameters), binding()));
+        }
+        for (String name : Arrays.asList(null, " ")) {
+            Map<String, Object> parameters = Collections.singletonMap(name, 2);
+            assertValidation(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, "/parameterValues",
+                    () -> compiler().compile(parameter, query(Map.of(), parameters), binding()));
+        }
+    }
+
+    /**
+     * 场景：时间维度同样必须在编译边界拒绝空值，不能漏成空指针异常或空值等号条件。
+     * 输入：created_at 维度为 null，物理映射为 Instant。
+     * 流程：调用 compile 创建时间维度过滤 SQL。
+     * 预期：报 QUERY_INVALID，定位 /dimensionValues/created_at。
+     */
+    @Test
+    void testCompileRejectsNullTemporalDimension() {
+        MetricDSLDefinition definition = definition().dimensions(List.of("created_at")).build();
+        MetricQuery query = query(Collections.singletonMap("created_at", null));
+        assertValidation(MetricErrorCode.QUERY_INVALID, "/dimensionValues/created_at",
+                () -> compiler().compile(definition, query, binding()));
+    }
 
     /**
      * 场景：公开编译入口拒绝缺少定义或条件的请求。

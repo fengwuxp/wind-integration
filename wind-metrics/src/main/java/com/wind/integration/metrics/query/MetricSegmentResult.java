@@ -1,5 +1,6 @@
 package com.wind.integration.metrics.query;
 
+import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
@@ -8,8 +9,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
-
-import static com.wind.integration.metrics.query.MetricQueryValueSupport.error;
 
 /**
  * 单次指标查询实际执行的一个连续时间分段摘要。
@@ -41,40 +40,45 @@ public record MetricSegmentResult(
 
     public MetricSegmentResult {
         if (segmentCode == null) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/segmentCode", "segmentCode must not be null");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/segmentCode", "segmentCode must not be null");
         }
         if (sourceType == null) {
-            throw error(MetricErrorCode.RESULT_INVALID, "/sourceType", "sourceType must not be null");
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/sourceType", "sourceType must not be null");
         }
-        MetricQueryValueSupport.validateWindow(startTime, endTime, MetricErrorCode.RESULT_INVALID);
+        if (startTime == null) {
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/startTime", "startTime must not be null");
+        }
+        if (endTime == null || !startTime.isBefore(endTime)) {
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/endTime", "endTime must be after startTime");
+        }
         if (sourceType == MetricSegmentSourceType.SNAPSHOT) {
             if (snapshotGranularity == null) {
-                throw error(MetricErrorCode.RESULT_INVALID, "/snapshotGranularity", "Snapshot granularity is required");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/snapshotGranularity", "Snapshot granularity is required");
             }
             if (queryableStartTime == null) {
-                throw error(MetricErrorCode.RESULT_INVALID, "/queryableStartTime", "Snapshot coverage is required");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/queryableStartTime", "Snapshot coverage is required");
             }
             if (watermarkTime == null) {
-                throw error(MetricErrorCode.RESULT_INVALID, "/watermarkTime", "Snapshot watermark is required");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/watermarkTime", "Snapshot watermark is required");
             }
             if (calculatedTime != null) {
-                throw error(
+                throw new MetricValidationException(
                         MetricErrorCode.RESULT_INVALID,
                         "/calculatedTime",
                         "Snapshot segment forbids calculatedTime");
             }
             if (queryableStartTime.isAfter(startTime) || watermarkTime.isBefore(endTime)) {
-                throw error(
+                throw new MetricValidationException(
                         MetricErrorCode.RESULT_INVALID,
                         "/watermarkTime",
                         "Snapshot coverage does not contain segment");
             }
         } else {
             if (snapshotGranularity != null || queryableStartTime != null || watermarkTime != null) {
-                throw error(MetricErrorCode.RESULT_INVALID, "", "Realtime segment forbids snapshot coverage");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "", "Realtime segment forbids snapshot coverage");
             }
             if (calculatedTime == null) {
-                throw error(MetricErrorCode.RESULT_INVALID, "/calculatedTime", "Realtime calculatedTime is required");
+                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/calculatedTime", "Realtime calculatedTime is required");
             }
         }
     }

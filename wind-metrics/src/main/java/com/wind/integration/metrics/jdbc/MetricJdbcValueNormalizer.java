@@ -93,6 +93,9 @@ final class MetricJdbcValueNormalizer {
 
     MetricSqlBinding dimension(MetricJdbcBinding binding, String field, Object value) {
         String path = "/dimensionValues/" + escape(field);
+        if (value == null) {
+            throw invalid(path, "Dimension value must not be null");
+        }
         return encode(binding, field, normalize(binding.javaType(field), value, path), path);
     }
 

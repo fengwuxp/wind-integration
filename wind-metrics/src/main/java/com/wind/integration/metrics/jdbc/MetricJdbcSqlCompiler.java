@@ -22,7 +22,6 @@ import com.wind.integration.metrics.enums.MetricJoinType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricSortDirection;
 import com.wind.integration.metrics.query.MetricQuery;
-import com.wind.integration.metrics.query.MetricQueryValidator;
 
 import org.jooq.Condition;
 import org.jooq.Field;
@@ -406,7 +405,12 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
             throw error(MetricErrorCode.METRIC_EXECUTION_MODE_UNSUPPORTED, "/metric/fact",
                     "Derived metric is not supported by JDBC SQL compiler");
         }
-        MetricQueryValidator.validateDsl(query);
+        if (query.startTime() == null) {
+            throw error(MetricErrorCode.QUERY_INVALID, "/startTime", "startTime must not be null");
+        }
+        if (query.endTime() == null || !query.startTime().isBefore(query.endTime())) {
+            throw error(MetricErrorCode.QUERY_INVALID, "/endTime", "endTime must be after startTime");
+        }
         if (query.subjectType() != null && !definition.subject().type().equals(query.subjectType())) {
             throw error(MetricErrorCode.QUERY_INVALID, "/subjectType", "Subject type does not match definition");
         }
@@ -415,10 +419,11 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         if (global && query.subjectId() != null) {
             throw error(MetricErrorCode.QUERY_INVALID, "/subjectId", "GLOBAL metric forbids subjectId");
         }
-        if (!global && query.subjectId() == null) {
-            throw error(MetricErrorCode.QUERY_INVALID, "/subjectId", "Subject metric requires subjectId");
+        if (!global && (!(query.subjectId() instanceof String id) || id.isBlank())) {
+            throw error(MetricErrorCode.QUERY_INVALID, "/subjectId", "Subject metric requires a non-blank string subjectId");
         }
-        if (!Set.copyOf(definition.dimensions()).equals(query.dimensionValues().keySet())) {
+        if (query.dimensionValues() == null
+                || !Set.copyOf(definition.dimensions()).equals(query.dimensionValues().keySet())) {
             throw error(MetricErrorCode.QUERY_INVALID, "/dimensionValues",
                     "Dimension keys must exactly match metric definition");
         }
@@ -426,6 +431,10 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
 
     private static void validateParameters(Map<String, MetricQueryParameterDsl> definitions,
                                            Map<String, Object> parameters) {
+        if (parameters == null || parameters.keySet().stream().anyMatch(name -> name == null || name.isBlank())) {
+            throw error(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, "/parameterValues",
+                    "Query parameters must have a container and non-blank names");
+        }
         for (String name : new TreeSet<>(parameters.keySet())) {
             if (!definitions.containsKey(name)) {
                 throw error(MetricErrorCode.METRIC_PARAMETER_UNEXPECTED, "/parameterValues/" + escape(name),

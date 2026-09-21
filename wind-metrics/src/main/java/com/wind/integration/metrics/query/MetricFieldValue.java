@@ -1,6 +1,8 @@
 package com.wind.integration.metrics.query;
 
 import com.wind.integration.metrics.WindMetricsValue;
+import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricValueType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
@@ -26,7 +28,10 @@ public record MetricFieldValue(
         @Schema(description = "字段具名值，包含类型及可空 payload") WindMetricsValue<?> value) {
 
     public MetricFieldValue {
-        value = MetricQueryValueSupport.normalizeMetricValue(value == null ? "value" : value.getCode(), value);
+        if (value == null) {
+            throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/value", "Metric value must not be null");
+        }
+        value = WindMetricsValue.of(value.getCode(), value.getValueType(), value.getValue());
     }
 
     /**

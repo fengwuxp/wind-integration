@@ -5,13 +5,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 
 /**
- * 指标数值字段支持的 Java 数值类型。
+ * 指标值声明类型；结果承载支持全部类型，计算能力须按具体执行器校验。
  *
  * @author wuxp
  * @date 2026-07-21 17:51
  */
 @Getter
-@Schema(description = "指标数值字段支持的 Java 数值类型")
+@Schema(description = "指标值声明类型")
 public enum MetricValueType implements DescriptiveEnum {
 
     @Schema(description = "32 位整数")

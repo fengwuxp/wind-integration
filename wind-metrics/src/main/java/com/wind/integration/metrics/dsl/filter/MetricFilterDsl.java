@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.dsl.filter;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 /**
  * 指标事实过滤条件的封闭语法树根类型。
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * @date 2026-07-21 17:51
  */
 @Schema(description = "指标事实过滤条件的封闭语法树")
+@JsonDeserialize(using = MetricFilterDslDeserializer.class)
 public sealed interface MetricFilterDsl permits ComparisonMetricFilterDsl,
         SetMetricFilterDsl, NullMetricFilterDsl, LogicalMetricFilterDsl {
 }

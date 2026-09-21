@@ -2,7 +2,8 @@ package com.wind.integration.metrics.query;
 
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.enums.MetricValueType;
+import com.wind.integration.metrics.WindMetricsValue;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -86,19 +87,12 @@ final class MetricQueryValueSupport {
         }
     }
 
-    static void validateMetricValue(MetricValueType valueType, Number value, String path) {
+    /** 固定提供者的类型和值；不能在 getter 中反复求值或转换。 */
+    static WindMetricsValue<?> normalizeMetricValue(String code, @Nullable WindMetricsValue<?> value) {
         if (value == null) {
-            return;
+            throw error(MetricErrorCode.RESULT_INVALID, "/value", "Metric value must not be null");
         }
-        boolean valid = switch (valueType) {
-            case INTEGER -> value instanceof Integer;
-            case LONG -> value instanceof Long;
-            case DECIMAL -> value instanceof BigDecimal;
-            case STRING, TIMESTAMP -> false;
-        };
-        if (!valid) {
-            throw error(MetricErrorCode.RESULT_INVALID, path, "Metric value type does not match valueType");
-        }
+        return WindMetricsValue.of(code, value.getValueType(), value.getValue());
     }
 
     static MetricValidationException error(MetricErrorCode code, String path, String message) {

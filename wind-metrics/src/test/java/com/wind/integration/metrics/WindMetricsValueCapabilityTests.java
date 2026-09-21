@@ -46,6 +46,33 @@ class WindMetricsValueCapabilityTests {
     private static final LocalDateTime END = START.plusDays(2);
 
     /**
+     * 场景：默认类型在接口实现、固定值工厂和结构化值中都必须非空。
+     * 输入：未覆盖类型的提供者、空 payload、通用业务对象，以及显式 STRING 空值。
+     * 流程：直接读取各值的 getValueType，不调用值提供者求值。
+     * 预期：默认均为 DECIMAL，已声明的 STRING 不被覆盖；读取类型不触发求值。
+     */
+    @Test
+    void testDefaultValueTypeIsNonNullAcrossImplementations() {
+        WindMetricsValue<BigDecimal> provider = new WindMetricsValue<>() {
+            @Override
+            public String getName() {
+                return "deferred";
+            }
+
+            @Override
+            public BigDecimal getValue() {
+                throw new AssertionError("Reading type must not evaluate the value");
+            }
+        };
+
+        assertEquals(MetricValueType.DECIMAL, provider.getValueType());
+        assertEquals(MetricValueType.DECIMAL, WindMetricsValue.of("empty", null).getValueType());
+        assertEquals(MetricValueType.DECIMAL, WindMetricsValue.of("events", List.of("created")).getValueType());
+        assertEquals(MetricValueType.DECIMAL, WindStructuredMetricsValue.of("summary", Map.of()).getValueType());
+        assertEquals(MetricValueType.STRING, WindMetricsValue.of("grade", MetricValueType.STRING, null).getValueType());
+    }
+
+    /**
      * 场景：调用方在三种查询模式下都可用相同的标量值视图。
      * 输入：各 MetricQueryMode 的 income@7 结果，金额12.5000。
      * 流程：构造结果并转为 toMetricsValue，再序列化原结果。
@@ -67,8 +94,7 @@ class WindMetricsValueCapabilityTests {
         assertFalse(json.contains("\"metricsValue\""));
         assertFalse(json.contains("\"name\""));
         Map<?, ?> payload = WindJson.getJsonMapper().readValue(json, Map.class);
-        assertEquals(Set.of("metricCode", "definitionRevision", "executionMode", "routeMetricCode",
-                "routeDefinitionRevision", "valueShape", "valueType", "value", "fields", "subjectId",
+        assertEquals(Set.of("metricCode", "definitionRevision", "executionMode", "valueShape", "value", "fields", "subjectId",
                 "startTime", "endTime", "calculatedTime", "timeZone", "snapshotGranularity",
                 "queryableStartTime", "watermarkTime", "planCode", "segments"), payload.keySet());
         assertEquals("income", payload.get("metricCode"));
@@ -105,13 +131,16 @@ class WindMetricsValueCapabilityTests {
     /**
      * 场景：正常空标量在三种模式的只读视图中保持为空。
      * 输入：各 MetricQueryMode 的 SCALAR 结果，value=null。
-     * 流程：调用 toMetricsValue().getValue()。
-     * 预期：返回 null，不编造零值。
+     * 流程：直接读取 value 以及 toMetricsValue 兼容入口。
+     * 预期：两入口返回同一非空具名值，payload 为 null，不编造零值。
      */
     @ParameterizedTest
     @EnumSource(MetricQueryMode.class)
     void testNormalEmptyScalarRemainsNull(MetricQueryMode mode) {
-        assertNull(result("empty", mode, MetricValueShape.SCALAR, null, Map.of()).toMetricsValue().getValue());
+        MetricResult result = result("empty", mode, MetricValueShape.SCALAR, null, Map.of());
+        assertEquals("empty", result.value().getCode());
+        assertNull(result.value().getValue());
+        assertSame(result.value(), result.toMetricsValue());
     }
 
     /**
@@ -213,10 +242,10 @@ class WindMetricsValueCapabilityTests {
                         START, START.plusDays(1), SnapshotGranularity.DAY, START, START.plusDays(1), null),
                 new MetricSegmentResult(MetricSegmentCode.RECENT, MetricSegmentSourceType.REALTIME,
                         START.plusDays(1), END, null, null, null, END)) : List.of();
-        return new MetricResult(name, 7, mode, null, null, shape,
-                shape == MetricValueShape.SCALAR ? MetricValueType.DECIMAL : null,
-                value, fields, "user1", START, END, END, ZoneId.of("Asia/Shanghai"),
+        return new MetricResult(name, 7, mode, shape,
+                shape == MetricValueShape.SCALAR ? WindMetricsValue.of("value", MetricValueType.DECIMAL, value) : null,
+                fields, "user1", START, END, END, ZoneId.of("Asia/Shanghai"),
                 snapshot ? SnapshotGranularity.DAY : null, snapshot ? START : null, snapshot ? END : null,
-                mode == MetricQueryMode.REALTIME ? null : "daily", segments);
+                mode == MetricQueryMode.REALTIME ? null : "daily", segments, List.of());
     }
 }

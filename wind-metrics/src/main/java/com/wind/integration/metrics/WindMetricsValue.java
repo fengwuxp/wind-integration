@@ -1,5 +1,6 @@
 package com.wind.integration.metrics;
 
+import com.wind.integration.metrics.enums.MetricValueType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -35,6 +36,17 @@ public interface WindMetricsValue<V> {
     }
 
     /**
+     * @return 非空指标值类型，未覆盖时默认为 DECIMAL。
+     * 指标或字段有明确声明时实现应返回该类型，即使 payload 为空也保留类型。
+     * 结构化值沿用接口默认值，子字段类型分别由字段值承载。
+     * 本方法不触发求值，不从每次变化的 payload 推断类型。
+     */
+    @NonNull
+    default MetricValueType getValueType() {
+        return MetricValueType.DECIMAL;
+    }
+
+    /**
      * @return 指标值；定义允许的正常空结果可以为空
      */
     @Nullable
@@ -42,6 +54,8 @@ public interface WindMetricsValue<V> {
 
     /**
      * 将已计算的指标编码和值保存为只读值对象，不触发计算或存储。
+     * 已知标量 payload 可推断类型；null 或其他通用对象使用默认 DECIMAL。
+     * 查询结果应使用显式类型工厂，以保留定义类型和正常空值的类型。
      *
      * @param code  非空白编码
      * @param value 已计算的值，可以为空；可变值的所有权由调用方管理
@@ -49,6 +63,18 @@ public interface WindMetricsValue<V> {
      * @return 编码与值引用固定的指标值
      */
     static <V> WindMetricsValue<V> of(String code, @Nullable V value) {
-        return new ImmutableMetricsValue<>(code, value);
+        return new ImmutableMetricsValue<>(code, MetricsValueSupport.inferType(value), value);
+    }
+
+    /**
+     * 固定声明类型和已计算值；精确整数按目标类型转换，拒绝浮点近似和溢出。
+     *
+     * @param code      指标或字段编码
+     * @param valueType 非空标量类型
+     * @param value     原始 payload，可以为空；TIMESTAMP 接受 LocalDateTime 或 ISO 本地时间文本
+     * @return 已验证、类型与值一同固定的指标值
+     */
+    static WindMetricsValue<?> of(String code, MetricValueType valueType, @Nullable Object value) {
+        return new ImmutableMetricsValue<>(code, valueType, MetricsValueSupport.normalize(valueType, value));
     }
 }

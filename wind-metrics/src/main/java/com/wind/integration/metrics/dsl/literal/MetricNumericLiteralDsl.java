@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.dsl.literal;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 /**
  * 不使用二进制浮点近似表示的精确数值字面量。
@@ -9,6 +10,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * @date 2026-07-21 17:51
  */
 @Schema(description = "不使用二进制浮点近似的精确数值字面量")
+@JsonDeserialize(using = MetricNumericLiteralDslDeserializer.class)
 public sealed interface MetricNumericLiteralDsl extends MetricLiteralDsl
         permits IntegralMetricLiteralDsl, DecimalMetricLiteralDsl {
 }

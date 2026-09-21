@@ -1,6 +1,7 @@
 package com.wind.integration.metrics;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -56,6 +57,17 @@ final class ReadOnlyStructuredMetricsValue implements WindStructuredMetricsValue
     @Override
     public Map<String, Object> asFieldValues() {
         return fieldValues;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object other) {
+        return this == other || other instanceof ReadOnlyStructuredMetricsValue value
+                && metricCode.equals(value.metricCode) && fieldValues.equals(value.fieldValues);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(metricCode, fieldValues);
     }
 
 }

@@ -22,7 +22,7 @@ class WindMetricsCriteriaCompatibilityTests {
 
     /**
      * 场景：旧条件转为公共条件后可无损返回。
-     * 输入：USER 主体集合11/12、USD 标签、SETTLED 参数及运行时对象。
+     * 输入：USER 主体集合11/12、无标签、SETTLED 参数及运行时对象。
      * 流程：legacy.asQuery 后再 fromQuery。
      * 预期：主体仍为集合、独立维度为空、上下文对象身份保留，时间为空且原查询相等。
      */
@@ -30,7 +30,7 @@ class WindMetricsCriteriaCompatibilityTests {
     void testLegacyConditionsRoundTripWithoutInventingDimensionsOrConvertingSubjects() {
         Object context = new Object();
         WindMetricsAggregationQuery legacy = WindMetricsAggregationQuery.newBuilder("USER", Set.of(11L, 12L))
-                .tag("currency", "USD").queryVariable(Map.of("runtime", context, "state", "SETTLED")).build();
+                .queryVariable(Map.of("runtime", context, "state", "SETTLED")).build();
         MetricQuery criteria = legacy.asQuery();
 
         assertEquals(Set.of(11L, 12L), criteria.subjectId());
@@ -45,19 +45,40 @@ class WindMetricsCriteriaCompatibilityTests {
      * 场景：兼容旧查询允许空属性与可变 getter 的行为。
      * 输入：全 null 旧查询，及带可变变量/标签集合的 USER 查询。
      * 流程：往返空查询，再经 getter 添加 state 和 currency 标签。
-     * 预期：空对象往返相等，新增变量与标签可从公共条件读取。
+     * 预期：空属性和变量保留；旧标签仍可读取，但有标签后转换公共条件会明确拒绝。
      */
     @Test
     void testLegacyNullValuesAndGetterMutabilityRemainAvailable() {
         WindMetricsAggregationQuery empty = new WindMetricsAggregationQuery(null, null, null, null, null, null);
-        assertEquals(empty, WindMetricsAggregationQuery.fromQuery(empty.asQuery()));
+        WindMetricsAggregationQuery restored = WindMetricsAggregationQuery.fromQuery(empty.asQuery());
+        assertEquals(empty.asQuery(), restored.asQuery());
+        assertEquals(Set.of(), restored.getSearchTags());
         Map<String, Object> variables = new HashMap<>();
         WindMetricsAggregationQuery legacy = new WindMetricsAggregationQuery("USER", 1L,
                 new HashSet<>(), variables, null, null);
         legacy.getQueryVariables().put("state", "SETTLED");
-        legacy.getSearchTags().add(WindTag.of("currency", "USD"));
         assertEquals("SETTLED", legacy.asQuery().parameterValues().get("state"));
-        assertEquals(1, legacy.asQuery().searchTags().size());
+        legacy.getSearchTags().add(WindTag.of("currency", "USD"));
+        assertEquals(Set.of(WindTag.of("currency", "USD")), legacy.getSearchTags());
+        assertThrows(IllegalArgumentException.class, legacy::asQuery);
+    }
+
+    /**
+     * 场景：旧标签查询仍可由旧求值器使用，不能在迁移时丢弃过滤条件。
+     * 输入：currency=USD 标签查询与读取该标签的旧求值器。
+     * 流程：执行旧入口，再尝试转换为 MetricQuery。
+     * 预期：旧入口读到USD；转换明确失败且原始标签不变。
+     */
+    @Test
+    void testTaggedLegacyQueryRemainsUsableButCannotConvertToMetricQuery() {
+        WindMetricsAggregationQuery legacy = WindMetricsAggregationQuery.newBuilder("USER", "customer")
+                .tag("currency", "USD").build();
+        WindMetricsEvaluator<String> evaluator = query -> query.getSearchTags().iterator().next().value();
+
+        assertEquals("USD", evaluator.evaluate(legacy));
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class, legacy::asQuery);
+        assertEquals("MetricQuery cannot represent legacy searchTags; use the legacy query entry", failure.getMessage());
+        assertEquals(Set.of(WindTag.of("currency", "USD")), legacy.getSearchTags());
     }
 
     /**
@@ -69,8 +90,8 @@ class WindMetricsCriteriaCompatibilityTests {
     @Test
     void testCommonEvaluatorDelegatesWithoutSerializingRuntimeContext() {
         Object context = new Object();
-        MetricQuery criteria = new MetricQuery(List.of(1L, 2L), null, null,
-                Map.of(), Map.of("runtime", context), "USER", List.of());
+        MetricQuery criteria = new MetricQuery(List.of(1L, 2L), "USER", null, null,
+                Map.of(), Map.of("runtime", context));
         WindMetricsEvaluator<Object> evaluator = query -> query == null ? null : query.getQueryVariables().get("runtime");
 
         assertSame(context, evaluator.evaluateWithCriteria(criteria));

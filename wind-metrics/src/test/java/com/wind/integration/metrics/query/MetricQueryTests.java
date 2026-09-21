@@ -2,8 +2,9 @@ package com.wind.integration.metrics.query;
 
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.enums.MetricErrorCode;
-import com.wind.integration.tag.WindTag;
 import org.junit.jupiter.api.Test;
+import com.wind.jackson.WindJson;
+import tools.jackson.core.JacksonException;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -23,6 +24,25 @@ class MetricQueryTests {
     private static final LocalDateTime START = LocalDateTime.of(2026, 9, 1, 0, 0);
 
     private static final LocalDateTime END = START.plusDays(1);
+
+    /**
+     * 场景：新查询 JSON 不再承载标签，旧请求不能因字段被删除而扩大查询范围。
+     * 输入：合法无标签查询，以及含 searchTags 或错误拼写属性的 JSON。
+     * 流程：序列化查询，再通过 WindJson 读取各非法输入。
+     * 预期：输出恰好为六个查询字段；所有未知属性明确拒绝。
+     */
+    @Test
+    void testRemovedTagsAreNotSerializedOrSilentlyAccepted() {
+        String json = WindJson.toJsonString(new MetricQuery("customer", START, END, Map.of(), Map.of()));
+        Map<?, ?> fields = WindJson.getJsonMapper().readValue(json, Map.class);
+        assertEquals(java.util.Set.of("subjectId", "startTime", "endTime", "dimensionValues", "parameterValues", "subjectType"),
+                fields.keySet());
+        for (String extra : List.of("\"searchTags\":[]", "\"searchTags\":null",
+                "\"searchTags\":[{\"name\":\"region\",\"value\":\"CN\"}]", "\"subjectTypo\":\"customer\"")) {
+            String invalid = json.substring(0, json.length() - 1) + "," + extra + "}";
+            assertThrows(JacksonException.class, () -> WindJson.parseObject(invalid, MetricQuery.class));
+        }
+    }
 
     /**
      * 场景：全局查询条件不强制携带主体或指标身份。
@@ -118,39 +138,39 @@ class MetricQueryTests {
 
     /**
      * 场景：通用查询可承载比正式 DSL 更宽的旧调用条件。
-     * 输入：主体11/12、无界时间、runtime 对象、USER 类型和 region=CN 标签。
+     * 输入：主体11/12、无界时间、runtime 对象、USER 类型。
      * 流程：构造并读取公共条件，再进入 DSL 校验。
      * 预期：公共条件原样保留对象身份等信息；DSL 在 subjectId 处拒绝多主体。
      */
     @Test
     void testGeneralCriteriaKeepsMultipleSubjectsUnboundedTimeAndRuntimeVariables() {
         Object context = new Object();
-        MetricQuery criteria = new MetricQuery(List.of(11L, 12L), null, null,
-                Map.of(), Map.of("currency", "USD", "context", context), "USER",
-                List.of(WindTag.of("region", "CN")));
+        MetricQuery criteria = new MetricQuery(List.of(11L, 12L), "USER", null, null,
+                Map.of(), Map.of("currency", "USD", "context", context));
 
         assertEquals(List.of(11L, 12L), criteria.subjectId());
         assertNull(criteria.startTime());
         assertNull(criteria.endTime());
         assertSame(context, criteria.parameterValues().get("context"));
         assertEquals("USER", criteria.subjectType());
-        assertEquals("CN", criteria.searchTags().iterator().next().value());
         assertEquals("/subjectId", assertThrows(MetricValidationException.class,
                 () -> MetricQueryValidator.validateDsl(criteria)).fieldPath());
     }
 
     /**
-     * 场景：正式 DSL 入口不能静默丢弃旧标签条件。
-     * 输入：合法单主体和时间窗口，额外 region=CN 标签。
-     * 流程：调用 validateDsl。
-     * 预期：在 /searchTags 处拒绝。
+     * 场景：移除标签后 Builder 与标准构造器提供相同查询条件。
+     * 输入：USER/customer、固定窗口、CN维度和整数参数。
+     * 流程：使用 Builder 构造并 JSON 往返，与六参数构造值比较。
+     * 预期：主体类型、窗口、维度和参数保留，没有额外过滤字段。
      */
     @Test
-    void testDslEntryDoesNotSilentlyIgnoreTags() {
-        MetricQuery criteria = new MetricQuery("user-1", START, END, Map.of(), Map.of(),
-                "USER", List.of(WindTag.of("region", "CN")));
-        assertEquals("/searchTags", assertThrows(MetricValidationException.class,
-                () -> MetricQueryValidator.validateDsl(criteria)).fieldPath());
+    void testBuilderAndSixArgumentConstructorRoundTrip() {
+        MetricQuery query = MetricQuery.builder().subjectId("customer").subjectType("USER")
+                .timeRange(START, END).dimension("region", "CN").parameter("limit", 3).build();
+        MetricQuery expected = new MetricQuery("customer", "USER", START, END, Map.of("region", "CN"), Map.of("limit", 3));
+
+        assertEquals(expected, query);
+        assertEquals(expected, WindJson.parseObject(WindJson.toJsonString(query), MetricQuery.class));
     }
 
     private static void validate(Object subjectId, LocalDateTime start, LocalDateTime end,

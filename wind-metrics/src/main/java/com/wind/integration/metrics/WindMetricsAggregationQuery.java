@@ -20,6 +20,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 聚合查询的兼容外观，旧模板属性、构造器和 builder 保持原语义。
@@ -77,16 +78,20 @@ public final class WindMetricsAggregationQuery {
     private final LocalDateTime maxGmtCreate;
 
     /**
-     * 提取通用条件，保持主体对象、可空时间、标签及任意业务变量。
+     * 提取通用条件，保持主体对象、可空时间及任意业务变量；有标签时不可转换。
      *
      * <p>旧 queryVariables 没有声明参数与维度的区分，全部作为通用变量承接，
      * 不根据名称或数值类型猜测 DSL 维度。DSL 使用方必须另做定义级绑定。</p>
      *
      * @return 不带指标身份的条件
+     * @throws IllegalArgumentException 旧查询包含新条件模型无法表达的标签
      */
     public MetricQuery asQuery() {
-        return new MetricQuery(dimensionsId, minGmtCreate, maxGmtCreate,
-                Map.of(), queryVariables, dimensions, searchTags);
+        if (searchTags != null && !searchTags.isEmpty()) {
+            throw new IllegalArgumentException("MetricQuery cannot represent legacy searchTags; use the legacy query entry");
+        }
+        return new MetricQuery(dimensionsId, dimensions, minGmtCreate, maxGmtCreate,
+                Map.of(), queryVariables);
     }
 
     /**
@@ -104,7 +109,7 @@ public final class WindMetricsAggregationQuery {
         if (values == null || !values.isEmpty()) {
             throw new IllegalArgumentException("Legacy aggregation cannot represent dimensionValues; implement the criteria entry");
         }
-        return new WindMetricsAggregationQuery(metricQuery.subjectType(), metricQuery.subjectId(), metricQuery.searchTags(),
+        return new WindMetricsAggregationQuery(metricQuery.subjectType(), metricQuery.subjectId(), Set.of(),
                 metricQuery.parameterValues(), metricQuery.startTime(), metricQuery.endTime());
     }
 

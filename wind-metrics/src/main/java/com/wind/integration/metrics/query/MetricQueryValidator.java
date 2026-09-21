@@ -20,7 +20,7 @@ public final class MetricQueryValidator {
     }
 
     /**
-     * 校验 DSL 的单主体、必填半开窗口、标量维度、整数参数及无标签限制。
+     * 校验 DSL 的单主体、必填半开窗口、标量维度及整数参数。
      *
      * @param criteria 待执行的公共条件
      * @throws com.wind.integration.metrics.MetricValidationException 条件不能用于正式 DSL 查询
@@ -39,8 +39,5 @@ public final class MetricQueryValidator {
         MetricQueryValueSupport.validateWindow(criteria.startTime(), criteria.endTime(), QUERY_INVALID);
         MetricQueryValueSupport.immutableDimensions(criteria.dimensionValues());
         MetricQueryValueSupport.immutableParameters(criteria.parameterValues());
-        if (criteria.searchTags() != null && !criteria.searchTags().isEmpty()) {
-            throw error(QUERY_INVALID, "/searchTags", "DSL queries do not support searchTags");
-        }
     }
 }

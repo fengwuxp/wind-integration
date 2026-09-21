@@ -6,6 +6,7 @@ import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.util.StringJoinSplitUtils;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.CollectionUtils;
 
@@ -28,10 +29,11 @@ import java.util.stream.Collectors;
  * @author wuxp
  * @date 2024-09-11 09:52
  */
-public record EntityTag(@JsonProperty("name") @NonNull String name,
-                        @JsonProperty("value") @NonNull String value,
-                        @JsonProperty("source") @NonNull TagSource source,
-                        @JsonProperty("sourceId") @NonNull Serializable sourceId) implements WindTag {
+@NullMarked
+public record EntityTag(@JsonProperty("name") String name,
+                        @JsonProperty("value") String value,
+                        @JsonProperty("source") TagSource source,
+                        @JsonProperty("sourceId") Serializable sourceId) implements WindTag {
 
 
     @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
@@ -51,7 +53,7 @@ public record EntityTag(@JsonProperty("name") @NonNull String name,
      * @param sourceId 标签来源标识
      * @return 标签
      */
-    public static EntityTag of(@NonNull String name, @NonNull String value, @NonNull TagSource source, @NonNull Serializable sourceId) {
+    public static EntityTag of(String name, String value, TagSource source, Serializable sourceId) {
         return new EntityTag(name, value, source, sourceId);
     }
 

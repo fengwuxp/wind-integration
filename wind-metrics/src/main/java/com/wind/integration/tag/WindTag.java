@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 标签
+ * 名称和值组成的标签；查询 JSON 使用这两个属性，业务来源由具体标签类型承载。
  *
  * @author wuxp
  * @date 2025-06-24 10:31
@@ -27,12 +27,14 @@ public interface WindTag extends Serializable {
      * @return 标签名称
      */
     @NonNull
+    @JsonProperty("name")
     String name();
 
     /**
      * @return 标签值
      */
     @NonNull
+    @JsonProperty("value")
     String value();
 
     /**
@@ -41,8 +43,9 @@ public interface WindTag extends Serializable {
      * @param name  标签名称
      * @param value 标签值
      * @return 标签
+     * @throws NullPointerException 名称或值为 null
      */
-    @JsonCreator
+    @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
     static WindTag of(@NonNull @JsonProperty("name") String name, @JsonProperty("value") @NonNull String value) {
         return new ImmutableTag(name, value);
     }
@@ -99,4 +102,3 @@ public interface WindTag extends Serializable {
     }
 
 }
-

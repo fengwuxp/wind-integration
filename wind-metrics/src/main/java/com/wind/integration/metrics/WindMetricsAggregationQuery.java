@@ -1,5 +1,6 @@
 package com.wind.integration.metrics;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.wind.common.enums.DescriptiveEnum;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.metrics.query.MetricQuery;
@@ -10,6 +11,7 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import tools.jackson.databind.annotation.JsonSerialize;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -49,9 +51,11 @@ public final class WindMetricsAggregationQuery {
     private final Object dimensionsId;
 
     /**
-     * 查询标签
+     * 查询标签；JSON 仅承载 name/value，不要求打标来源。
      */
     @Schema(description = "查询标签")
+    @JsonSerialize(contentAs = WindTag.class)
+    @JsonIgnoreProperties({"source", "sourceId"})
     private final Collection<WindTag> searchTags;
 
     /**

@@ -1,7 +1,6 @@
 package com.wind.integration.metrics.query;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -17,13 +16,13 @@ import java.util.List;
  * <p>REALTIME 按定义计算事实；SNAPSHOT 要求获准查询区间全部被已提交快照覆盖；SEGMENTED
  * 按各 RAW 来源自身的已提交覆盖执行各段。当前生效查询与批量查询消费生效读取绑定和稳定覆盖；
  * 指定修订查询承接实时试算约定，整个依赖闭包按 REALTIME 执行。各入口均不选择候选物化计划、
- * 不重新解释 Plan DSL；已有计划标识只能作为结果溯源。快照必须匹配固定成员版本，并使用与写回相同的
+ * 不重新解释 Plan DSL；计划溯源由宿主管理。快照必须匹配固定成员版本，并使用与写回相同的
  * 身份解释和绑定。查询不得触发物化、推进 Checkpoint、切换生效版本，或在失败时擅自改走其他取数路线。</p>
  *
  * <p>执行入口依据所选定义和执行模式校验条件；事实 SQL 查询
  * 只接收单个字符串主体或全局主体、必填半开窗口、匹配物理字段的维度及声明的整数参数，不接收查询标签。
  * 通用条件中的 subjectType 非空时必须与所选定义一致；不能忽略不支持的条件后执行。
- * 编码、修订及批量列表也由入口校验，批量还须拒绝非空参数。注解不会自动拦截直接 Java 调用。</p>
+ * 编码、修订及业务条件由单查入口校验，批量查询逐项复用单查。注解不会自动拦截直接 Java 调用。</p>
  *
  * <p>参数校验、授权及主体/维度数据归属由宿主既有应用入口承接。Wind 提供公共合同和模型，
  * 不注册服务实现，也不保证宿主支持所有指标组合；不支持的路线或条件必须明确失败。</p>
@@ -38,7 +37,7 @@ public interface MetricValueQueryService {
      *
      * <p>实现方在本次查询的一致性读取边界内选定实际定义、固定依赖及生效读取绑定，
      * 执行期间不重新读取变化的生效指针，也不扫描或选择候选计划。生效选择不等于最大的定义修订号；
-     * 结果中的计划标识（若有）只来自底层读取证据。</p>
+     * 结果保留实际定义修订、统计范围和数据来源。</p>
      *
      * @param metricCode 非空白指标编码，由宿主在执行前校验
      * @param query      主体、半开时间区间、完整维度和参数；时间按宿主选定的业务时区解释
@@ -71,23 +70,24 @@ public interface MetricValueQueryService {
     MetricResult query(@NotBlank String metricCode, @NotNull @Positive Integer definitionRevision, @NotNull MetricQuery query);
 
     /**
-     * 在相同主体、半开时间区间和完整维度条件下批量查询各指标的生效定义。
+     * 使用共同条件，按输入顺序逐项查询各指标的生效定义。
      *
-     * <p>实现方先选定每项实际定义、依赖及路线，并完成全部条件校验，再执行查询。
-     * 各项保留自己的修订、值结构和数据来源，不共用一个定义修订号，也不因批量而强制走实时。
-     * 批量不承诺单条 SQL；宿主须说明支持的指标组合及一致性读取范围。</p>
+     * <p>默认实现逐项调用 {@link #query(String, MetricQuery)}，保留重复编码，空列表返回空列表。
+     * 编码、业务参数和其他条件均由当前项的单查校验；不预检整批，不共享跨项计算缓存，
+     * 不承诺各项使用同一读取视图。</p>
      *
-     * <p>返回顺序和数量与 metricCodes 严格对应；任一项失败则整次抛出异常，不返回部分成功。
-     * 本阶段批量条件的 parameterValues 必须为空，非空应明确拒绝，不能丢弃后执行；
-     * 需要查询参数或逐项修订时使用单查入口。输入编码列表须由宿主在执行前校验并固定副本。</p>
+     * <p>返回顺序和数量与 metricCodes 对应；任一项失败时原样抛出异常，停止后续查询，
+     * 不返回部分结果，之前的单查可能已经执行。</p>
      *
-     * @param metricCodes 非空、不重复、元素非空白的指标编码列表
-     * @param query       所有指标共用的主体、时间区间和完整维度；查询参数必须为空
+     * @param metricCodes 指标编码列表，允许为空列表和包含重复编码
+     * @param query       原样传给每次单查的共同条件，包含主体、时间、维度和业务参数
      * @return 与请求编码逐项对应的完整结果列表，不包含 null 项
-     * @throws IllegalArgumentException 批量条件不合法，或共同主体/完整维度与某项定义不兼容
-     * @throws RuntimeException         某项指标、依赖、路线或覆盖不可用，或任一查询失败；不得返回部分成功
+     * @throws IllegalArgumentException 某次单查拒绝编码或查询条件
+     * @throws RuntimeException         某次单查失败，原样传播
      */
     @NotNull
-    List<MetricResult> batchQuery(@NotEmpty List<@NotBlank String> metricCodes, @NotNull MetricQuery query);
+    default List<MetricResult> batchQuery(@NotNull List<String> metricCodes, @NotNull MetricQuery query) {
+        return metricCodes.stream().map(code -> query(code, query)).toList();
+    }
 
 }

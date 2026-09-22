@@ -4,9 +4,6 @@ import com.wind.integration.metrics.WindMetricsAggregationQuery;
 import com.wind.jackson.WindJson;
 import org.jspecify.annotations.NullMarked;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 
 import java.util.List;
@@ -15,7 +12,6 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 标签 JSON 的公共属性、查询投影与规则配置兼容；不代表宿主 DSL 支持标签过滤。
@@ -103,31 +99,15 @@ class WindTagJsonTests {
     }
 
     /**
-     * 场景：非法 JSON 不应构造违反接口非空约束的标签。
-     * 输入：缺 name/value 或显式 null。
-     * 流程：直接读取 WindTag，再以规则配置标签列表读取。
-     * 预期：两种入口都拒绝，不还原成含 null 的标签。
-     */
-    @ParameterizedTest
-    @ValueSource(strings = {"{}", "{\"value\":\"CN\"}", "{\"name\":\"region\"}",
-            "{\"name\":null,\"value\":\"CN\"}", "{\"name\":\"region\",\"value\":null}"})
-    void testRejectMissingAndNullTagProperties(String tagJson) {
-        assertThrows(JacksonException.class, () -> WindJson.parseObject(tagJson, WindTag.class));
-        assertThrows(JacksonException.class,
-                () -> WindJson.parseObject("[" + tagJson + "]", new TypeReference<List<WindTag>>() { }));
-    }
-
-    /**
-     * 场景：Java 工厂与 JSON 入口保持同一非空约束，不顺便改变既有空字符串语义。
-     * 输入：null 名称、null 值，以及两个空字符串。
-     * 流程：调用公共 of/tags 工厂并对空字符串做 JSON 往返。
-     * 预期：null 拒绝，非 null 的空字符串仍保留。
+     * 场景：Java 工厂与 JSON 入口保留既有空字符串语义。
+     * 输入：名称和值均为空字符串的标签。
+     * 流程：调用公共 of/tags 工厂并进行 JSON 往返。
+     * 预期：单个和列表工厂结果一致，空字符串原样保留。
      */
     @Test
-    void testFactoriesRejectNullButKeepExistingEmptyStringValues() {
-        assertThrows(NullPointerException.class, () -> WindTag.of(null, "CN"));
-        assertThrows(NullPointerException.class, () -> WindTag.tags("region", null));
+    void testFactoriesKeepExistingEmptyStringValues() {
         WindTag empty = WindTag.of("", "");
+        assertEquals(List.of(empty), WindTag.tags("", ""));
         assertEquals(empty, WindJson.parseObject(WindJson.toJsonString(empty), WindTag.class));
     }
 

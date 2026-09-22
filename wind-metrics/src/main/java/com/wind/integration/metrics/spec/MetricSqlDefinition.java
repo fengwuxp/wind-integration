@@ -42,7 +42,7 @@ public record MetricSqlDefinition(
         Objects.requireNonNull(subjectType, "subjectType must not be null");
         Objects.requireNonNull(sqlTemplate, "sqlTemplate must not be null");
         dimensions = List.copyOf(dimensions);
-        parameters = immutableMap(parameters);
+        parameters = Collections.unmodifiableMap(new LinkedHashMap<>(parameters));
     }
 
     @Override
@@ -50,7 +50,4 @@ public record MetricSqlDefinition(
         return MetricDerivationType.RAW;
     }
 
-    private static <T> Map<String, T> immutableMap(Map<String, T> source) {
-        return Collections.unmodifiableMap(new LinkedHashMap<>(source));
-    }
 }

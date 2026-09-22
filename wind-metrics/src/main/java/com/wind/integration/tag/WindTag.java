@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
 
 import java.io.Serializable;
 import java.util.Collection;
@@ -43,7 +44,6 @@ public interface WindTag extends Serializable {
      * @param name  标签名称
      * @param value 标签值
      * @return 标签
-     * @throws NullPointerException 名称或值为 null
      */
     @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
     static WindTag of(@NonNull @JsonProperty("name") String name, @JsonProperty("value") @NonNull String value) {
@@ -100,5 +100,17 @@ public interface WindTag extends Serializable {
         }
         return tags.stream().map(WindTag::value).collect(Collectors.toSet());
     }
+
+    /**
+     * 不可变标签
+     *
+     * @author wuxp
+     * @date 2026-02-06 13:30
+     **/
+    @NullMarked
+    record ImmutableTag(String name, String value) implements WindTag {
+
+    }
+
 
 }

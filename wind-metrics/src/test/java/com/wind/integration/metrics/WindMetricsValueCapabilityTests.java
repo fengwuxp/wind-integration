@@ -1,15 +1,11 @@
 package com.wind.integration.metrics;
 
 import com.wind.integration.metrics.enums.MetricQueryMode;
-import com.wind.integration.metrics.enums.MetricSegmentCode;
-import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
-import com.wind.integration.metrics.enums.MetricSnapshotGranularity;
 import com.wind.integration.metrics.fields.MultipleValueMetricsField;
 import com.wind.integration.metrics.query.MetricFieldValue;
 import com.wind.integration.metrics.query.MetricResult;
-import com.wind.integration.metrics.query.MetricSegmentResult;
 import com.wind.jackson.WindJson;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
@@ -18,7 +14,6 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -75,28 +70,27 @@ class WindMetricsValueCapabilityTests {
     /**
      * 场景：调用方在三种查询模式下都可用相同的标量值视图。
      * 输入：各 MetricQueryMode 的 income@7 结果，金额12.5000。
-     * 流程：构造结果并转为 toMetricsValue，再序列化原结果。
-     * 预期：code/值/版本/模式保留；视图不成为求值器，JSON 仍只有原响应字段。
+     * 流程：通过结果自身的 WindMetricsValue 能力取值，再序列化结果。
+     * 预期：code/值/版本/模式保留；结果不成为求值器，JSON 只保留当前字段。
      */
     @ParameterizedTest
     @EnumSource(MetricQueryMode.class)
     void testScalarDeveloperAccessDoesNotDependOnQueryMode(MetricQueryMode mode) {
         MetricResult detailed = result("income", mode, MetricValueShape.SCALAR, new BigDecimal("12.5000"), Map.of());
-        WindMetricsValue<?> value = detailed.toMetricsValue();
+        WindMetricsValue<?> value = detailed;
 
         assertEquals("income", value.getCode());
         assertEquals(new BigDecimal("12.5000"), value.getValue());
         assertEquals(7, detailed.definitionRevision());
         assertEquals(mode, detailed.executionMode());
         assertFalse(value instanceof WindMetricsEvaluator<?>);
-        // 详细查询结果保留原响应字段，不增加 JavaBean 值属性。
+        // 详细查询结果保留查询语义字段，不增加 JavaBean 值属性。
         String json = WindJson.toJsonString(detailed);
         assertFalse(json.contains("\"metricsValue\""));
         assertFalse(json.contains("\"name\""));
         Map<?, ?> payload = WindJson.getJsonMapper().readValue(json, Map.class);
         assertEquals(Set.of("metricCode", "definitionRevision", "executionMode", "valueShape", "value", "fields", "subjectId",
-                "startTime", "endTime", "calculatedTime", "timeZone", "snapshotGranularity",
-                "queryableStartTime", "watermarkTime", "planCode", "segments"), payload.keySet());
+                "startTime", "endTime"), payload.keySet());
         assertEquals("income", payload.get("metricCode"));
         assertTrue(json.contains("12.5000"));
     }
@@ -104,8 +98,8 @@ class WindMetricsValueCapabilityTests {
     /**
      * 场景：字段集合的读取方式不随查询模式变化。
      * 输入：各模式下 amount=12.5000、count=3、average=null。
-     * 流程：转为结构化值视图并尝试修改。
-     * 预期：顺序、数值类型和显式 null 保留，missing 不存在，容器不可修改。
+     * 流程：读取装配方提供的字段 Map。
+     * 预期：顺序、数值类型和显式 null 保留，missing 不存在。
      */
     @ParameterizedTest
     @EnumSource(MetricQueryMode.class)
@@ -114,33 +108,31 @@ class WindMetricsValueCapabilityTests {
         fields.put("amount", new MetricFieldValue(MetricValueType.DECIMAL, new BigDecimal("12.5000")));
         fields.put("count", new MetricFieldValue(MetricValueType.LONG, 3L));
         fields.put("average", new MetricFieldValue(MetricValueType.DECIMAL, null));
-        WindStructuredMetricsValue<?> value = assertInstanceOf(WindStructuredMetricsValue.class,
-                result("summary", mode, MetricValueShape.FIELD_SET, null, fields).toMetricsValue());
+        MetricResult result = result("summary", mode, MetricValueShape.FIELD_SET, null, fields);
+        Map<?, ?> value = assertInstanceOf(Map.class, result.getValue());
 
-        assertEquals("summary", value.getCode());
-        assertSame(value.getValue(), value.asFieldValues());
-        assertEquals(List.of("amount", "count", "average"), List.copyOf(value.asFieldValues().keySet()));
-        assertEquals(new BigDecimal("12.5000"), value.asFieldValues().get("amount"));
-        assertEquals(3L, value.asFieldValues().get("count"));
-        assertTrue(value.asFieldValues().containsKey("average"));
-        assertNull(value.asFieldValues().get("average"));
-        assertFalse(value.asFieldValues().containsKey("missing"));
-        assertThrows(UnsupportedOperationException.class, () -> value.asFieldValues().put("count", 4L));
+        assertEquals("summary", result.getCode());
+        assertEquals(List.of("amount", "count", "average"), List.copyOf(value.keySet()));
+        assertEquals(new BigDecimal("12.5000"), value.get("amount"));
+        assertEquals(3L, value.get("count"));
+        assertTrue(value.containsKey("average"));
+        assertNull(value.get("average"));
+        assertFalse(value.containsKey("missing"));
     }
 
     /**
      * 场景：正常空标量在三种模式的只读视图中保持为空。
      * 输入：各 MetricQueryMode 的 SCALAR 结果，value=null。
-     * 流程：直接读取 value 以及 toMetricsValue 兼容入口。
-     * 预期：两入口返回同一非空具名值，payload 为 null，不编造零值。
+     * 流程：通过 value 和 getValue 读取原始值。
+     * 预期：两入口均为空，指标编码保留，不编造零值。
      */
     @ParameterizedTest
     @EnumSource(MetricQueryMode.class)
     void testNormalEmptyScalarRemainsNull(MetricQueryMode mode) {
         MetricResult result = result("empty", mode, MetricValueShape.SCALAR, null, Map.of());
-        assertEquals("empty", result.value().getCode());
-        assertNull(result.value().getValue());
-        assertSame(result.value(), result.toMetricsValue());
+        assertEquals("empty", result.getCode());
+        assertNull(result.value());
+        assertNull(result.getValue());
     }
 
     /**
@@ -236,16 +228,22 @@ class WindMetricsValueCapabilityTests {
 
     private static MetricResult result(String name, MetricQueryMode mode, MetricValueShape shape,
                                        Number value, Map<String, MetricFieldValue> fields) {
-        boolean snapshot = mode == MetricQueryMode.SNAPSHOT;
-        List<MetricSegmentResult> segments = mode == MetricQueryMode.SEGMENTED ? List.of(
-                new MetricSegmentResult(MetricSegmentCode.ARCHIVE, MetricSegmentSourceType.SNAPSHOT,
-                        START, START.plusDays(1), MetricSnapshotGranularity.DAY, START, START.plusDays(1), null),
-                new MetricSegmentResult(MetricSegmentCode.RECENT, MetricSegmentSourceType.REALTIME,
-                        START.plusDays(1), END, null, null, null, END)) : List.of();
-        return new MetricResult(name, 7, mode, shape,
-                shape == MetricValueShape.SCALAR ? WindMetricsValue.of("value", MetricValueType.DECIMAL, value) : null,
-                fields, "user1", START, END, END, ZoneId.of("Asia/Shanghai"),
-                snapshot ? MetricSnapshotGranularity.DAY : null, snapshot ? START : null, snapshot ? END : null,
-                mode == MetricQueryMode.REALTIME ? null : "daily", segments, List.of());
+        Object payload = value;
+        if (shape == MetricValueShape.FIELD_SET) {
+            Map<String, Object> values = new LinkedHashMap<>();
+            fields.forEach((field, metricValue) -> values.put(field, metricValue.value().getValue()));
+            payload = values;
+        }
+        return MetricResult.builder()
+                .metricCode(name)
+                .definitionRevision(7)
+                .executionMode(mode)
+                .valueShape(shape)
+                .value(payload)
+                .fields(fields)
+                .subjectId("user1")
+                .startTime(START)
+                .endTime(END)
+                .build();
     }
 }

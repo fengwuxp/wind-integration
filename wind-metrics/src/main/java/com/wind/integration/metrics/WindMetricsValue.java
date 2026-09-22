@@ -1,9 +1,17 @@
 package com.wind.integration.metrics;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.wind.integration.metrics.enums.MetricValueType;
+import com.wind.integration.metrics.json.MetricValuePayloadJsonDeserializer;
+import com.wind.integration.metrics.json.MetricValuePayloadJsonSerializer;
+import com.wind.integration.metrics.query.MetricValueJsonDeserializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.annotation.JsonSerialize;
 
 /**
  * 面向开发者的具名指标值能力，与定义方式、计算引擎和取数策略无关。
@@ -18,12 +26,14 @@ import org.jspecify.annotations.Nullable;
  * @date 2025-06-17 14:27
  **/
 @Schema(description = "指标编码和值的描述对象")
+@JsonDeserialize(using = MetricValueJsonDeserializer.class)
 public interface WindMetricsValue<V> {
 
     /**
      * 获取指标名称
      */
     @NonNull
+    @JsonIgnore
     @Deprecated(forRemoval = true)
     String getName();
 
@@ -50,6 +60,7 @@ public interface WindMetricsValue<V> {
      * @return 指标值；定义允许的正常空结果可以为空
      */
     @Nullable
+    @JsonSerialize(using = MetricValuePayloadJsonSerializer.class)
     V getValue();
 
     /**
@@ -62,7 +73,7 @@ public interface WindMetricsValue<V> {
      * @param <V>   值类型
      * @return 编码与值引用固定的指标值
      */
-    static <V> WindMetricsValue<V> of(String code, @Nullable V value) {
+    static <V> WindMetricsValue<V> of(@JsonProperty("code") String code, @JsonProperty("value") @Nullable V value) {
         return new ImmutableMetricsValue<>(code, MetricsValueSupport.inferType(value), value);
     }
 
@@ -74,7 +85,9 @@ public interface WindMetricsValue<V> {
      * @param value     原始 payload，可以为空；TIMESTAMP 接受 LocalDateTime 或 ISO 本地时间文本
      * @return 已验证、类型与值一同固定的指标值
      */
-    static WindMetricsValue<?> of(String code, MetricValueType valueType, @Nullable Object value) {
+    @JsonCreator
+    static WindMetricsValue<?> of(@JsonProperty("code") String code, @JsonProperty("valueType") MetricValueType valueType,
+                                 @JsonProperty("value") @JsonDeserialize(using = MetricValuePayloadJsonDeserializer.class) @Nullable Object value) {
         return new ImmutableMetricsValue<>(code, valueType, MetricsValueSupport.normalize(valueType, value));
     }
 }

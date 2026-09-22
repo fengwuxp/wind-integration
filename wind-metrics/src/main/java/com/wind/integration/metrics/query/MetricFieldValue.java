@@ -13,8 +13,8 @@ import tools.jackson.databind.annotation.JsonSerialize;
 /**
  * 多字段指标结果中的单个字段值。
  *
- * <p>字段 Map 的 key 是字段身份；所属结果会绑定值对象的 code。值类型由 WindMetricsValue 持有。
- * TIMESTAMP payload 使用 LocalDateTime，按所属结果的 timeZone 解释。</p>
+ * <p>字段 Map 的 key 是字段身份；装配方提供对应的 code，值类型由 WindMetricsValue 持有。
+ * TIMESTAMP payload 使用 LocalDateTime，时间解释由宿主统一确定。</p>
  *
  * @param value     字段具名值，构造后必不为空；正常空结果由其 payload 为 null 表示
  * @author wuxp

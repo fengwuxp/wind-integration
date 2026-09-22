@@ -15,7 +15,7 @@ import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
 import com.wind.integration.metrics.enums.MetricDerivationType;
-import com.wind.integration.metrics.enums.SnapshotGranularity;
+import com.wind.integration.metrics.enums.MetricSnapshotGranularity;
 import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -53,7 +53,7 @@ class MetricEnumContractTests {
                 MetricValueShape.class,
                 MetricValueType.class,
                 MetricDerivationType.class,
-                SnapshotGranularity.class);
+                MetricSnapshotGranularity.class);
 
         enumTypes.forEach(enumType -> {
             for (Enum<?> enumValue : enumType.getEnumConstants()) {

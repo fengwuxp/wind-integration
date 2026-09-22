@@ -8,7 +8,7 @@ import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricValueShape;
-import com.wind.integration.metrics.enums.SnapshotGranularity;
+import com.wind.integration.metrics.enums.MetricSnapshotGranularity;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
@@ -72,7 +72,7 @@ public record MetricResult(
         @Schema(description = "查询结束时间，不包含") LocalDateTime endTime,
         @Schema(description = "本次结果的计算完成时间") LocalDateTime calculatedTime,
         @Schema(description = "时间字段解释所使用的时区") ZoneId timeZone,
-        @Nullable @Schema(description = "SNAPSHOT 查询模式的快照桶粒度；其他模式为空") SnapshotGranularity snapshotGranularity,
+        @Nullable @Schema(description = "SNAPSHOT 查询模式的快照桶粒度；其他模式为空") MetricSnapshotGranularity snapshotGranularity,
         @Nullable @Schema(description = "SNAPSHOT 查询模式的实际连续可读区间下界；其他模式为空") LocalDateTime queryableStartTime,
         @Nullable @Schema(description = "SNAPSHOT 查询模式的已提交连续覆盖上界；其他模式为空") LocalDateTime watermarkTime,
         @Nullable @Schema(description = "读取证据提供的计划编码；仅作可选溯源，实时模式为空") String planCode,
@@ -179,7 +179,7 @@ public record MetricResult(
     }
 
     private static void validateExecutionBranch(MetricQueryMode executionMode,
-                                                @Nullable SnapshotGranularity snapshotGranularity,
+                                                @Nullable MetricSnapshotGranularity snapshotGranularity,
                                                 @Nullable LocalDateTime queryableStartTime,
                                                 @Nullable LocalDateTime watermarkTime,
                                                 @Nullable String planCode,
@@ -242,7 +242,7 @@ public record MetricResult(
 
     private record SourceSummary(
             @Nullable MetricQueryMode executionMode,
-            @Nullable SnapshotGranularity snapshotGranularity,
+            @Nullable MetricSnapshotGranularity snapshotGranularity,
             @Nullable LocalDateTime queryableStartTime,
             @Nullable LocalDateTime watermarkTime,
             @Nullable String planCode,

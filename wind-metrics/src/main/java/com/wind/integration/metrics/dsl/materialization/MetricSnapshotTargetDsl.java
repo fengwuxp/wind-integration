@@ -24,7 +24,7 @@ import java.util.Objects;
  * 及读写一致性校验；公共 DSL 不加载该类，也不重复声明字段映射。</p>
  *
  * @param storageType 逻辑保存形态
- * @param bucketTimeField 结果行的逻辑时间字段，不是运行水位
+ * @param bucketTimeField 快照对象中实际覆盖末端的属性名，例如 endTime；该值是不包含的最后快照水位，不是计算完成时间或计划目标时间
  * @param objectTypeClassName 聚合结果对象的全限定二进制类名，对应 factory 的 objectType 入参
  *
  * @author wuxp
@@ -33,7 +33,7 @@ import java.util.Objects;
 @Schema(description = "物化计划中的逻辑保存目标及聚合结果类型，不包含物理绑定")
 public record MetricSnapshotTargetDsl(
         @Schema(description = "逻辑保存形态") MetricSnapshotStorageType storageType,
-        @Schema(description = "结果行的逻辑时间字段，不是运行水位") String bucketTimeField,
+        @Schema(description = "快照对象的实际覆盖末端属性名，例如 endTime；左闭右开区间的最后快照水位") String bucketTimeField,
         @Schema(description = "聚合结果对象全限定类名，对应 factory(Class) 的目标类型") String objectTypeClassName) {
 
     public MetricSnapshotTargetDsl {

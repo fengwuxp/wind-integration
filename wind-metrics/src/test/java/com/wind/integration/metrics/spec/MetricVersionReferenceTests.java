@@ -18,7 +18,7 @@ import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricSnapshotStorageType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
-import com.wind.integration.metrics.enums.SnapshotGranularity;
+import com.wind.integration.metrics.enums.MetricSnapshotGranularity;
 import com.wind.integration.metrics.expression.MetricExpressionCompiler;
 import com.wind.integration.metrics.expression.MetricValueReference;
 import com.wind.jackson.WindJson;
@@ -264,7 +264,7 @@ class MetricVersionReferenceTests {
 
     /**
      * 场景：定义 schema 的兼容范围必须显式校验。
-     * 输入：RAW 使用 null/-1/0/5，已绑定 DERIVED 使用1/2/3。
+     * 输入：RAW 使用 null/-1/0/6，已绑定 DERIVED 使用1/2/3。
      * 流程：构造 MetricDSLDefinitionSpec。
      * 预期：均报 DSL_SCHEMA_VERSION_UNSUPPORTED；RAW 错误定位 /schemaVersion。
      */
@@ -285,14 +285,14 @@ class MetricVersionReferenceTests {
     }
 
     /**
-     * 场景：Plan 继续使用 schema3 并保存成员精确版本。
+     * 场景：Plan 使用 schema4 并保存成员精确版本。
      * 输入：快照计划包含 BASE@7。
      * 流程：Plan JSON 往返，再尝试修改成员集合。
      * 预期：计划相等、保留 BASE@7，成员集合不可修改。
      */
     @Test
-    void testPlanSchemaThreeRoundTripRetainsExactMemberRevision() {
-        MetricMaterializationPlanDsl plan = plan(3, List.of(new MetricReferenceDsl("BASE", 7)));
+    void testPlanSchemaFourRoundTripRetainsExactMemberRevision() {
+        MetricMaterializationPlanDsl plan = plan(4, List.of(new MetricReferenceDsl("BASE", 7)));
         MetricMaterializationPlanDsl restored = WindJson.parseObject(WindJson.toJsonString(plan), MetricMaterializationPlanDsl.class);
         Assertions.assertEquals(plan, restored);
         Assertions.assertEquals(List.of(new MetricReferenceDsl("BASE", 7)), restored.metrics());
@@ -301,23 +301,23 @@ class MetricVersionReferenceTests {
 
     /**
      * 场景：计划不能使用错误 schema 或不确定的成员集合。
-     * 输入：schema2/4、空成员、重复 BASE@1 或 BASE@1/2。
+     * 输入：schema2/3/5、空成员、重复 BASE@1 或 BASE@1/2。
      * 流程：分别构造 Plan。
      * 预期：错误 schema 报版本错误；空成员或重复 code 报 DSL_PLAN_INVALID。
      */
     @Test
     void testPlanRejectsUnsupportedSchemaEmptyAndDuplicateMembers() {
-        for (int schema : List.of(2, 4)) {
+        for (int schema : List.of(2, 3, 5)) {
             Assertions.assertEquals(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED,
                     Assertions.assertThrows(MetricValidationException.class,
                             () -> plan(schema, List.of(new MetricReferenceDsl("BASE", 1)))).errorCode());
         }
         Assertions.assertEquals(MetricErrorCode.DSL_PLAN_INVALID,
-                Assertions.assertThrows(MetricValidationException.class, () -> plan(3, List.of())).errorCode());
+                Assertions.assertThrows(MetricValidationException.class, () -> plan(4, List.of())).errorCode());
         for (int revision : List.of(1, 2)) {
             Assertions.assertEquals(MetricErrorCode.DSL_PLAN_INVALID,
                     Assertions.assertThrows(MetricValidationException.class,
-                            () -> plan(3, List.of(new MetricReferenceDsl("BASE", 1), new MetricReferenceDsl("BASE", revision)))).errorCode());
+                            () -> plan(4, List.of(new MetricReferenceDsl("BASE", 1), new MetricReferenceDsl("BASE", revision)))).errorCode());
         }
     }
 
@@ -329,7 +329,7 @@ class MetricVersionReferenceTests {
      */
     @Test
     void testLegacyPlanJsonWithoutExactRevisionIsRejected() {
-        String json = WindJson.toJsonString(plan(3, List.of(new MetricReferenceDsl("BASE", 7))));
+        String json = WindJson.toJsonString(plan(4, List.of(new MetricReferenceDsl("BASE", 7))));
         for (String replacement : List.of("\"definitionRevision\":null", "\"definitionRevision\":0")) {
             String invalid = json.replace("\"definitionRevision\":7", replacement);
             Assertions.assertNotEquals(json, invalid);
@@ -365,8 +365,8 @@ class MetricVersionReferenceTests {
 
     private static MetricMaterializationPlanDsl plan(int schema, List<MetricReferenceDsl> metrics) {
         return new MetricMaterializationPlanDsl(schema, MetricQueryMode.SNAPSHOT, "CUSTOMER", metrics,
-                SnapshotGranularity.DAY, new MetricSnapshotTargetDsl(MetricSnapshotStorageType.METRIC_VALUE_TABLE,
-                "bucketTime", "com.example.Snapshot"), null, List.of());
+                MetricSnapshotGranularity.DAY, new MetricSnapshotTargetDsl(MetricSnapshotStorageType.METRIC_VALUE_TABLE,
+                "bucketTime", "com.example.Snapshot"), List.of());
     }
 
     private static void assertBindingInvalid(org.junit.jupiter.api.function.Executable action) {

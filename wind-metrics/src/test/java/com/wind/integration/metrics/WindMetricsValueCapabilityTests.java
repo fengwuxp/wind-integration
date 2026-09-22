@@ -5,7 +5,7 @@ import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
-import com.wind.integration.metrics.enums.SnapshotGranularity;
+import com.wind.integration.metrics.enums.MetricSnapshotGranularity;
 import com.wind.integration.metrics.fields.MultipleValueMetricsField;
 import com.wind.integration.metrics.query.MetricFieldValue;
 import com.wind.integration.metrics.query.MetricResult;
@@ -239,13 +239,13 @@ class WindMetricsValueCapabilityTests {
         boolean snapshot = mode == MetricQueryMode.SNAPSHOT;
         List<MetricSegmentResult> segments = mode == MetricQueryMode.SEGMENTED ? List.of(
                 new MetricSegmentResult(MetricSegmentCode.ARCHIVE, MetricSegmentSourceType.SNAPSHOT,
-                        START, START.plusDays(1), SnapshotGranularity.DAY, START, START.plusDays(1), null),
+                        START, START.plusDays(1), MetricSnapshotGranularity.DAY, START, START.plusDays(1), null),
                 new MetricSegmentResult(MetricSegmentCode.RECENT, MetricSegmentSourceType.REALTIME,
                         START.plusDays(1), END, null, null, null, END)) : List.of();
         return new MetricResult(name, 7, mode, shape,
                 shape == MetricValueShape.SCALAR ? WindMetricsValue.of("value", MetricValueType.DECIMAL, value) : null,
                 fields, "user1", START, END, END, ZoneId.of("Asia/Shanghai"),
-                snapshot ? SnapshotGranularity.DAY : null, snapshot ? START : null, snapshot ? END : null,
+                snapshot ? MetricSnapshotGranularity.DAY : null, snapshot ? START : null, snapshot ? END : null,
                 mode == MetricQueryMode.REALTIME ? null : "daily", segments, List.of());
     }
 }

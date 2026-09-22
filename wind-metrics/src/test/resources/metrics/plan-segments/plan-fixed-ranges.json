@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 4,
+  "executionMode": "SEGMENTED",
+  "dimensionKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
+  "metrics": [
+    {
+      "metricCode": "VCC_APPROVED_COUNT",
+      "definitionRevision": 1
+    },
+    {
+      "metricCode": "VCC_TOTAL_COUNT",
+      "definitionRevision": 1
+    }
+  ],
+  "snapshotTarget": {
+    "storageType": "METRIC_VALUE_TABLE",
+    "bucketTimeField": "endTime",
+    "objectTypeClassName": "java.util.Map"
+  },
+  "segments": [
+    {
+      "sourceType": "REALTIME",
+      "start": "2025-01-01T00:00:00",
+      "end": "2026-01-01T00:00:00"
+    },
+    {
+      "sourceType": "SNAPSHOT",
+      "start": "2024-01-01T00:00:00",
+      "end": "2025-01-01T00:00:00"
+    }
+  ]
+}

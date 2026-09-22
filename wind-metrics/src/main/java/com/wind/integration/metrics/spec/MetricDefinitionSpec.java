@@ -33,7 +33,9 @@ import java.util.Objects;
 public sealed interface MetricDefinitionSpec<O extends MetricDefinitionObject>
         permits MetricDefinitionSpec.MetricDSLDefinitionSpec, MetricDefinitionSpec.MetricSqlDefinitionSpec {
 
-    /** 完整携带派生依赖精确版本的 Definition DSL 结构版本；Plan 独立演进。 */
+    /**
+     * 携带精确依赖的计算定义版本；读取模式和分段规则不进入计算正文。
+     */
     int DSL_SCHEMA_VERSION = 4;
 
     /**
@@ -62,11 +64,11 @@ public sealed interface MetricDefinitionSpec<O extends MetricDefinitionObject>
 
         public MetricDSLDefinitionSpec {
             Objects.requireNonNull(definition, "definition must not be null");
-            if (schemaVersion == null || schemaVersion < 1 || schemaVersion > DSL_SCHEMA_VERSION
-                    || (definition.derivationType().isDerived() && schemaVersion != DSL_SCHEMA_VERSION)) {
+            if (schemaVersion == null || schemaVersion < 1 || schemaVersion > DSL_SCHEMA_VERSION || definition.derivationType().isDerived() && schemaVersion < 4) {
                 throw new MetricValidationException(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED,
                         "/schemaVersion", "Definition DSL supports RAW schemas 1 to 4 and DERIVED schema 4");
             }
+
         }
 
         @Override

@@ -8,7 +8,7 @@ import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
-import com.wind.integration.metrics.enums.SnapshotGranularity;
+import com.wind.integration.metrics.enums.MetricSnapshotGranularity;
 import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -161,7 +161,7 @@ class MetricResultContractTests {
                         MetricSegmentSourceType.SNAPSHOT,
                         START_TIME,
                         END_TIME,
-                        SnapshotGranularity.DAY,
+                        MetricSnapshotGranularity.DAY,
                         null,
                         END_TIME,
                         null));
@@ -185,7 +185,7 @@ class MetricResultContractTests {
                         MetricSegmentSourceType.SNAPSHOT,
                         START_TIME,
                         cutoverTime,
-                        SnapshotGranularity.DAY,
+                        MetricSnapshotGranularity.DAY,
                         START_TIME,
                         cutoverTime,
                         null),
@@ -224,7 +224,7 @@ class MetricResultContractTests {
                 MetricSegmentSourceType.SNAPSHOT,
                 START_TIME,
                 cutoverTime,
-                SnapshotGranularity.DAY,
+                MetricSnapshotGranularity.DAY,
                 START_TIME,
                 cutoverTime,
                 null);
@@ -242,7 +242,7 @@ class MetricResultContractTests {
                 MetricSegmentSourceType.SNAPSHOT,
                 cutoverTime,
                 END_TIME,
-                SnapshotGranularity.DAY,
+                MetricSnapshotGranularity.DAY,
                 cutoverTime,
                 END_TIME,
                 null);
@@ -379,7 +379,7 @@ class MetricResultContractTests {
     void testMixedSourcesExposeNullTopLevelModeWithoutFakingCoverage() {
         MetricResult result = resultWithSources(List.of(
                 source("A", 1, MetricQueryMode.REALTIME),
-                sourceResult("B", 2, MetricQueryMode.SNAPSHOT, SnapshotGranularity.DAY,
+                sourceResult("B", 2, MetricQueryMode.SNAPSHOT, MetricSnapshotGranularity.DAY,
                         START_TIME, END_TIME, null, List.of())));
 
         Assertions.assertNull(result.executionMode());
@@ -403,13 +403,13 @@ class MetricResultContractTests {
     @Test
     void testSingleSnapshotSourceMayOmitPlanTrace() {
         MetricResult result = resultWithSources(List.of(sourceResult(
-                "SUMMARY", 3, MetricQueryMode.SNAPSHOT, SnapshotGranularity.DAY,
+                "SUMMARY", 3, MetricQueryMode.SNAPSHOT, MetricSnapshotGranularity.DAY,
                 START_TIME, END_TIME, null, List.of())));
 
         Assertions.assertEquals(MetricQueryMode.SNAPSHOT, result.executionMode());
         Assertions.assertEquals("SUMMARY", result.sources().getFirst().metricCode());
         Assertions.assertEquals(3, result.sources().getFirst().definitionRevision());
-        Assertions.assertEquals(SnapshotGranularity.DAY, result.snapshotGranularity());
+        Assertions.assertEquals(MetricSnapshotGranularity.DAY, result.snapshotGranularity());
         Assertions.assertNull(result.planCode());
     }
 
@@ -424,7 +424,7 @@ class MetricResultContractTests {
         MetricValidationException exception = Assertions.assertThrows(MetricValidationException.class,
                 () -> resultWithSources(List.of(
                         sourceResult("SNAPSHOT", 1, MetricQueryMode.SNAPSHOT,
-                                SnapshotGranularity.DAY, START_TIME.plusHours(1), END_TIME,
+                                MetricSnapshotGranularity.DAY, START_TIME.plusHours(1), END_TIME,
                                 null, List.of()))));
 
         Assertions.assertEquals(MetricErrorCode.RESULT_INVALID, exception.errorCode());
@@ -441,7 +441,7 @@ class MetricResultContractTests {
     void testSegmentedSourceValidatesItsOwnContinuousWindow() {
         MetricSegmentResult archive = new MetricSegmentResult(
                 MetricSegmentCode.ARCHIVE, MetricSegmentSourceType.SNAPSHOT, START_TIME,
-                START_TIME.plusDays(1), SnapshotGranularity.DAY, START_TIME, START_TIME.plusDays(1), null);
+                START_TIME.plusDays(1), MetricSnapshotGranularity.DAY, START_TIME, START_TIME.plusDays(1), null);
         MetricSegmentResult recent = new MetricSegmentResult(
                 MetricSegmentCode.RECENT, MetricSegmentSourceType.REALTIME, START_TIME.plusDays(1), END_TIME,
                 null, null, null, CALCULATED_TIME);
@@ -476,7 +476,7 @@ class MetricResultContractTests {
     }
 
     private static MetricResult sourceResult(String code, int revision, MetricQueryMode mode,
-                                             SnapshotGranularity granularity, LocalDateTime coverageStart,
+                                             MetricSnapshotGranularity granularity, LocalDateTime coverageStart,
                                              LocalDateTime watermark, String plan, List<MetricSegmentResult> segments) {
         return new MetricResult(code, revision, mode, MetricValueShape.SCALAR,
                 WindMetricsValue.of(code, MetricValueType.LONG, 3L), Map.of(), null,
@@ -491,7 +491,7 @@ class MetricResultContractTests {
     private static MetricResult resultWithSources(List<MetricResult> sources) {
         return new MetricResult("DERIVED", 1, null, MetricValueShape.SCALAR,
                 WindMetricsValue.of("value", MetricValueType.LONG, 6L), Map.of(), null, START_TIME, END_TIME,
-                CALCULATED_TIME, ZoneId.of("Asia/Shanghai"), SnapshotGranularity.DAY, START_TIME, END_TIME,
+                CALCULATED_TIME, ZoneId.of("Asia/Shanghai"), MetricSnapshotGranularity.DAY, START_TIME, END_TIME,
                 "stale-plan", List.of(), sources);
     }
 }

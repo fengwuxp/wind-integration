@@ -1,5 +1,6 @@
 package com.wind.integration.metrics.spec;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.dsl.definition.MetricJoinDsl;
 import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDsl;
@@ -24,7 +25,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * 指标计算口径，描述事实聚合或跨指标派生表达式。
+ * 指标计算口径，描述事实聚合和跨指标派生表达式。
  *
  * <p>事实指标必须提供 {@code fact} 和 {@code time}；派生指标不提供事实字段，改由表达式取值。
  * {@code SCALAR} 只使用 {@code value}，
@@ -42,6 +43,15 @@ import java.util.TreeSet;
  * 提供。{@code dependencies} 只保存每个直接引用编码的精确版本，其编码集合必须与
  * 表达式完全一致；字段仍由表达式决定，同编码多字段共用一个版本。宿主负责确认已发布目标、
  * 冻结选择、展开传递闭包、校验环和深度，以及执行与物化能力检查；不追随最新版本。</p>
+ *
+ * <p>读取模式由宿主指标元信息统一维护，不在计算定义中复制。分段配置只保存在
+ * {@link com.wind.integration.metrics.dsl.materialization.MetricMaterializationPlanDsl} 中；
+ * 宿主按指标编码和定义修订固定读取绑定；查询按业务键读取有效快照并按实际时间合并，
+ * 不展开计划分段或用配置窗口决定查询边界。
+ * 派生指标继承精确依赖的读取方式，不单独声明模式。</p>
+ *
+ * <p>分段规则只供物化执行器计算待快照范围；快照查询使用已冻结的保存绑定。
+ * 物化计划引用精确定义，共同保存的成员共享同一套分段规则。</p>
  *
  * @param code 稳定且唯一的指标编码
  * @param revision 定义修订号，与编码共同唯一标识一个定义实例
@@ -112,6 +122,14 @@ public record MetricDSLDefinition(
 
     private static <T> Map<String, T> immutableMap(Map<String, T> source) {
         return Collections.unmodifiableMap(new LinkedHashMap<>(source));
+    }
+
+    // Jackson 反射调用；拒绝 executionMode、segments 等非计算属性，避免形成重复配置源。
+    @SuppressWarnings({"PMD.UnusedPrivateMethod", "PMD.UnusedFormalParameter"})
+    @JsonAnySetter
+    private void rejectUnknownProperty(String name, @Nullable Object value) {
+        throw new MetricValidationException(MetricErrorCode.DSL_VALUE_INVALID,
+                "/metric/" + name.replace("~", "~0").replace("/", "~1"), "Unknown metric definition property");
     }
 
     private static void validateDependencies(@Nullable String fact, MetricValueShape shape,

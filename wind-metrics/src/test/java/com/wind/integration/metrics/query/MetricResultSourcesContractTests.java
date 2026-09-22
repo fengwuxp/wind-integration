@@ -5,7 +5,7 @@ import com.wind.integration.metrics.WindMetricsValue;
 import com.wind.integration.metrics.enums.MetricQueryMode;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
-import com.wind.integration.metrics.enums.SnapshotGranularity;
+import com.wind.integration.metrics.enums.MetricSnapshotGranularity;
 import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -54,7 +54,7 @@ class MetricResultSourcesContractTests {
                         "count", new MetricFieldValue(WindMetricsValue.of("count", MetricValueType.LONG, 3)),
                         "average", new MetricFieldValue(WindMetricsValue.of("average", MetricValueType.DECIMAL, null))),
                 "customer", START, START.plusDays(1), START.plusDays(1).plusSeconds(2), ZONE,
-                SnapshotGranularity.DAY, START, START.plusDays(1), null, List.of(), List.of());
+                MetricSnapshotGranularity.DAY, START, START.plusDays(1), null, List.of(), List.of());
         List<MetricResult> sources = new ArrayList<>(List.of(realtime, snapshot));
         MetricResult result = new MetricResult("TOTAL", 3, null, MetricValueShape.SCALAR,
                 WindMetricsValue.of("TOTAL", MetricValueType.DECIMAL,

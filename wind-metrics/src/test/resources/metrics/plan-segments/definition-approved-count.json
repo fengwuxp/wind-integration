@@ -1,0 +1,40 @@
+{
+  "definitionType": "DSL",
+  "schemaVersion": 4,
+  "definition": {
+    "code": "VCC_APPROVED_COUNT",
+    "revision": 1,
+    "valueShape": "SCALAR",
+    "fact": "VccTransaction",
+    "joins": [],
+    "subject": {
+      "type": "CUSTOMER",
+      "field": "customerId"
+    },
+    "time": {
+      "field": "authTime"
+    },
+    "dimensions": [
+      "currency"
+    ],
+    "parameters": {},
+    "value": {
+      "valueType": "LONG",
+      "measure": {
+        "aggregation": "COUNT",
+        "filter": {
+          "operator": "EQ",
+          "fieldRef": "authStatus",
+          "value": {
+            "value": "APPROVED"
+          }
+        }
+      },
+      "orElse": {
+        "mode": "ZERO"
+      }
+    },
+    "fields": {},
+    "dependencies": []
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "definitionType": "DSL",
+  "schemaVersion": 4,
+  "definition": {
+    "code": "VCC_TOTAL_COUNT",
+    "revision": 1,
+    "valueShape": "SCALAR",
+    "fact": "VccTransaction",
+    "joins": [],
+    "subject": {
+      "type": "CUSTOMER",
+      "field": "customerId"
+    },
+    "time": {
+      "field": "authTime"
+    },
+    "dimensions": [
+      "currency"
+    ],
+    "parameters": {},
+    "value": {
+      "valueType": "LONG",
+      "measure": {
+        "aggregation": "COUNT"
+      },
+      "orElse": {
+        "mode": "ZERO"
+      }
+    },
+    "fields": {},
+    "dependencies": []
+  }
+}

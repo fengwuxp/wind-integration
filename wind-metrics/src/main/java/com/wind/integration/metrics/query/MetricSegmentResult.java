@@ -4,7 +4,7 @@ import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricSegmentCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
-import com.wind.integration.metrics.enums.SnapshotGranularity;
+import com.wind.integration.metrics.enums.MetricSnapshotGranularity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
@@ -13,13 +13,14 @@ import java.time.LocalDateTime;
 /**
  * 单次指标查询实际执行的一个连续时间分段摘要。
  *
- * <p>快照分段必须返回粒度和连续覆盖区间，实时分段只返回计算时间。</p>
+ * <p>快照分段必须返回真实连续覆盖区间；整体历史或不同粒度合并的摘要没有统一粒度，可以为空。
+ * 实时分段只返回计算时间。</p>
  *
  * @param segmentCode 实际分段编码
  * @param sourceType 分段实际数据来源
  * @param startTime 分段开始时间，包含
  * @param endTime 分段结束时间，不包含
- * @param snapshotGranularity 快照桶粒度；实时分段为空
+ * @param snapshotGranularity 快照桶粒度；整体历史、不同粒度的共同摘要或实时分段为空
  * @param queryableStartTime 快照连续可读区间下界，包含；实时分段为空
  * @param watermarkTime 快照连续覆盖上界，不包含；实时分段为空
  * @param calculatedTime 实时计算完成时间；快照分段为空
@@ -33,7 +34,7 @@ public record MetricSegmentResult(
         @Schema(description = "分段实际数据来源") MetricSegmentSourceType sourceType,
         @Schema(description = "分段开始时间，包含") LocalDateTime startTime,
         @Schema(description = "分段结束时间，不包含") LocalDateTime endTime,
-        @Nullable @Schema(description = "快照桶粒度；实时分段为空") SnapshotGranularity snapshotGranularity,
+        @Nullable @Schema(description = "快照桶粒度；整体历史、混合粒度摘要或实时分段为空") MetricSnapshotGranularity snapshotGranularity,
         @Nullable @Schema(description = "快照连续可读区间下界；实时分段为空") LocalDateTime queryableStartTime,
         @Nullable @Schema(description = "快照连续覆盖上界；实时分段为空") LocalDateTime watermarkTime,
         @Nullable @Schema(description = "实时计算完成时间；快照分段为空") LocalDateTime calculatedTime) {
@@ -52,9 +53,6 @@ public record MetricSegmentResult(
             throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/endTime", "endTime must be after startTime");
         }
         if (sourceType == MetricSegmentSourceType.SNAPSHOT) {
-            if (snapshotGranularity == null) {
-                throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/snapshotGranularity", "Snapshot granularity is required");
-            }
             if (queryableStartTime == null) {
                 throw new MetricValidationException(MetricErrorCode.RESULT_INVALID, "/queryableStartTime", "Snapshot coverage is required");
             }

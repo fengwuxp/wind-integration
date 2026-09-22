@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 4,
+  "executionMode": "SNAPSHOT",
+  "dimensionKeyProviderCode": "VCC_CUSTOMER_CURRENCY_KEYS",
+  "metrics": [
+    {
+      "metricCode": "VCC_APPROVED_COUNT",
+      "definitionRevision": 1
+    },
+    {
+      "metricCode": "VCC_TOTAL_COUNT",
+      "definitionRevision": 1
+    }
+  ],
+  "snapshotTarget": {
+    "storageType": "METRIC_VALUE_TABLE",
+    "bucketTimeField": "endTime",
+    "objectTypeClassName": "java.util.Map"
+  },
+  "snapshotGranularity": "DAY",
+  "segments": []
+}

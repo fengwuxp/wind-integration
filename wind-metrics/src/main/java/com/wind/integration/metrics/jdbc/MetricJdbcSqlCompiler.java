@@ -60,16 +60,17 @@ import java.util.regex.Pattern;
  * 也不选择发布修订。实例持有固定方言、时区、行数上限，以及按 (code, revision) 注册的冻结物理映射缓存；
  * 单次编译的其余状态均为局部变量。
  * SQL 生成只返回 {@link MetricSqlDescriptor}，不把 JDBC 执行、结果读取或最终表达式计算混入编译器。
+ * 推荐将同次校验得到的映射直接传入 {@link #compile}；只有通过 {@link #generate} 接入时才读取注册缓存。
  *
  * @author wuxp
  */
-public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
+public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
 
     /** 单次编译已经固定的声明、绑定和投影上下文；不跨查询缓存。 */
     private record CompilationPlan(
             MetricDSLDefinition definition,
             MetricQuery query,
-            MetricJdbcBinding binding,
+            MetricJdbcMapping binding,
             MetricRowSelectionDsl rowSelection,
             int rowSelectionLimit,
             List<MetricJoinDsl> joins,
@@ -92,9 +93,9 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
 
     private final MetricJdbcValueNormalizer metricJdbcValueNormalizer;
 
-    private final MetricJdbcPredicateRenderer metricJdbcPredicateRenderer;
+    private final MetricJdbcPredicateBuilder metricJdbcPredicateBuilder;
 
-    private final ConcurrentMap<String, MetricJdbcBinding> bindings = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, MetricJdbcMapping> bindings = new ConcurrentHashMap<>();
 
     /**
      * 使用固定指标时区与默认 1000 行上限创建编译器。
@@ -135,11 +136,11 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         }
         this.maxRowSelectionLimit = maxRowSelectionLimit;
         metricJdbcValueNormalizer = new MetricJdbcValueNormalizer(Objects.requireNonNull(timeZone, "timeZone must not be null"));
-        metricJdbcPredicateRenderer = new MetricJdbcPredicateRenderer(metricJdbcValueNormalizer);
+        metricJdbcPredicateBuilder = new MetricJdbcPredicateBuilder(metricJdbcValueNormalizer);
     }
 
     /**
-     * 编译单个事实指标；表达式字段由宿主在 measure 加载后求值，不进入 SQL 投影。
+     * 编译具有完整半开时间窗的单个 RAW 事实指标；表达式字段由宿主在 measure 加载后求值，不进入 SQL 投影。
      *
      * <p>编排顺序固定为：校验查询 -> 固定事实/join/measure 投影 -> 构造来源和谓词 ->
      * 渲染参数化 SQL。每次调用的参数、别名和投影均为局部状态。</p>
@@ -150,21 +151,21 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
      * @return SQL、占位符顺序参数以及 measure 投影
      * @throws MetricValidationException 定义形态、查询条件或字段值不受支持时抛出
      */
-    public MetricSqlDescriptor compile(MetricDSLDefinition definition, MetricQuery query, MetricJdbcBinding binding) {
+    public MetricSqlDescriptor compile(MetricDSLDefinition definition, MetricQuery query, MetricJdbcMapping binding) {
         CompilationPlan plan = plan(definition, query, binding);
 
-        Map<String, MetricSqlBinding> parameters = new LinkedHashMap<>();
+        Map<String, MetricJdbcParameterBinding> parameters = new LinkedHashMap<>();
         Map<String, String> resultProjections = new LinkedHashMap<>();
         List<Field<?>> projections = projections(plan, parameters, resultProjections);
         Table<?> source = buildSource(plan.joins(), plan.binding(), plan.aliases(), plan.columns());
         List<Condition> conditions = buildPredicates(plan.definition(), plan.query(), plan.binding(), plan.columns(), parameters);
         SelectQuery<?> sql = assembleQuery(plan, source, conditions, projections, parameters);
-        List<MetricSqlBinding> bindings = new ArrayList<>();
+        List<MetricJdbcParameterBinding> bindings = new ArrayList<>();
         String rendered = render(sql, parameters, bindings);
         return new MetricSqlDescriptor(rendered, bindings, resultProjections);
     }
 
-    private CompilationPlan plan(MetricDSLDefinition definition, MetricQuery query, MetricJdbcBinding binding) {
+    private CompilationPlan plan(MetricDSLDefinition definition, MetricQuery query, MetricJdbcMapping binding) {
         validateQuery(definition, query);
         Objects.requireNonNull(binding, "binding must not be null");
         MetricRowSelectionDsl selection = definition.rowSelection();
@@ -181,7 +182,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
                 measures, selectedColumns, projectionColumns);
     }
 
-    private List<Field<?>> projections(CompilationPlan plan, Map<String, MetricSqlBinding> parameters,
+    private List<Field<?>> projections(CompilationPlan plan, Map<String, MetricJdbcParameterBinding> parameters,
                                        Map<String, String> resultProjections) {
         List<Field<?>> projections = new ArrayList<>();
         for (Map.Entry<String, MetricMeasureDsl> entry : plan.measures().entrySet()) {
@@ -195,7 +196,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
     }
 
     private SelectQuery<?> assembleQuery(CompilationPlan plan, Table<?> source, List<Condition> conditions,
-                                         List<Field<?>> projections, Map<String, MetricSqlBinding> parameters) {
+                                         List<Field<?>> projections, Map<String, MetricJdbcParameterBinding> parameters) {
         SelectQuery<?> sql = DSL.using(dialect).selectQuery();
         sql.addSelect(projections);
         if (plan.rowSelection() == null) {
@@ -209,19 +210,22 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
     }
 
     /**
-     * 注册某定义修订的冻结物理映射，供 {@link #render} 内部按 (code, revision) 获取。
+     * 注册某定义修订的冻结物理映射，供 {@link #generate} 内部按 (code, revision) 获取。
+     *
+     * <p>这是 generate 的可选接入路径；显式传入映射的 {@link #compile} 不读取或修改此缓存。
+     * 同一 (code, revision) 再次注册会替换原映射，宿主负责保证其适用范围与生命周期一致。</p>
      *
      * @param definition DSL 定义，提供编码与修订
      * @param binding    该修订冻结的物理映射，不得执行 IO
      */
-    public void registerBinding(MetricDSLDefinition definition, MetricJdbcBinding binding) {
+    public void registerBinding(MetricDSLDefinition definition, MetricJdbcMapping binding) {
         Objects.requireNonNull(definition, "definition must not be null");
         Objects.requireNonNull(binding, "binding must not be null");
         bindings.put(key(definition.code(), definition.revision()), binding);
     }
 
     /**
-     * 实现 {@link MetricQuerySqlRender}，按 DSL 模式编译查询，物理映射从内部缓存获取。
+     * 实现 {@link MetricSqlGenerator}，按 DSL 模式编译查询，物理映射从内部缓存获取。
      *
      * @param definition 必须是 {@link MetricDSLDefinition}
      * @param query      查询条件
@@ -230,12 +234,12 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
      * @throws IllegalStateException    未注册对应 (code, revision) 的物理映射
      */
     @Override
-    public MetricSqlDescriptor render(MetricDefinitionObject definition, MetricQuery query) {
+    public MetricSqlDescriptor generate(MetricDefinitionObject definition, MetricQuery query) {
         if (!(definition instanceof MetricDSLDefinition dsl)) {
             throw new IllegalArgumentException("DSL compiler requires a MetricDSLDefinition, but was "
                     + definition.getClass().getSimpleName());
         }
-        MetricJdbcBinding binding = bindings.get(key(dsl.code(), dsl.revision()));
+        MetricJdbcMapping binding = bindings.get(key(dsl.code(), dsl.revision()));
         if (binding == null) {
             throw new IllegalStateException("No binding registered for metric " + dsl.code() + "@" + dsl.revision());
         }
@@ -258,24 +262,24 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
      * @param columnResolver 逻辑字段引用到受控列引用的转换
      * @return 参数化谓词
      */
-    public String renderValidatedFilter(MetricJdbcBinding binding, MetricFilterDsl filter,
-                                        List<MetricSqlBinding> bindings, Function<String, String> columnResolver) {
+    public String renderValidatedFilter(MetricJdbcMapping binding, MetricFilterDsl filter,
+                                        List<MetricJdbcParameterBinding> bindings, Function<String, String> columnResolver) {
         Objects.requireNonNull(binding, "binding must not be null");
         Objects.requireNonNull(filter, "filter must not be null");
         Objects.requireNonNull(bindings, "bindings must not be null");
         Objects.requireNonNull(columnResolver, "columnResolver must not be null");
-        Map<String, MetricSqlBinding> parameters = new LinkedHashMap<>();
-        Condition predicate = metricJdbcPredicateRenderer.render(binding, filter, parameters,
+        Map<String, MetricJdbcParameterBinding> parameters = new LinkedHashMap<>();
+        Condition predicate = metricJdbcPredicateBuilder.build(binding, filter, parameters,
                 field -> DSL.field(columnResolver.apply(field)));
-        List<MetricSqlBinding> ordered = new ArrayList<>();
+        List<MetricJdbcParameterBinding> ordered = new ArrayList<>();
         String sql = render(predicate, parameters, ordered);
         bindings.addAll(ordered);
         return sql;
     }
 
     private Table<?> renderRowSelection(MetricRowSelectionDsl selection, Map<String, String> selectedColumns,
-                                  Table<?> source, List<Condition> predicates, int limit, MetricJdbcBinding binding,
-                                  Function<String, Field<Object>> columns, Map<String, MetricSqlBinding> parameters) {
+                                  Table<?> source, List<Condition> predicates, int limit, MetricJdbcMapping binding,
+                                  Function<String, Field<Object>> columns, Map<String, MetricJdbcParameterBinding> parameters) {
         SelectQuery<?> sql = DSL.using(dialect).selectQuery();
         for (Map.Entry<String, String> entry : selectedColumns.entrySet()) {
             sql.addSelect(columns.apply(entry.getKey()).as(DSL.name(entry.getValue())));
@@ -283,7 +287,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         sql.addFrom(source);
         sql.addConditions(predicates);
         if (selection.filter() != null) {
-            sql.addConditions(metricJdbcPredicateRenderer.render(binding, selection.filter(), parameters, columns));
+            sql.addConditions(metricJdbcPredicateBuilder.build(binding, selection.filter(), parameters, columns));
         }
         List<SortField<?>> orderBy = selection.orderBy().stream().<SortField<?>>map(order -> {
             Field<?> field = columns.apply(order.field());
@@ -291,28 +295,28 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         }).toList();
         sql.addOrderBy(orderBy);
         String limitName = "v" + parameters.size();
-        parameters.put(limitName, new MetricSqlBinding(limit, Types.INTEGER));
+        parameters.put(limitName, new MetricJdbcParameterBinding(limit, Types.INTEGER));
         sql.addLimit(DSL.param(limitName, limit));
         return sql.asTable(DSL.name("r"));
     }
 
-    private Field<?> renderAggregate(MetricJdbcBinding binding, MetricMeasureDsl measure,
-                                Function<String, Field<Object>> columns, Map<String, MetricSqlBinding> parameters) {
+    private Field<?> renderAggregate(MetricJdbcMapping binding, MetricMeasureDsl measure,
+                                Function<String, Field<Object>> columns, Map<String, MetricJdbcParameterBinding> parameters) {
         boolean count = measure.aggregation() == MetricAggregation.COUNT;
         if (count && measure.filter() == null) {
             return DSL.count();
         }
         Field<?> argument = count ? DSL.inline(1) : columns.apply(measure.field());
         if (measure.filter() != null) {
-            Condition predicate = metricJdbcPredicateRenderer.render(binding, measure.filter(), parameters, columns);
+            Condition predicate = metricJdbcPredicateBuilder.build(binding, measure.filter(), parameters, columns);
             argument = DSL.when(predicate, argument);
         }
         return DSL.aggregate(measure.aggregation().name(), SQLDataType.DECIMAL, argument);
     }
 
-    private List<Condition> buildPredicates(MetricDSLDefinition definition, MetricQuery query, MetricJdbcBinding binding,
+    private List<Condition> buildPredicates(MetricDSLDefinition definition, MetricQuery query, MetricJdbcMapping binding,
                                        Function<String, Field<Object>> columns,
-                                       Map<String, MetricSqlBinding> parameters) {
+                                       Map<String, MetricJdbcParameterBinding> parameters) {
         List<Condition> result = new ArrayList<>();
         if (!MetricSubjectDsl.GLOBAL.equals(definition.subject().type())) {
             String field = definition.subject().field();
@@ -332,7 +336,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         return result;
     }
 
-    private static Table<?> buildSource(List<MetricJoinDsl> joins, MetricJdbcBinding binding,
+    private static Table<?> buildSource(List<MetricJoinDsl> joins, MetricJdbcMapping binding,
                                    Map<String, String> aliases, Function<String, Field<Object>> columns) {
         Table<?> source = DSL.table(DSL.name(physical(binding.tableName("")))).as(DSL.name("p"));
         for (MetricJoinDsl join : joins) {
@@ -352,16 +356,16 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
     /**
      * 绑定身份独立于值相等性，避免等值参数或方言重排丢失 JDBC 类型。
      */
-    static Field<Object> parameter(Map<String, MetricSqlBinding> parameters, MetricSqlBinding binding) {
+    static Field<Object> parameter(Map<String, MetricJdbcParameterBinding> parameters, MetricJdbcParameterBinding binding) {
         String name = "v" + parameters.size();
         parameters.put(name, binding);
         return DSL.param(name, binding.value());
     }
 
-    private String render(QueryPart part, Map<String, MetricSqlBinding> parameters, List<MetricSqlBinding> ordered) {
+    private String render(QueryPart part, Map<String, MetricJdbcParameterBinding> parameters, List<MetricJdbcParameterBinding> ordered) {
         VisitListener listener = VisitListener.onVisitStart(visit -> {
             if (visit.queryPart() instanceof Param<?> parameter && !parameter.isInline()) {
-                MetricSqlBinding binding = parameters.get(parameter.getParamName());
+                MetricJdbcParameterBinding binding = parameters.get(parameter.getParamName());
                 if (binding == null) {
                     throw new IllegalStateException("SQL renderer introduced an unregistered parameter");
                 }
@@ -508,7 +512,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         return value;
     }
 
-    private static Field<Object> column(MetricJdbcBinding binding, Map<String, String> aliases, String field) {
+    private static Field<Object> column(MetricJdbcMapping binding, Map<String, String> aliases, String field) {
         int separator = field.indexOf('.');
         String reference = separator < 0 ? "" : field.substring(0, separator);
         String alias = aliases.get(reference);

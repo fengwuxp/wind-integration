@@ -19,13 +19,16 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.Date;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
- * 指标 JDBC 值规范化器，将指标查询中的各种输入值转换为数据库字段期望的 Java 类型。
+ * 指标 JDBC 查询值规范化器，校验查询输入并委托宿主编码为 JDBC 参数。
+ *
+ * <p>处理主体、时间、维度和过滤字面量；指标查询结果的值类型转换、聚合和表达式求值由包外能力负责。</p>
  *
  * <h2>核心职责</h2>
  * <ul>
- *   <li>类型转换：将查询条件中的值转换为对应数据库字段的 Java 类型</li>
+ *   <li>类型转换：按字段声明归一查询条件值，枚举名称和实例均保留其输入形式</li>
  *   <li>值校验：验证输入值的格式和范围是否符合字段要求</li>
  *   <li>时区转换：将时间值按配置的时区转换为目标时间类型</li>
  *   <li>编码委托：将规范化后的值委托给宿主 codec 进行 JDBC 编码</li>
@@ -35,25 +38,29 @@ import java.util.UUID;
  * <ul>
  *   <li>主体标识（subject）：字符串、整数、UUID</li>
  *   <li>时间范围（time）：LocalDateTime → 目标时间类型</li>
- *   <li>维度值（dimension）：任意维度字段的值</li>
+ *   <li>维度值（dimension）：与声明字段类型匹配的非空值</li>
  *   <li>过滤字面量（literal）：DSL 中的比较值</li>
  * </ul>
  *
  * <h2>支持的目标类型</h2>
  * <ul>
  *   <li>字符串：String, Character</li>
- *   <li>整数：int, long, BigDecimal</li>
- *   <li>枚举：任意枚举类型</li>
+ *   <li>整数：byte、short、int 及包装类型归一为 Integer，long 及包装类型归一为 Long</li>
+ *   <li>精确十进制：BigDecimal；整数字面量可精确转换为 BigDecimal，不接收 Float 或 Double</li>
+ *   <li>枚举：与声明类型匹配的枚举实例，或通过枚举名称校验的 String</li>
  *   <li>UUID：标准 UUID</li>
  *   <li>布尔：Boolean</li>
  *   <li>时间：LocalDateTime, Instant, OffsetDateTime, ZonedDateTime, Timestamp, Date</li>
  * </ul>
  *
- * <p><b>设计原则：</b>不持有字段声明副本，每次规范化都通过 {@link MetricJdbcBinding} 查询字段元信息。
+ * <p>不持有字段声明副本，每次规范化都通过 {@link MetricJdbcMapping} 读取字段元信息。
+ * 宿主 codec 负责将归一后的输入转换为实际存储值，并校验更窄的物理字段范围。</p>
  *
  * @author wuxp
  */
 final class MetricJdbcValueNormalizer {
+
+    private static final Pattern INTEGER_SUBJECT_PATTERN = Pattern.compile("0|[1-9]\\d*");
 
     private final ZoneId timeZone;
 
@@ -61,7 +68,7 @@ final class MetricJdbcValueNormalizer {
         this.timeZone = timeZone;
     }
 
-    MetricSqlBinding subject(MetricJdbcBinding binding, String field, String value) {
+    MetricJdbcParameterBinding subject(MetricJdbcMapping binding, String field, String value) {
         String path = "/subjectId";
         Class<?> type = binding.javaType(field);
         Object normalized;
@@ -73,7 +80,7 @@ final class MetricJdbcValueNormalizer {
         } else if (type == UUID.class) {
             normalized = uuid(value, path);
         } else if (isInt32(type) || isInt64(type)) {
-            if (!value.matches("0|[1-9][0-9]*")) {
+            if (!INTEGER_SUBJECT_PATTERN.matcher(value).matches()) {
                 throw invalid(path, "Subject integer is not canonical");
             }
             normalized = integer(type, new BigInteger(value), path);
@@ -83,7 +90,7 @@ final class MetricJdbcValueNormalizer {
         return encode(binding, field, normalized, path);
     }
 
-    MetricSqlBinding time(MetricJdbcBinding binding, String field, LocalDateTime value) {
+    MetricJdbcParameterBinding time(MetricJdbcMapping binding, String field, LocalDateTime value) {
         return encode(
                 binding,
                 field,
@@ -91,7 +98,7 @@ final class MetricJdbcValueNormalizer {
                 "/metric/time/field");
     }
 
-    MetricSqlBinding dimension(MetricJdbcBinding binding, String field, Object value) {
+    MetricJdbcParameterBinding dimension(MetricJdbcMapping binding, String field, Object value) {
         String path = "/dimensionValues/" + escape(field);
         if (value == null) {
             throw invalid(path, "Dimension value must not be null");
@@ -99,7 +106,7 @@ final class MetricJdbcValueNormalizer {
         return encode(binding, field, normalize(binding.javaType(field), value, path), path);
     }
 
-    MetricSqlBinding literal(MetricJdbcBinding binding, String field, MetricLiteralDsl literal) {
+    MetricJdbcParameterBinding literal(MetricJdbcMapping binding, String field, MetricLiteralDsl literal) {
         String path = "/metric/filter";
         Class<?> type = binding.javaType(field);
         Object normalized =
@@ -251,10 +258,10 @@ final class MetricJdbcValueNormalizer {
         throw invalid("/metric/time/field", "Unsupported temporal Java type");
     }
 
-    private static MetricSqlBinding encode(
-            MetricJdbcBinding binding, String field, Object value, String path) {
+    private static MetricJdbcParameterBinding encode(
+            MetricJdbcMapping binding, String field, Object value, String path) {
         try {
-            return new MetricSqlBinding(binding.toJdbcValue(field, value), binding.jdbcType(field));
+            return new MetricJdbcParameterBinding(binding.toJdbcValue(field, value), binding.jdbcType(field));
         } catch (IllegalArgumentException | ArithmeticException exception) {
             throw new MetricValidationException(
                     MetricErrorCode.QUERY_INVALID,

@@ -23,7 +23,9 @@ import java.util.Objects;
  *
  * <p>与 {@link MetricJdbcSqlCompiler}（DSL 模式产出参数化 SQL 与有序绑定）不同，本渲染器按
  * 内部配置信任模型使用 Freemarker {@code ${...}} 直接插值：查询值以字面量进入 SQL 文本，不产生
- * 参数绑定。字符串字面量的引号与转义由模板作者负责，模板与取值均为受信内部配置。</p>
+ * 参数绑定。模板来自已通过宿主校验的受信配置，取值来自本次 {@link MetricQuery}；
+ * 调用方必须约束运行时输入，字符串字面量的引号与转义由模板作者负责。模板校验本身
+ * 不提供运行时值的转义；需要安全绑定外部查询值时应使用参数化 SQL 能力。</p>
  *
  * <p>模板可引用以下数据模型变量：</p>
  * <ul>
@@ -40,7 +42,7 @@ import java.util.Objects;
  *
  * @author wuxp
  */
-public final class FreemarkerSqlTemplateRenderer implements MetricQuerySqlRender {
+public final class FreemarkerSqlTemplateRenderer implements MetricSqlGenerator {
 
     private static final DateTimeFormatter SQL_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -54,7 +56,7 @@ public final class FreemarkerSqlTemplateRenderer implements MetricQuerySqlRender
     }
 
     /**
-     * 实现 {@link MetricQuerySqlRender}，按 SQL 模板模式渲染查询。
+     * 实现 {@link MetricSqlGenerator}，按 SQL 模板模式生成查询。
      *
      * @param definition 必须是 {@link MetricSqlDefinition}
      * @param query 查询条件
@@ -62,7 +64,7 @@ public final class FreemarkerSqlTemplateRenderer implements MetricQuerySqlRender
      * @throws IllegalArgumentException 定义不是 SQL 形态或模板渲染失败
      */
     @Override
-    public MetricSqlDescriptor render(MetricDefinitionObject definition, MetricQuery query) {
+    public MetricSqlDescriptor generate(MetricDefinitionObject definition, MetricQuery query) {
         if (!(definition instanceof MetricSqlDefinition sql)) {
             throw new IllegalArgumentException("SQL renderer requires a MetricSqlDefinition, but was "
                     + definition.getClass().getSimpleName());

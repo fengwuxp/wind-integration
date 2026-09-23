@@ -52,7 +52,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * 以 {@code docs/metrics/legacy-sit-2026-09-16/SCENARIOS.md} 的真实指标为输入，
  * 验证 {@link MetricJdbcSqlCompiler} 对复杂场景的当前覆盖边界。
  *
- * <p>用例直接将 {@link MetricDSLDefinition} 交给编译器，与夹具提供的冻结 {@link MetricJdbcBinding}、
+ * <p>用例直接将 {@link MetricDSLDefinition} 交给编译器，与夹具提供的冻结 {@link MetricJdbcMapping}、
  * {@link MetricQuery} 一起产出参数化 SQL，断言文本、有序绑定及拒绝边界；不连接数据库，
  * 也不验证定义版本服务。以下为 DSL 模式相对 18 组场景的可表达性，
  * 其余未列出者需 SQL 模式或业务事实适配：</p>
@@ -287,7 +287,7 @@ class MetricJdbcSqlCompilerScenarioTests {
                 .time(new MetricTimeDsl("gmt_create"))
                 .build();
         MetricJdbcSqlCompiler compiler = compiler();
-        MetricJdbcBinding binding = binding(
+        MetricJdbcMapping binding = binding(
                 table("", "t_vcc"),
                 column("vcc_id", "vcc_id", String.class, Types.VARCHAR),
                 column("gmt_create", "gmt_create", Instant.class, Types.TIMESTAMP));
@@ -349,7 +349,7 @@ class MetricJdbcSqlCompilerScenarioTests {
         return new IntegralMetricLiteralDsl(BigInteger.valueOf(value));
     }
 
-    private static MetricJdbcBinding binding(Object... parts) {
+    private static MetricJdbcMapping binding(Object... parts) {
         Binding binding = new Binding();
         for (int i = 0; i < parts.length; i++) {
             Object part = parts[i];
@@ -376,7 +376,7 @@ class MetricJdbcSqlCompilerScenarioTests {
         assertEquals(path, error.fieldPath());
     }
 
-    private static void assertBindings(List<MetricSqlBinding> actual, Object... expected) {
+    private static void assertBindings(List<MetricJdbcParameterBinding> actual, Object... expected) {
         assertEquals(expected.length / 2, actual.size(), "binding count");
         for (int i = 0; i < actual.size(); i++) {
             assertEquals(expected[i * 2], actual.get(i).value(), "binding[" + i + "] value");
@@ -412,8 +412,8 @@ class MetricJdbcSqlCompilerScenarioTests {
             return this;
         }
 
-        MetricJdbcBinding build() {
-            return new MetricJdbcBinding() {
+        MetricJdbcMapping build() {
+            return new MetricJdbcMapping() {
                 @Override
                 public String tableName(String factReference) {
                     return tables.get(factReference);

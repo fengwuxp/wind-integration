@@ -7,7 +7,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>它把 DSL 的逻辑引用转换为受控的表、列、Java 类型、JDBC 类型和字段 codec。Wind 编译器
  * 只消费本端口，不发现实体、不查询 Registry、不读取数据库元数据，也不选择指标 revision。
- * 实现应按 {@code (metricCode, revision)} 与编译器绑定，并在一次查询期间保持映射和 codec 一致。
+ * 实例对应本次已选定定义的物理校验结果，并在一次查询期间保持映射和 codec 一致。
  * 字段引用使用 DSL 名称，例如 {@code amount}、{@code customer.region}。</p>
  *
  * <h2>责任与不变量</h2>
@@ -19,13 +19,17 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  *
  * <h2>使用流程</h2>
- * <p>宿主先完成定义、字段、权限和 codec 校验，再创建本端口并注册到
- * {@link MetricJdbcSqlCompiler}；编译器随后按主体、时间、维度、measure filter 和 literal
- * 逐次读取本端口，生成 {@link MetricSqlDescriptor}。本端口不负责执行该描述，也不负责读取结果。</p>
+ * <p>宿主先完成定义、字段、权限和 codec 校验，再将本次冻结的映射直接传给
+ * {@link MetricJdbcSqlCompiler#compile}。编译器按主体、时间、维度、measure filter 和 literal
+ * 读取映射，生成 {@link MetricSqlDescriptor}。这条路径不依赖预先注册，也不修改编译器的映射缓存。</p>
+ *
+ * <p>只有使用 {@link MetricJdbcSqlCompiler#generate} 时，才需要先通过
+ * {@link MetricJdbcSqlCompiler#registerBinding} 注册对应定义修订的映射。本端口不管理注册生命周期，
+ * 不执行 SQL，也不负责读取结果；一个占位符的值和 JDBC 类型由 {@link MetricJdbcParameterBinding} 承载。</p>
  *
  * @author wuxp
  */
-public interface MetricJdbcBinding {
+public interface MetricJdbcMapping {
 
     /**
      * 返回裸物理表名。主事实源使用空字符串，关联事实源使用 {@link com.wind.integration.metrics.dsl.definition.MetricJoinDsl#alias()}
@@ -65,11 +69,12 @@ public interface MetricJdbcBinding {
     int jdbcType(String fieldReference);
 
     /**
-     * 将已归一的 Java 逻辑值编码为实际 JDBC 值；每个字段参数调用一次。
+     * 将已归一的查询条件值编码为实际 JDBC 值；每个字段参数调用一次。
      *
      * <p>枚举存储代码、自定义字段编码归宿主；回调不执行 IO。实现应固定使用本次映射的 codec，
-     * 不再次解释主体文本或时间窗，不返回共享的可变业务容器。返回 {@code null} 时，
-     * {@link #jdbcType(String)} 仍决定绑定类型。
+     * 枚举输入可能是对应枚举实例或已校验的枚举名称，整型输入按 Integer 或 Long 归一；
+     * codec 根据字段实际存储类型完成编码及范围校验。不再次解释主体文本或时间窗，
+     * 不返回共享的可变业务容器。返回 {@code null} 时，{@link #jdbcType(String)} 仍决定绑定类型。</p>
      *
      * @param fieldReference DSL 逻辑字段引用
      * @param normalizedValue 按字段 Java 类型和编译器时区归一后的逻辑值

@@ -516,7 +516,7 @@ class MetricJdbcSqlCompilerTests {
     void testCompileRejectsDimensionKeyMismatch() {
         MetricDSLDefinition definition = definition().dimensions(List.of("region")).build();
         MetricJdbcSqlCompiler compiler = compiler();
-        MetricJdbcBinding binding = binding();
+        MetricJdbcMapping binding = binding();
 
         assertValidation(MetricErrorCode.QUERY_INVALID, "/dimensionValues",
                 () -> compiler.compile(definition, query(), binding));
@@ -635,7 +635,7 @@ class MetricJdbcSqlCompilerTests {
     @Test
     void testRenderValidatedFilterComparison() {
         MetricJdbcSqlCompiler compiler = compiler();
-        List<MetricSqlBinding> bindings = new ArrayList<>();
+        List<MetricJdbcParameterBinding> bindings = new ArrayList<>();
         MetricFilterDsl filter = new ComparisonMetricFilterDsl(MetricFilterOperator.EQ, "status",
                 new StringMetricLiteralDsl("APPROVED"));
 
@@ -654,7 +654,7 @@ class MetricJdbcSqlCompilerTests {
     @Test
     void testRenderValidatedFilterSetMembership() {
         MetricJdbcSqlCompiler compiler = compiler();
-        List<MetricSqlBinding> bindings = new ArrayList<>();
+        List<MetricJdbcParameterBinding> bindings = new ArrayList<>();
         MetricFilterDsl filter = new SetMetricFilterDsl(MetricFilterOperator.IN, "status",
                 List.of(new StringMetricLiteralDsl("APPROVED"), new StringMetricLiteralDsl("PENDING")));
 
@@ -675,7 +675,7 @@ class MetricJdbcSqlCompilerTests {
     @Test
     void testRenderValidatedFilterNullPredicate() {
         MetricJdbcSqlCompiler compiler = compiler();
-        List<MetricSqlBinding> bindings = new ArrayList<>();
+        List<MetricJdbcParameterBinding> bindings = new ArrayList<>();
         MetricFilterDsl filter = new NullMetricFilterDsl(MetricFilterOperator.IS_NULL, "status");
 
         String sql = compiler.renderValidatedFilter(binding(), filter, bindings, field -> "p." + field);
@@ -693,7 +693,7 @@ class MetricJdbcSqlCompilerTests {
     @Test
     void testRenderValidatedFilterLogicalCombination() {
         MetricJdbcSqlCompiler compiler = compiler();
-        List<MetricSqlBinding> bindings = new ArrayList<>();
+        List<MetricJdbcParameterBinding> bindings = new ArrayList<>();
         MetricFilterDsl filter = new LogicalMetricFilterDsl(MetricFilterOperator.AND, List.of(
                 new ComparisonMetricFilterDsl(MetricFilterOperator.EQ, "status",
                         new StringMetricLiteralDsl("APPROVED")),
@@ -715,7 +715,7 @@ class MetricJdbcSqlCompilerTests {
     void testRenderValidatedFilterRejectsNullArguments() {
         MetricJdbcSqlCompiler compiler = compiler();
         MetricFilterDsl filter = new NullMetricFilterDsl(MetricFilterOperator.IS_NULL, "status");
-        List<MetricSqlBinding> bindings = new ArrayList<>();
+        List<MetricJdbcParameterBinding> bindings = new ArrayList<>();
 
         assertThrows(NullPointerException.class,
                 () -> compiler.renderValidatedFilter(null, filter, bindings, field -> "p." + field));
@@ -771,7 +771,7 @@ class MetricJdbcSqlCompilerTests {
                 List.of(new MetricJoinOnDsl("customer_id", "id")));
     }
 
-    private static MetricJdbcBinding binding() {
+    private static MetricJdbcMapping binding() {
         return new Binding()
                 .table("", "order_fact")
                 .column("created_at", "created_at").javaType("created_at", Instant.class)
@@ -789,7 +789,7 @@ class MetricJdbcSqlCompilerTests {
                 .build();
     }
 
-    private static MetricJdbcBinding joinBinding() {
+    private static MetricJdbcMapping joinBinding() {
         return new Binding()
                 .table("", "order_fact")
                 .column("created_at", "created_at").javaType("created_at", Instant.class)
@@ -806,7 +806,7 @@ class MetricJdbcSqlCompilerTests {
         assertEquals(path, error.fieldPath());
     }
 
-    private static void assertBindings(List<MetricSqlBinding> actual, Object... expected) {
+    private static void assertBindings(List<MetricJdbcParameterBinding> actual, Object... expected) {
         assertEquals(expected.length / 2, actual.size(), "binding count");
         for (int i = 0; i < actual.size(); i++) {
             assertEquals(expected[i * 2], actual.get(i).value(), "binding[" + i + "] value");
@@ -892,7 +892,7 @@ class MetricJdbcSqlCompilerTests {
     }
 
     /**
-     * 构建 {@link MetricJdbcBinding} 内存版测试替身的构建器，按字段引用返回冻结的物理映射。
+     * 构建 {@link MetricJdbcMapping} 内存版测试替身的构建器，按字段引用返回冻结的物理映射。
      */
     private static final class Binding {
 
@@ -924,8 +924,8 @@ class MetricJdbcSqlCompilerTests {
             return this;
         }
 
-        MetricJdbcBinding build() {
-            return new MetricJdbcBinding() {
+        MetricJdbcMapping build() {
+            return new MetricJdbcMapping() {
                 @Override
                 public String tableName(String factReference) {
                     return tables.get(factReference);

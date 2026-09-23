@@ -44,7 +44,7 @@ import java.util.regex.Pattern;
  * 将指标 SpEL 编译为受控 AST，并提取本地 measure 或跨指标依赖。
  *
  * <p>本类只做静态编译和结构校验：不加载指标、不选择 revision、不访问数据库，也不执行求值。
- * {@link CompiledMetricExpression} 承接已经编译的句柄，宿主提供值后再求值。</p>
+ * {@link MetricExpression} 承接已经编译的句柄，宿主提供值后再求值。</p>
  *
  * @author wuxp
  * @since 2026-07-23
@@ -62,38 +62,33 @@ public final class MetricExpressionCompiler {
     /** 单个指标表达式允许的最大 AST 深度。 */
     static final int MAX_AST_DEPTH = 32;
 
+    private static final int MAX_METRIC_CODE_LENGTH = 100;
+
+    private static final int MAX_VALUE_FIELD_LENGTH = 64;
+
     private static final SpelExpressionParser PARSER = new SpelExpressionParser();
 
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z][A-Za-z0-9_]*");
 
     /**
-     * 编译事实指标中的本地表达式。
+     * 编译一条受限指标表达式，按所属定义的 measure 字段确定可引用范围。
+     *
+     * <p>调用方传入定义中所有 measure 字段名，无需选择事实或派生编译入口。集合非空时，
+     * 表达式只可引用其中的字段，也允许常量；集合为空时，只可通过
+     * {@code metric('CODE', 'FIELD')} 引用其他指标，且至少包含一个静态指标引用。
+     * 该规则以合法事实定义至少包含一个 measure 为前提，不从表达式文本猜测指标类别。</p>
+     *
+     * <p>跨指标引用不携带 revision；精确版本由所属定义的 dependencies 声明，宿主按该声明
+     * 准备依赖结果。编译器只提取和校验引用，不选择版本或加载数据。</p>
      *
      * @param definition 表达式定义
-     * @param measureValueFields 可引用的本指标 measure 字段
+     * @param measureValueFields 当前定义允许引用的本地 measure 字段；传空集合表示派生表达式作用域
      * @param path 表达式字段路径
-     * @return 已校验表达式
+     * @return 已校验表达式及其本地字段/跨指标引用信息
+     * @throws MetricValidationException 语法、作用域、类型、深度或安全边界不合法
      */
-    public CompiledMetricExpression compileFact(MetricExpressionDsl definition, Set<String> measureValueFields, String path) {
-        return compile(definition, measureValueFields, path, ExpressionMode.FACT);
-    }
-
-    /**
-     * 编译只引用其他指标结果的派生表达式。
-     *
-     * @param definition 表达式定义
-     * @param path 表达式字段路径
-     * @return 已校验表达式及确定性依赖集合
-     */
-    public CompiledMetricExpression compileDerived(MetricExpressionDsl definition, String path) {
-        return compile(definition, Set.of(), path, ExpressionMode.DERIVED);
-    }
-
-    private static CompiledMetricExpression compile(
-            MetricExpressionDsl definition,
-            Set<String> measureValueFields,
-            String path,
-            ExpressionMode mode) {
+    public MetricExpression compile(MetricExpressionDsl definition, Set<String> measureValueFields, String path) {
+        ExpressionMode mode = measureValueFields.isEmpty() ? ExpressionMode.DERIVED : ExpressionMode.FACT;
         if (definition.type() != MetricExpressionType.SPEL) {
             throw invalid(path + "/type", "Only SPEL expression is supported");
         }
@@ -124,14 +119,13 @@ public final class MetricExpressionCompiler {
                         1,
                         mode);
         if (mode == ExpressionMode.DERIVED && metricValueReferences.isEmpty()) {
-            throw invalid(
-                    path + "/value", "Derived expression must reference at least one metric value");
+            throw invalid(path + "/value", "Derived expression must reference at least one metric value");
         }
         if (!isNumericResult(root)) {
             throw invalid(path + "/value", "Metric expression result must be numeric or null");
         }
         validateIntegralArithmetic(root, path + "/value");
-        return new CompiledMetricExpression(expression, references, metricValueReferences, ratio);
+        return new MetricExpression(expression, references, metricValueReferences, ratio);
     }
 
     private static boolean validate(
@@ -154,13 +148,13 @@ public final class MetricExpressionCompiler {
             return false;
         }
         if (node instanceof MethodReference method) {
-            if ("metric".equals(method.getName())) {
+            if (MetricExpressionRoot.METRIC_FUNCTION.equals(method.getName())) {
                 validateMetricReference(method, metricValueReferences, path, mode);
                 return false;
             }
             if (!terminal
                     || method.isNullSafe()
-                    || !"ratio".equals(method.getName())
+                    || !MetricExpressionRoot.RATIO_FUNCTION.equals(method.getName())
                     || method.getChildCount() != 2) {
                 throw invalid(path, "Only terminal ratio(numerator, denominator) is supported");
             }
@@ -213,7 +207,7 @@ public final class MetricExpressionCompiler {
         }
         String metricCode = (String) metricCodeLiteral.getLiteralValue().getValue();
         String valueField = (String) valueFieldLiteral.getLiteralValue().getValue();
-        if (!isIdentifier(metricCode, 100) || !isIdentifier(valueField, 64)) {
+        if (!isIdentifier(metricCode, MAX_METRIC_CODE_LENGTH) || !isIdentifier(valueField, MAX_VALUE_FIELD_LENGTH)) {
             throw invalid(path, "metric arguments must use valid non-empty identifiers");
         }
         references.add(new MetricValueReference(metricCode, valueField));

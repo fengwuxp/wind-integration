@@ -61,7 +61,7 @@ class MetricDefinitionObjectTests {
 
         MetricDefinitionObject contract = definition;
         Assertions.assertEquals(MetricDerivationType.RAW, contract.derivationType());
-        var compiled = compiler.compileFact(doubled.expression(), Set.of("count"), VALUE_PATH);
+        var compiled = compiler.compile(doubled.expression(), Set.of("count"), VALUE_PATH);
         Assertions.assertEquals(Map.of("count", 3L, "doubled", 6L),
                 calculator.calculate(definition, Map.of("count", 3L),
                         (field, measures) -> compiled.evaluate(doubled, measures, Map.of(), VALUE_PATH)));
@@ -79,7 +79,7 @@ class MetricDefinitionObjectTests {
                 derivedDefinition("metric('BASE', 'value') * 2"), MetricDSLDefinition.class);
         MetricDefinitionObject contract = definition;
         Assertions.assertEquals(MetricDerivationType.DERIVED, contract.derivationType());
-        var compiled = compiler.compileDerived(definition.value().expression(), VALUE_PATH);
+        var compiled = compiler.compile(definition.value().expression(), Set.of(), VALUE_PATH);
         MetricValueReference dependency = new MetricValueReference("BASE", "value");
 
         Assertions.assertEquals(Set.of(dependency), compiled.metricValueReferences());

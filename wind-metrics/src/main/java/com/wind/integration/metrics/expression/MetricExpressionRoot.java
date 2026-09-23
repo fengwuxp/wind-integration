@@ -8,7 +8,10 @@ import java.math.RoundingMode;
 import java.util.Map;
 
 /**
- * 一次表达式求值的只读输入。
+ * 一次指标表达式求值的根对象，提供本地数值以及 metric、ratio 函数。
+ *
+ * <p>由编译句柄为每次求值创建，只接收已筛选的引用值和本次精度。Spring 的求值上下文
+ * 负责限制访问，本对象负责读取预备值和数值运算；不持有查询服务或数据加载回调。</p>
  *
  * @param scale         当前结果精度
  * @param roundingMode  当前舍入方式
@@ -17,11 +20,15 @@ import java.util.Map;
  * @author wuxp
  * @since 2026-07-23
  */
-record ExpressionEvaluationContext(
+record MetricExpressionRoot(
         @Nullable Integer scale,
         @Nullable RoundingMode roundingMode,
         Map<String, ?> measureValues,
         Map<MetricValueReference, ?> metricValues) {
+
+    static final String METRIC_FUNCTION = "metric";
+
+    static final String RATIO_FUNCTION = "ratio";
 
     /**
      * 读取宿主已经准备好的跨指标结果。

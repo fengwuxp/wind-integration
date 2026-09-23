@@ -37,9 +37,9 @@ import java.util.TreeSet;
  * {@code ratio(metric('APPROVED_COUNT', 'value'), metric('TOTAL_COUNT', 'value'))}，
  * 更高层指标可以继续引用该二级指标。</p>
  *
- * <p>{@link com.wind.integration.metrics.expression.MetricExpressionCompiler#compileDerived}
+ * <p>{@link com.wind.integration.metrics.expression.MetricExpressionCompiler#compile}
  * 从表达式提取直接引用，结果由
- * {@link com.wind.integration.metrics.expression.CompiledMetricExpression#metricValueReferences()}
+ * {@link com.wind.integration.metrics.expression.MetricExpression#metricValueReferences()}
  * 提供。{@code dependencies} 只保存每个直接引用编码的精确版本，其编码集合必须与
  * 表达式完全一致；字段仍由表达式决定，同编码多字段共用一个版本。宿主负责确认已发布目标、
  * 冻结选择、展开传递闭包、校验环和深度，以及执行与物化能力检查；不追随最新版本。</p>
@@ -165,7 +165,7 @@ public record MetricDSLDefinition(
                 throw new MetricValidationException(MetricErrorCode.DSL_VALUE_BRANCH_INVALID, fieldPath,
                         "DERIVED values require an expression and must not contain a measure");
             }
-            compiler.compileDerived(definition.expression(), fieldPath + "/expression")
+            compiler.compile(definition.expression(), Set.of(), fieldPath + "/expression")
                     .metricValueReferences().forEach(reference -> referencedCodes.add(reference.metricCode()));
         });
         if (!selectedCodes.equals(referencedCodes)) {

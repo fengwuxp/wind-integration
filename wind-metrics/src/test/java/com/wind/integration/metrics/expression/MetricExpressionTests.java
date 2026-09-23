@@ -1,4 +1,4 @@
-package com.wind.integration.metrics.dsl.expression;
+package com.wind.integration.metrics.expression;
 
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.dsl.MetricValueCalculator;
@@ -10,9 +10,6 @@ import com.wind.integration.metrics.enums.MetricExpressionType;
 import com.wind.integration.metrics.enums.MetricOrElseMode;
 import com.wind.integration.metrics.enums.MetricValueType;
 
-import com.wind.integration.metrics.expression.CompiledMetricExpression;
-import com.wind.integration.metrics.expression.MetricExpressionCompiler;
-import com.wind.integration.metrics.expression.MetricValueReference;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.expression.spel.standard.SpelExpression;
@@ -47,7 +44,8 @@ class MetricExpressionTests {
     @Test
     void testLocalExpressionReturnsExactRawResultBeforeFinalNormalization() {
         MetricValueDsl value = value("count * 2", MetricValueType.LONG, null);
-        CompiledMetricExpression compiled = fact(value, Set.of("count"));
+        MetricExpression compiled = fact(value, Set.of("count"));
+        Assertions.assertFalse(compiled.usesRatio());
         Number raw = compiled.evaluate(value, Map.of("count", 7L), Map.of(), VALUE_PATH);
         Assertions.assertEquals(new BigDecimal("14"), raw);
         Assertions.assertEquals(14L, new MetricValueCalculator().normalize(value, raw, VALUE_PATH));
@@ -62,7 +60,7 @@ class MetricExpressionTests {
     @Test
     void testCompiledHandleDoesNotReusePreviousRequestValues() {
         MetricValueDsl value = value("count * 2", MetricValueType.LONG, null);
-        CompiledMetricExpression compiled = fact(value, Set.of("count"));
+        MetricExpression compiled = fact(value, Set.of("count"));
         IntStream.range(0, 100)
                 .parallel()
                 .forEach(
@@ -87,8 +85,8 @@ class MetricExpressionTests {
         String source = "ratio(metric('PAYMENT', 'approved'), metric('PAYMENT', 'total'))";
         MetricValueDsl four = value(source, MetricValueType.DECIMAL, 4);
         MetricValueDsl six = value(source, MetricValueType.DECIMAL, 6);
-        CompiledMetricExpression compiled =
-                compiler.compileDerived(four.expression(), VALUE_PATH + "/expression");
+        MetricExpression compiled =
+                compiler.compile(four.expression(), Set.of(), VALUE_PATH + "/expression");
         MetricValueReference approved = new MetricValueReference("PAYMENT", "approved");
         MetricValueReference total = new MetricValueReference("PAYMENT", "total");
         IntStream.range(0, 100)
@@ -117,8 +115,8 @@ class MetricExpressionTests {
     @Test
     void testRatioPrecisionAtFourAndSixPlaces() {
         MetricValueDsl four = value("ratio(approvedCount, totalCount)", MetricValueType.DECIMAL, 4);
-        CompiledMetricExpression compiled = fact(four, Set.of("approvedCount", "totalCount"));
-        Assertions.assertTrue(compiled.ratio());
+        MetricExpression compiled = fact(four, Set.of("approvedCount", "totalCount"));
+        Assertions.assertTrue(compiled.usesRatio());
         for (List<Number> input :
                 List.<List<Number>>of(
                         List.of(1L, 3L, new BigDecimal("0.3333")),
@@ -298,7 +296,7 @@ class MetricExpressionTests {
         Assertions.assertThrows(
                 MetricValidationException.class,
                 () ->
-                        compiler.compileDerived(derived.expression(), VALUE_PATH + "/expression")
+                        compiler.compile(derived.expression(), Set.of(), VALUE_PATH + "/expression")
                                 .evaluate(
                                         derived,
                                         Map.of(),
@@ -319,8 +317,8 @@ class MetricExpressionTests {
                         "metric('B', 'value') + metric('A', 'amount') + metric('B', 'value')",
                         MetricValueType.LONG,
                         null);
-        CompiledMetricExpression compiled =
-                compiler.compileDerived(value.expression(), VALUE_PATH + "/expression");
+        MetricExpression compiled =
+                compiler.compile(value.expression(), Set.of(), VALUE_PATH + "/expression");
         Assertions.assertEquals(
                 List.of(
                         new MetricValueReference("A", "amount"),
@@ -356,8 +354,8 @@ class MetricExpressionTests {
                         "ratio(metric('SUMMARY', 'approved'), metric('SUMMARY', 'total'))",
                         MetricValueType.DECIMAL,
                         6);
-        CompiledMetricExpression compiled =
-                compiler.compileDerived(value.expression(), VALUE_PATH + "/expression");
+        MetricExpression compiled =
+                compiler.compile(value.expression(), Set.of(), VALUE_PATH + "/expression");
         Assertions.assertEquals(
                 new BigDecimal("0.333333"),
                 compiled.evaluate(
@@ -372,7 +370,7 @@ class MetricExpressionTests {
     /**
      * 场景：派生定义必须包含静态可识别的指标引用。
      * 输入：动态拼接 code/field、空名称、纯常量及本地变量表达式。
-     * 流程：调用 compileDerived。
+     * 流程：调用统一 compile 并传入空的本地 measure 集合。
      * 预期：均拒绝，不能生成动态或无依赖的派生句柄。
      */
     @Test
@@ -388,10 +386,16 @@ class MetricExpressionTests {
             Assertions.assertThrows(
                     MetricValidationException.class,
                     () ->
-                            compiler.compileDerived(
+                            compiler.compile(
                                     value(source, MetricValueType.LONG, null).expression(),
+                                    Set.of(),
                                     VALUE_PATH + "/expression"));
         }
+        Assertions.assertThrows(
+                MetricValidationException.class,
+                () -> compiler.compile(
+                        value("metric('COUNT', 'value') + count", MetricValueType.LONG, null).expression(),
+                        Set.of("count"), VALUE_PATH + "/expression"));
     }
 
     /**
@@ -404,7 +408,7 @@ class MetricExpressionTests {
     void testNormalNullDiffersFromMissingMeasureOrDependency() {
         MetricValueDsl local =
                 value("count == null ? null : count * 2", MetricValueType.LONG, null);
-        CompiledMetricExpression compiled = fact(local, Set.of("count"));
+        MetricExpression compiled = fact(local, Set.of("count"));
         Assertions.assertNull(
                 compiled.evaluate(
                         local, Collections.singletonMap("count", null), Map.of(), VALUE_PATH));
@@ -412,8 +416,8 @@ class MetricExpressionTests {
                 MetricValidationException.class,
                 () -> compiled.evaluate(local, Map.of(), Map.of(), VALUE_PATH));
         MetricValueDsl derived = value("metric('COUNT', 'value') ?: 0", MetricValueType.LONG, null);
-        CompiledMetricExpression dependency =
-                compiler.compileDerived(derived.expression(), VALUE_PATH + "/expression");
+        MetricExpression dependency =
+                compiler.compile(derived.expression(), Set.of(), VALUE_PATH + "/expression");
         Assertions.assertEquals(
                 0,
                 dependency.evaluate(
@@ -437,7 +441,7 @@ class MetricExpressionTests {
         MetricValueDsl first = value("count * 2", MetricValueType.LONG, null);
         MetricValueDsl second = value("( count  *  2 )", MetricValueType.LONG, null);
         MetricValueDsl different = value("count * 3", MetricValueType.LONG, null);
-        CompiledMetricExpression compiled = fact(first, Set.of("count"));
+        MetricExpression compiled = fact(first, Set.of("count"));
         Assertions.assertEquals(
                 compiled.canonicalAst(), fact(second, Set.of("count")).canonicalAst());
         Assertions.assertNotEquals(
@@ -462,8 +466,8 @@ class MetricExpressionTests {
                         "count > 0",
                         "T(java.lang.String)",
                         "new java.lang.String()")) {
-            CompiledMetricExpression bypassed =
-                    new CompiledMetricExpression(parse(source), Set.of("count"), Set.of(), false);
+            MetricExpression bypassed =
+                    new MetricExpression(parse(source), Set.of("count"), Set.of(), false);
             MetricValidationException exception =
                     Assertions.assertThrows(
                             MetricValidationException.class,
@@ -486,8 +490,8 @@ class MetricExpressionTests {
         MetricValueDsl value = value("metric('DECLARED', 'value')", MetricValueType.LONG, null);
         MetricValueReference declared = new MetricValueReference("DECLARED", "value");
         MetricValueReference undeclared = new MetricValueReference("OTHER", "value");
-        CompiledMetricExpression bypassed =
-                new CompiledMetricExpression(
+        MetricExpression bypassed =
+                new MetricExpression(
                         parse("metric('OTHER', 'value')"), Set.of(), Set.of(declared), false);
         Assertions.assertThrows(
                 MetricValidationException.class,
@@ -505,8 +509,8 @@ class MetricExpressionTests {
     @Test
     void testRuntimeCannotReadOutsideValidatedLocalFields() {
         MetricValueDsl value = value("count * 2", MetricValueType.LONG, null);
-        CompiledMetricExpression bypassed =
-                new CompiledMetricExpression(parse("extra + 1"), Set.of("count"), Set.of(), false);
+        MetricExpression bypassed =
+                new MetricExpression(parse("extra + 1"), Set.of("count"), Set.of(), false);
         Assertions.assertThrows(
                 MetricValidationException.class,
                 () ->
@@ -514,8 +518,8 @@ class MetricExpressionTests {
                                 value, Map.of("count", 1L, "extra", 99L), Map.of(), VALUE_PATH));
     }
 
-    private CompiledMetricExpression fact(MetricValueDsl value, Set<String> fields) {
-        return compiler.compileFact(value.expression(), fields, VALUE_PATH + "/expression");
+    private MetricExpression fact(MetricValueDsl value, Set<String> fields) {
+        return compiler.compile(value.expression(), fields, VALUE_PATH + "/expression");
     }
 
     private static MetricValueDsl value(String expression, MetricValueType type, Integer scale) {

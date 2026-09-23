@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 完整定义规范的独立 JSON 往返与精确版本引用合同。
@@ -81,7 +82,7 @@ class MetricVersionReferenceTests {
         MetricDSLDefinition result = (MetricDSLDefinition) restored.definition();
         Assertions.assertEquals(List.of(new MetricReferenceDsl("APPROVED", 2), new MetricReferenceDsl("TOTAL", 7)),
                 result.dependencies());
-        var expression = new MetricExpressionCompiler().compileDerived(result.value().expression(), "/metric/value/expression");
+        var expression = new MetricExpressionCompiler().compile(result.value().expression(), Set.of(), "/metric/value/expression");
         Assertions.assertEquals(new BigDecimal("0.333333"), expression.evaluate(result.value(), Map.of(),
                 Map.of(new MetricValueReference("APPROVED", "value"), 1L,
                         new MetricValueReference("TOTAL", "value"), 3L), "/metric/value"));

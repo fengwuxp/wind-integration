@@ -10,7 +10,7 @@ import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
 import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
 import com.wind.integration.metrics.dsl.definition.selection.MetricLimitDsl;
 import com.wind.integration.metrics.dsl.definition.selection.MetricRowSelectionDsl;
-import com.wind.integration.metrics.expression.CompiledMetricExpression;
+import com.wind.integration.metrics.expression.MetricExpression;
 import com.wind.integration.metrics.expression.MetricExpressionCompiler;
 import com.wind.integration.metrics.dsl.literal.DecimalMetricLiteralDsl;
 import com.wind.integration.metrics.enums.MetricAggregation;
@@ -556,9 +556,9 @@ class MetricValueCalculatorTests {
                                                 MetricValueType.DECIMAL,
                                                 MetricOrElseMode.NULL),
                                 "average", average));
-        CompiledMetricExpression expression =
+        MetricExpression expression =
                 new MetricExpressionCompiler()
-                        .compileFact(
+                        .compile(
                                 average.expression(),
                                 Set.of("sum", "count"),
                                 "/metric/fields/average/expression");

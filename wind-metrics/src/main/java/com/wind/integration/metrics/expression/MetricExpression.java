@@ -22,13 +22,18 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * 通过指标语法白名单验证的表达式编译句柄。
+ * 可重复求值的指标表达式。
  *
- * <p>只保存 AST 与验证所得引用信息，不复制指标声明。宿主使用原值 DSL 与本次预先计算的值求值； 不接受数据加载函数，不公开 Spring AST 或任意构造入口。
+ * <p>外部调用方通过 {@link MetricExpressionCompiler#compile} 获取本对象。构造器仅包内可见，
+ * AST 和引用信息由编译器校验后共同生成，不允许外部自行拼装未校验的句柄。</p>
+ *
+ * <p>句柄只保存 AST 和引用信息；每次 {@link #evaluate} 创建独立的求值根对象和受限上下文，
+ * 使用本次值与精度。宿主负责预先加载依赖；本对象不保存主体数据、不选择版本、不做最终
+ * 类型归一或 orElse 处理。ratio 函数的除法使用本次值定义中的精度。</p>
  *
  * @author wuxp
  */
-public final class CompiledMetricExpression {
+public final class MetricExpression {
 
     private static final MethodResolver INSTANCE_METHODS =
             DataBindingMethodResolver.forInstanceMethodInvocation();
@@ -41,18 +46,18 @@ public final class CompiledMetricExpression {
 
     private final Set<MetricValueReference> metricValueReferences;
 
-    private final boolean ratio;
+    private final boolean usesRatio;
 
-    public CompiledMetricExpression(
+    MetricExpression(
             SpelExpression expression,
             Set<String> localValueFields,
             Set<MetricValueReference> metricValueReferences,
-            boolean ratio) {
+            boolean usesRatio) {
         this.expression = expression;
         this.localValueFields = Collections.unmodifiableSet(new TreeSet<>(localValueFields));
         this.metricValueReferences =
                 Collections.unmodifiableSet(new TreeSet<>(metricValueReferences));
-        this.ratio = ratio;
+        this.usesRatio = usesRatio;
     }
 
     /**
@@ -78,8 +83,8 @@ public final class CompiledMetricExpression {
      *
      * @return 使用 ratio 时为 true，对应值须声明 DECIMAL 精度
      */
-    public boolean ratio() {
-        return ratio;
+    public boolean usesRatio() {
+        return usesRatio;
     }
 
     /**
@@ -105,8 +110,8 @@ public final class CompiledMetricExpression {
             Map<String, ?> measureValues,
             Map<MetricValueReference, ?> metricValues,
             String path) {
-        ExpressionEvaluationContext contextRoot =
-                new ExpressionEvaluationContext(
+        MetricExpressionRoot root =
+                new MetricExpressionRoot(
                         definition.scale(),
                         definition.roundingMode(),
                         referencedValues(localValueFields, measureValues, path),
@@ -116,17 +121,18 @@ public final class CompiledMetricExpression {
                         .withAssignmentDisabled()
                         .withMethodResolvers(
                                 (evaluationContext, target, name, arguments) ->
-                                        target instanceof ExpressionEvaluationContext
-                                                        && ("ratio".equals(name) || "metric".equals(name))
+                                        target instanceof MetricExpressionRoot
+                                                        && (MetricExpressionRoot.RATIO_FUNCTION.equals(name)
+                                                                || MetricExpressionRoot.METRIC_FUNCTION.equals(name))
                                                 ? INSTANCE_METHODS.resolve(
                                                         evaluationContext, target, name, arguments)
                                                 : null)
-                        .withRootObject(contextRoot)
+                        .withRootObject(root)
                         .build();
         try {
             Object result = expression.getValue(context);
             if (result != null) {
-                ExpressionEvaluationContext.exactDecimal(result);
+                MetricExpressionRoot.exactDecimal(result);
             }
             return (Number) result;
         } catch (EvaluationException | IllegalArgumentException exception) {
@@ -164,12 +170,12 @@ public final class CompiledMetricExpression {
 
         @Override
         public Class<?>[] getSpecificTargetClasses() {
-            return new Class<?>[] {ExpressionEvaluationContext.class};
+            return new Class<?>[] {MetricExpressionRoot.class};
         }
 
         @Override
         public boolean canRead(EvaluationContext context, Object target, String name) {
-            return target instanceof ExpressionEvaluationContext root
+            return target instanceof MetricExpressionRoot root
                     && root.measureValues().containsKey(name);
         }
 
@@ -179,8 +185,8 @@ public final class CompiledMetricExpression {
             if (!canRead(context, target, name)) {
                 throw new AccessException("Metric measure value is not readable");
             }
-            Object value = ((ExpressionEvaluationContext) target).measureValues().get(name);
-            return new TypedValue(value == null ? null : ExpressionEvaluationContext.exactDecimal(value));
+            Object value = ((MetricExpressionRoot) target).measureValues().get(name);
+            return new TypedValue(value == null ? null : MetricExpressionRoot.exactDecimal(value));
         }
 
         @Override

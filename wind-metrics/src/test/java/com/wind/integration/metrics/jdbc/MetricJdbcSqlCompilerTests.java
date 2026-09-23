@@ -159,6 +159,22 @@ class MetricJdbcSqlCompilerTests {
     }
 
     /**
+     * 场景：没有声明维度或参数的全局指标，调用方省略两个可选容器。
+     * 输入：null dimensionValues 与 null parameterValues，完整半开时间窗。
+     * 流程：使用冻结 JDBC mapping 编译 COUNT SQL。
+     * 预期：编译成功，只产生时间绑定；不把缺省容器误判为合同错误。
+     */
+    @Test
+    void testCompileAllowsOmittedOptionalQueryContainers() {
+        MetricQuery query = new MetricQuery(null, START, END, null, null);
+        MetricSqlDescriptor result = compiler().compile(definition().build(), query, binding());
+
+        assertEquals("SELECT count(*) AS `value` FROM `order_fact` AS `p`"
+                + " WHERE (`p`.`created_at` >= ? AND `p`.`created_at` < ?)", result.sql());
+        assertBindings(result.bindings(), START_INSTANT, Types.TIMESTAMP, END_INSTANT, Types.TIMESTAMP);
+    }
+
+    /**
      * 场景：度量条件只影响对应汇总值。
      * 输入：SUM(amount)，条件 amount 大于100，完整窗口。
      * 流程：编译带 measure.filter 的定义。
@@ -386,17 +402,23 @@ class MetricJdbcSqlCompilerTests {
     @Test
     void testCompileRejectsInvalidDimensionAndParameterValues() {
         MetricDSLDefinition global = definition().build();
+        assertDoesNotThrow(() -> compiler().compile(global,
+                new MetricQuery(null, START, END, null, null), binding()));
         assertValidation(MetricErrorCode.QUERY_INVALID, "/dimensionValues",
-                () -> compiler().compile(global, query(null, Map.of()), binding()));
-        assertValidation(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, "/parameterValues",
-                () -> compiler().compile(global, query(Map.of(), null), binding()));
+                () -> compiler().compile(global, query(Map.of("unexpected", "x")), binding()));
+        assertValidation(MetricErrorCode.METRIC_PARAMETER_UNEXPECTED, "/parameterValues/unexpected",
+                () -> compiler().compile(global, query(Map.of(), Map.of("unexpected", 2)), binding()));
         MetricDSLDefinition dimension = definition().dimensions(List.of("region")).build();
+        assertValidation(MetricErrorCode.QUERY_INVALID, "/dimensionValues",
+                () -> compiler().compile(dimension, new MetricQuery(null, START, END, null, Map.of()), binding()));
         for (Object value : Arrays.asList(List.of("CN"), Map.of("code", "CN"), 1.5D, null)) {
             Map<String, Object> dimensions = Collections.singletonMap("region", value);
             assertValidation(MetricErrorCode.QUERY_INVALID, "/dimensionValues/region",
                     () -> compiler().compile(dimension, query(dimensions), binding()));
         }
         MetricDSLDefinition parameter = definition().parameters(Map.of("entryLimit", parameter(1, 10))).build();
+        assertValidation(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, "/parameterValues",
+                () -> compiler().compile(parameter, new MetricQuery(null, START, END, Map.of(), null), binding()));
         for (Object value : Arrays.asList("2", 2L, 2.0D, List.of(2), null)) {
             Map<String, Object> parameters = Collections.singletonMap("entryLimit", value);
             assertValidation(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, "/parameterValues/entryLimit",
@@ -404,6 +426,8 @@ class MetricJdbcSqlCompilerTests {
         }
         for (String name : Arrays.asList(null, " ")) {
             Map<String, Object> parameters = Collections.singletonMap(name, 2);
+            assertValidation(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, "/parameterValues",
+                    () -> compiler().compile(global, query(Map.of(), parameters), binding()));
             assertValidation(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, "/parameterValues",
                     () -> compiler().compile(parameter, query(Map.of(), parameters), binding()));
         }

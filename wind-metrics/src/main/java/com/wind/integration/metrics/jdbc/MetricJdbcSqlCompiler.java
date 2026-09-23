@@ -61,6 +61,8 @@ import java.util.regex.Pattern;
  * 单次编译的其余状态均为局部变量。
  * SQL 生成只返回 {@link MetricSqlDescriptor}，不把 JDBC 执行、结果读取或最终表达式计算混入编译器。
  * 推荐将同次校验得到的映射直接传入 {@link #compile}；只有通过 {@link #generate} 接入时才读取注册缓存。
+ * DSL 未声明维度或参数时，查询可省略对应 Map；声明后才要求容器存在并校验其键集合、类型和值域。
+ * 未声明内容仍拒绝非空额外键，避免宿主误传查询条件后被静默忽略。
  *
  * @author wuxp
  */
@@ -462,8 +464,21 @@ public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
         if (!global && (!(query.subjectId() instanceof String id) || id.isBlank())) {
             throw error(MetricErrorCode.QUERY_INVALID, "/subjectId", "Subject metric requires a non-blank string subjectId");
         }
-        if (query.dimensionValues() == null
-                || !Set.copyOf(definition.dimensions()).equals(query.dimensionValues().keySet())) {
+        validateDimensions(definition.dimensions(), query.dimensionValues());
+    }
+
+    /**
+     * 无声明维度时允许调用方省略容器；一旦声明维度，容器必须存在且键集合必须完全匹配。
+     */
+    private static void validateDimensions(List<String> definitions, Map<String, Object> dimensions) {
+        if (definitions.isEmpty()) {
+            if (dimensions != null && !dimensions.isEmpty()) {
+                throw error(MetricErrorCode.QUERY_INVALID, "/dimensionValues",
+                        "Metric does not declare query dimensions");
+            }
+            return;
+        }
+        if (dimensions == null || !Set.copyOf(definitions).equals(dimensions.keySet())) {
             throw error(MetricErrorCode.QUERY_INVALID, "/dimensionValues",
                     "Dimension keys must exactly match metric definition");
         }
@@ -471,6 +486,9 @@ public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
 
     private static void validateParameters(Map<String, MetricQueryParameterDsl> definitions,
                                            Map<String, Object> parameters) {
+        if (parameters == null && definitions.isEmpty()) {
+            return;
+        }
         if (parameters == null || parameters.keySet().stream().anyMatch(name -> name == null || name.isBlank())) {
             throw error(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, "/parameterValues",
                     "Query parameters must have a container and non-blank names");

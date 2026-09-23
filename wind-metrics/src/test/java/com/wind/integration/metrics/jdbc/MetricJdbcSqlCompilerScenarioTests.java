@@ -253,6 +253,30 @@ class MetricJdbcSqlCompilerScenarioTests {
     }
 
     /**
+     * 场景：真实 SQL 编译场景中的无维度、无参数全局计数。
+     * 输入：省略 MetricQuery 的两个可选 Map，使用冻结事实表和 JDBC 类型映射。
+     * 流程：编译事实 DSL 并检查参数化 SQL。
+     * 预期：只绑定时间窗口，宿主可以直接构造最小查询条件。
+     */
+    @Test
+    void testGlobalCountScenarioAllowsOmittedOptionalQueryContainers() {
+        MetricDSLDefinition definition = definition()
+                .subject(new MetricSubjectDsl("GLOBAL", null))
+                .time(new MetricTimeDsl("gmt_create"))
+                .value(value(measure(MetricAggregation.COUNT, null, null)))
+                .build();
+
+        MetricSqlDescriptor result = compiler().compile(definition,
+                new MetricQuery(null, START, END, null, null), binding(
+                        table("", "t_global_payment_income_detail"),
+                        column("gmt_create", "gmt_create", Instant.class, Types.TIMESTAMP)));
+
+        assertEquals("SELECT count(*) AS `value` FROM `t_global_payment_income_detail` AS `p`"
+                + " WHERE (`p`.`gmt_create` >= ? AND `p`.`gmt_create` < ?)", result.sql());
+        assertBindings(result.bindings(), START_INSTANT, Types.TIMESTAMP, END_INSTANT, Types.TIMESTAMP);
+    }
+
+    /**
      * 场景：S03/S04/S08 类派生公式不由事实 SQL 编译器直接执行。
      * 输入：无 fact 的 ratio 定义，绑定 APPROVED@1 和 TOTAL@2。
      * 流程：将合法派生定义交给事实 compile。

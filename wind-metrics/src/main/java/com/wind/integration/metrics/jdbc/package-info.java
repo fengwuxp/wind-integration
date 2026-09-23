@@ -10,5 +10,10 @@
  * {@code MetricJdbcParameterBinding} 承载一个占位符的实际值和 JDBC 类型。
  * 包内的 {@code MetricJdbcPredicateBuilder} 构造条件对象，{@code MetricJdbcValueNormalizer}
  * 归一查询输入，最终 SQL 文本和参数顺序由编译器生成。</p>
+ *
+ * <p>DSL 查询没有声明维度或参数时，{@code MetricQuery.dimensionValues()} 和
+ * {@code MetricQuery.parameterValues()} 可以为 {@code null}；声明了对应内容时，
+ * 编译器才要求容器存在并校验键集合、类型和值域。未声明内容的非空额外键仍会被拒绝，
+ * 避免宿主误传条件后被静默忽略。</p>
  */
 package com.wind.integration.metrics.jdbc;

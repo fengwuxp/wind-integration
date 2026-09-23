@@ -20,7 +20,7 @@ import com.wind.integration.metrics.spec.MetricDefinitionObject;
  *
  * <h2>使用流程</h2>
  * <p>查询服务确定实际实时区间后调用 renderer，得到 {@link MetricSqlDescriptor}，再交给
- * {@code MetricRuntimeRepository} 或宿主 JDBC 适配器执行。实时查询、分段查询的实时尾段和物化
+ * {@code MetricRealtimeRepository} 或宿主 JDBC 适配器执行。实时查询、分段查询的实时尾段和物化
  * 增量读取可以复用本端口；快照读取、revision 选择、依赖展开和结果合并不属于本端口。</p>
  *
  * <p>SQL 模板插值只适用于宿主已信任和发布校验的模板。面向不可信输入的业务筛选应使用 DSL

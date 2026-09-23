@@ -230,6 +230,26 @@ public record MetricQuery(
         }
 
         /**
+         * 将计划编码写入同名参数，与 parameter、parameters 按调用顺序后写覆盖。
+         *
+         * @param planCode 计划编码；null 作为显式参数值保存
+         * @return this
+         */
+        public Builder planCode(@Nullable String planCode) {
+            return parameter(PLAN_CODE_PARAMETER, planCode);
+        }
+
+        /**
+         * 将计划版本写入同名参数，不增加查询字段或选择默认版本。
+         *
+         * @param planRevision 计划版本；null 作为显式参数值保存，遵循参数后写覆盖规则
+         * @return this
+         */
+        public Builder planRevision(@Nullable Integer planRevision) {
+            return parameter(PLAN_REVISION_PARAMETER, planRevision);
+        }
+
+        /**
          * 设置主体类型。
          *
          * @param subjectType 主体类型

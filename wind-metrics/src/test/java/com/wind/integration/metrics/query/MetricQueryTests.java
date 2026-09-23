@@ -134,16 +134,72 @@ class MetricQueryTests {
     void testSnapshotIdentityUsesExistingParameterValues() {
         Map<String, Object> parameters = Map.of("planCode", "USER_METRICS", "planRevision", 3);
         MetricQuery query = new MetricQuery("user-1", START, END, Map.of(), parameters);
-        MetricQuery built = MetricQuery.builder().subjectId("user-1").timeRange(START, END).parameters(parameters).build();
+        MetricQuery built = MetricQuery.builder().subjectId("user-1").timeRange(START, END).planCode("USER_METRICS").planRevision(3).build();
 
         assertEquals(query, built);
-        String json = WindJson.toJsonString(query);
+        String json = WindJson.toJsonString(built);
         MetricQuery restored = WindJson.parseObject(json, MetricQuery.class);
         assertEquals(parameters, restored.parameterValues());
         assertEquals("USER_METRICS", restored.planCode());
         assertEquals(3, restored.planRevision());
         assertEquals(6, MetricQuery.class.getRecordComponents().length);
         assertEquals(6, WindJson.getJsonMapper().readValue(json, Map.class).size());
+    }
+
+    /**
+     * 计划便捷入口允许显式 null，覆盖旧值但保留参数键，JSON 往返不增加顶层字段。
+     */
+    @Test
+    void testPlanBuilderNullValuesOverwriteAndRoundTrip() {
+        MetricQuery query = MetricQuery.builder().parameters(Map.of("planCode", "OLD", "planRevision", 1, "currency", "USD"))
+                .planCode(null).planRevision(null).build();
+        MetricQuery restored = WindJson.parseObject(WindJson.toJsonString(query), MetricQuery.class);
+        Map<String, Object> expected = new HashMap<>();
+        expected.put("planCode", null);
+        expected.put("planRevision", null);
+        expected.put("currency", "USD");
+
+        assertEquals(expected, restored.parameterValues());
+        assertNull(restored.planCode());
+        assertNull(restored.planRevision());
+        assertEquals(query, restored);
+    }
+
+    /**
+     * 便捷方法、单项 parameter 和批量 parameters 共用同一个参数空间，严格按后写覆盖。
+     */
+    @Test
+    void testPlanBuilderSharesLastWriteWinsWithParameterMethods() {
+        MetricQuery.Builder builder = MetricQuery.builder().planCode("INITIAL").planRevision(1);
+
+        MetricQuery single = builder.parameter("planCode", "SINGLE").parameter("planRevision", 2).build();
+        assertEquals("SINGLE", single.planCode());
+        assertEquals(2, single.planRevision());
+
+        MetricQuery batch = builder.parameters(Map.of("planCode", "BATCH", "planRevision", 3)).build();
+        assertEquals("BATCH", batch.planCode());
+        assertEquals(3, batch.planRevision());
+
+        MetricQuery typed = builder.planCode("FINAL").planRevision(4).build();
+        assertEquals("FINAL", typed.planCode());
+        assertEquals(4, typed.planRevision());
+    }
+
+    /**
+     * 构建后的参数独立且只读；外部 Map 变化与 Builder 再次赋值不影响已构建查询。
+     */
+    @Test
+    void testPlanBuilderKeepsBuiltParametersIsolated() {
+        Map<String, Object> parameters = new HashMap<>(Map.of("currency", "USD"));
+        MetricQuery.Builder builder = MetricQuery.builder().parameters(parameters).planCode("FIRST").planRevision(1);
+        MetricQuery first = builder.build();
+
+        parameters.put("currency", "EUR");
+        MetricQuery second = builder.planCode("SECOND").planRevision(2).parameter("currency", "JPY").build();
+
+        assertEquals(Map.of("planCode", "FIRST", "planRevision", 1, "currency", "USD"), first.parameterValues());
+        assertEquals(Map.of("planCode", "SECOND", "planRevision", 2, "currency", "JPY"), second.parameterValues());
+        assertThrows(UnsupportedOperationException.class, () -> first.parameterValues().put("planCode", "MUTATED"));
     }
 
     /**

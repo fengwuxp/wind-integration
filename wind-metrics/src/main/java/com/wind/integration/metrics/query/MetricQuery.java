@@ -1,6 +1,7 @@
 package com.wind.integration.metrics.query;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -21,13 +22,15 @@ import java.util.Set;
  * <p>通用计算可以使用集合主体、可空时间及任意业务变量。执行入口依据所选定义和执行模式校验条件。
  * 构造时仅对条件容器做一次只读浅复制，Date/Timestamp 和业务对象均保留原引用，
  * 其生命周期由调用方维护；读取条件不再复制。</p>
+ * <p>快照计划身份保存在 parameterValues 中，{@link #planCode()} 与 {@link #planRevision()}
+ * 仅提供读取便利，不增加查询字段，不负责计划解析、版本选择或实时查询参数校验。</p>
  *
  * @param subjectId       单主体标识或主体集合；全局查询为空
  * @param subjectType     主体类型；省略时由已选指标定义确定
  * @param startTime       时间下界，可空；是否包含由具体计算合同决定，DSL 为包含
  * @param endTime         时间上界，可空；是否包含由具体计算合同决定，DSL 为不包含
  * @param dimensionValues 具名维度值，与业务变量保持独立
- * @param parameterValues 业务变量或声明参数；DSL 仅允许 Integer
+ * @param parameterValues 业务变量、声明参数或快照目标身份；由执行入口解释，DSL 仅允许声明的 Integer 参数
  * @author wuxp
  * @since 2026-09-15
  */
@@ -38,7 +41,11 @@ public record MetricQuery(
         @Nullable @Schema(description = "时间下界；DSL 必填且包含") LocalDateTime startTime,
         @Nullable @Schema(description = "时间上界；DSL 必填且不包含") LocalDateTime endTime,
         @Nullable @Schema(description = "独立具名维度") Map<String, Object> dimensionValues,
-        @Nullable @Schema(description = "业务变量；DSL 仅允许声明的整数参数") Map<String, Object> parameterValues) {
+        @Nullable @Schema(description = "业务变量或快照目标身份；DSL 仅允许声明的整数参数") Map<String, Object> parameterValues) {
+
+    private static final String PLAN_CODE_PARAMETER = "planCode";
+
+    private static final String PLAN_REVISION_PARAMETER = "planRevision";
 
     public MetricQuery {
         if (subjectId instanceof Collection<?> subjects) {
@@ -61,6 +68,28 @@ public record MetricQuery(
                        @Nullable LocalDateTime endTime, @Nullable Map<String, Object> dimensionValues,
                        @Nullable Map<String, Object> parameterValues) {
         this(subjectId, null, startTime, endTime, dimensionValues, parameterValues);
+    }
+
+    /**
+     * 读取 parameterValues 中约定为 String 的 planCode，不参与 JSON 字段序列化。
+     *
+     * @return 计划编码；参数容器、键或值为空时返回 null
+     * @throws ClassCastException 已提供的参数值不是 String
+     */
+    @JsonIgnore
+    public @Nullable String planCode() {
+        return parameterValues == null ? null : (String) parameterValues.get(PLAN_CODE_PARAMETER);
+    }
+
+    /**
+     * 读取 parameterValues 中约定为 Integer 的 planRevision，不选择默认版本。
+     *
+     * @return 计划版本；参数容器、键或值为空时返回 null
+     * @throws ClassCastException 已提供的参数值不是 Integer
+     */
+    @JsonIgnore
+    public @Nullable Integer planRevision() {
+        return parameterValues == null ? null : (Integer) parameterValues.get(PLAN_REVISION_PARAMETER);
     }
 
     /**
@@ -116,17 +145,6 @@ public record MetricQuery(
          */
         public Builder subjectId(@NonNull Object subjectId) {
             this.subjectId = subjectId;
-            return this;
-        }
-
-        /**
-         * 设置主体集合。
-         *
-         * @param subjectIds 主体集合
-         * @return this
-         */
-        public Builder subjectIds(@NonNull Collection<?> subjectIds) {
-            this.subjectId = subjectIds;
             return this;
         }
 

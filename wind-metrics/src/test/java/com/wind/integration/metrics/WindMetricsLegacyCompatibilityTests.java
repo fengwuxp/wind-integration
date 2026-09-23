@@ -1,9 +1,12 @@
 package com.wind.integration.metrics;
 
+import com.wind.integration.metrics.query.MetricQuery;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * 新 DSL 引入后的旧指标 API 兼容合同测试。
@@ -45,5 +48,111 @@ class WindMetricsLegacyCompatibilityTests {
     void testAggregatorFactoryKeepsBothFactoryMethods() throws NoSuchMethodException {
         Assertions.assertNotNull(WindMetricsAggregatorFactory.class.getMethod("factory", Class.class));
         Assertions.assertNotNull(WindMetricsAggregatorFactory.class.getMethod("factory", String.class, Class.class));
+    }
+
+    /**
+     * 未指定定义版本时，新入口保留旧实现的返回对象及完整查询条件。
+     */
+    @Test
+    void testValueFactoryNullRevisionDelegatesToLegacyMethods() {
+        LegacyValueFactory factory = new LegacyValueFactory();
+        MetricQuery query = MetricQuery.builder().subjectId("user-1").parameter("currency", "USD").build();
+
+        Assertions.assertSame(factory.scalar, factory.value("COUNT", null, query));
+        Assertions.assertEquals("COUNT", factory.metricCode);
+        Assertions.assertSame(query, factory.query);
+        Assertions.assertSame(factory.structured, factory.fields("SUMMARY", null, query));
+        Assertions.assertEquals("SUMMARY", factory.metricCode);
+        Assertions.assertSame(query, factory.query);
+        Assertions.assertEquals(2, factory.calls);
+    }
+
+    /**
+     * 旧实现不支持精确版本时立即失败，不能调用旧入口并静默读取 current。
+     */
+    @Test
+    void testValueFactoryExactRevisionRejectsWithoutLegacyFallback() {
+        LegacyValueFactory factory = new LegacyValueFactory();
+        MetricQuery query = MetricQuery.builder().subjectId("user-1").build();
+
+        Assertions.assertThrows(UnsupportedOperationException.class, () -> factory.value("COUNT", 2, query));
+        Assertions.assertThrows(UnsupportedOperationException.class, () -> factory.fields("SUMMARY", 3, query));
+        Assertions.assertEquals(0, factory.calls);
+    }
+
+    /**
+     * 空版本只委托原映射方法，保留字段、指标名称与链式返回对象。
+     */
+    @Test
+    void testAggregatorNullRevisionDelegatesToLegacyMapping() {
+        LegacyAggregator aggregator = new LegacyAggregator();
+
+        Assertions.assertSame(aggregator, aggregator.named("count", "COUNT", null));
+        Assertions.assertEquals("count", aggregator.fieldName);
+        Assertions.assertEquals("COUNT", aggregator.metricCode);
+    }
+
+    /**
+     * 精确版本不支持时不改动已有映射，也不把该版本丢弃后继续组装。
+     */
+    @Test
+    void testAggregatorExactRevisionRejectsWithoutChangingLegacyMapping() {
+        LegacyAggregator aggregator = new LegacyAggregator();
+        aggregator.named("count", "COUNT");
+
+        Assertions.assertThrows(UnsupportedOperationException.class, () -> aggregator.named("amount", "AMOUNT", 2));
+        Assertions.assertEquals("count", aggregator.fieldName);
+        Assertions.assertEquals("COUNT", aggregator.metricCode);
+    }
+
+    private static final class LegacyValueFactory implements WindMetricsValueFactory {
+
+        private final WindMetricsValue<Long> scalar = WindMetricsValue.of("COUNT", 7L);
+
+        private final WindStructuredMetricsValue<Map<String, Object>> structured =
+                WindStructuredMetricsValue.of("SUMMARY", Map.of("count", 7L));
+
+        private String metricCode;
+
+        private MetricQuery query;
+
+        private int calls;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <N extends Number> WindMetricsValue<N> value(String metricCode, MetricQuery query) {
+            this.metricCode = metricCode;
+            this.query = query;
+            calls++;
+            return (WindMetricsValue<N>) scalar;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <V> WindStructuredMetricsValue<V> fields(String metricCode, MetricQuery query) {
+            this.metricCode = metricCode;
+            this.query = query;
+            calls++;
+            return (WindStructuredMetricsValue<V>) structured;
+        }
+    }
+
+    private static final class LegacyAggregator implements WindMetricsAggregator<Object> {
+
+        private String fieldName;
+
+        private String metricCode;
+
+        @Override
+        public WindMetricsAggregator<Object> named(String fieldName, String metricCode) {
+            this.fieldName = fieldName;
+            this.metricCode = metricCode;
+            return this;
+        }
+
+        @Override
+        public Object aggregate(WindMetricsAggregationQuery query) {
+            throw new UnsupportedOperationException("This fixture only records field mappings");
+        }
     }
 }

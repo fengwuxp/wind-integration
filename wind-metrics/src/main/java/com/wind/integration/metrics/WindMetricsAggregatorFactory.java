@@ -1,7 +1,6 @@
 package com.wind.integration.metrics;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * 聚合一个或多个指标转换为指标（java）对象的工厂
@@ -21,18 +20,18 @@ public interface WindMetricsAggregatorFactory {
      * @return 指标对象工厂
      * @see WindMetricsValue
      */
-    <T> WindMetricsAggregator<T> factory(@NotNull Class<T> objectType);
+    <T> WindMetricsAggregator<T> factory(@NonNull Class<T> objectType);
 
     /**
      * 通过指标名称和指标对象类型创建一个指标对象
      * 一般用于指标输出多个值的场景
      *
-     * @param metricsName 指标名称
+     * @param metricsCode 指标编码
      * @param objectType  指标聚合对象类型
      * @return 指标对象工厂
      * @see WindStructuredMetricsValue
      */
-    <T> WindMetricsAggregator<T> factory(@NotBlank String metricsName, @NotNull Class<T> objectType);
+    <T> WindMetricsAggregator<T> factory(@NonNull String metricsCode, @NonNull Class<T> objectType);
 
 
 }

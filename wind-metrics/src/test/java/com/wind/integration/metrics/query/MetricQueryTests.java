@@ -127,4 +127,50 @@ class MetricQueryTests {
         assertEquals(expected, WindJson.parseObject(WindJson.toJsonString(query), MetricQuery.class));
     }
 
+    /**
+     * 快照实现约定的计划身份保留在原参数容器中，公共模型不解释或扩展这些字段。
+     */
+    @Test
+    void testSnapshotIdentityUsesExistingParameterValues() {
+        Map<String, Object> parameters = Map.of("planCode", "USER_METRICS", "planRevision", 3);
+        MetricQuery query = new MetricQuery("user-1", START, END, Map.of(), parameters);
+        MetricQuery built = MetricQuery.builder().subjectId("user-1").timeRange(START, END).parameters(parameters).build();
+
+        assertEquals(query, built);
+        String json = WindJson.toJsonString(query);
+        MetricQuery restored = WindJson.parseObject(json, MetricQuery.class);
+        assertEquals(parameters, restored.parameterValues());
+        assertEquals("USER_METRICS", restored.planCode());
+        assertEquals(3, restored.planRevision());
+        assertEquals(6, MetricQuery.class.getRecordComponents().length);
+        assertEquals(6, WindJson.getJsonMapper().readValue(json, Map.class).size());
+    }
+
+    /**
+     * 便捷 getter 在参数容器缺失、键缺失或值显式为空时不补默认计划或版本。
+     */
+    @Test
+    void testSnapshotIdentityGettersReturnNullWithMissingParameters() {
+        List<MetricQuery> queries = List.of(
+                new MetricQuery("user-1", START, END, Map.of(), null),
+                MetricQuery.builder().subjectId("user-1").build(),
+                MetricQuery.builder().subjectId("user-1").parameter("planCode", null).parameter("planRevision", null).build());
+
+        for (MetricQuery query : queries) {
+            assertNull(query.planCode());
+            assertNull(query.planRevision());
+        }
+    }
+
+    /**
+     * 便捷 getter 不将错误类型静默转换为另一个计划身份。
+     */
+    @Test
+    void testSnapshotIdentityGettersKeepDeclaredParameterTypes() {
+        MetricQuery query = MetricQuery.builder().parameter("planCode", 1).parameter("planRevision", "3").build();
+
+        assertThrows(ClassCastException.class, query::planCode);
+        assertThrows(ClassCastException.class, query::planRevision);
+    }
+
 }

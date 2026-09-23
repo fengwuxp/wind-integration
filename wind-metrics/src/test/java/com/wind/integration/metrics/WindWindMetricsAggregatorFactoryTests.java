@@ -62,7 +62,7 @@ class WindWindMetricsAggregatorFactoryTests {
         }
 
         @Override
-        public <T> WindMetricsAggregator<T> factory(String metricsName, Class<T> objectType) {
+        public <T> WindMetricsAggregator<T> factory(String metricsCode, Class<T> objectType) {
             return factory(objectType);
         }
     }

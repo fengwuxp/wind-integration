@@ -1,14 +1,20 @@
 package com.wind.integration.metrics;
 
 import com.wind.integration.metrics.query.MetricQuery;
-import org.jspecify.annotations.Nullable;
 
 /**
- * 用于指标计算
+ * 历史指标求值接口，保留旧查询实现与 lambda 的调用合同。
+ *
+ * <p>与 {@link WindMetricsValue} 组合时，可由 getValue 触发求值；重新读取是否求值由实现决定。
+ * 新实现使用 {@link WindMetricsValueEvaluator} 直接接收 MetricQuery，无需实现旧条件入口。
+ * 条件类型迁移时由装配方显式转换，无法表示的条件应明确失败。</p>
  *
  * @author wuxp
  * @date 2025-07-03 13:58
+ * @deprecated 新实现使用 {@link WindMetricsValueEvaluator}；历史消费者迁移前保留旧查询方法签名
  **/
+@FunctionalInterface
+@Deprecated(since = "4.0.0", forRemoval = false)
 public interface WindMetricsEvaluator<M> {
 
     /**
@@ -16,21 +22,9 @@ public interface WindMetricsEvaluator<M> {
      *
      * @param query 计算条件
      * @return 指标值
-     * @deprecated 新调用使用 {@link #evaluateWithCriteria(MetricQuery)}
+     * @deprecated 新实现使用 {@link WindMetricsValueEvaluator#evaluate(MetricQuery)}
      */
-    @Deprecated
+    @Deprecated(forRemoval = true)
     M evaluate(WindMetricsAggregationQuery query);
 
-    /**
-     * 使用通用条件求值；新实现应直接消费完整条件。
-     *
-     * <p>默认实现适配既有求值器，独立维度不能转为旧业务变量时明确失败。
-     * 方法使用不同名称，避免 evaluate(null) 的旧调用出现重载歧义。</p>
-     *
-     * @param criteria 计算条件，null 保持原默认求值语义
-     * @return 指标值
-     */
-    default M evaluateWithCriteria(@Nullable MetricQuery criteria) {
-        return evaluate(WindMetricsAggregationQuery.fromQuery(criteria));
-    }
 }

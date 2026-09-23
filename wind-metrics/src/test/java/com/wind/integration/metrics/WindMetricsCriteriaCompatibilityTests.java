@@ -84,7 +84,7 @@ class WindMetricsCriteriaCompatibilityTests {
     /**
      * 场景：公共条件适配旧求值入口时保留运行时对象。
      * 输入：主体列表1/2及 runtime 对象，另传 null 查询。
-     * 流程：调用 evaluateWithCriteria 和旧 evaluate。
+     * 流程：显式转换公共条件后调用旧 evaluate。
      * 预期：返回同一 runtime 实例，null 入口仍返回 null。
      */
     @Test
@@ -94,15 +94,15 @@ class WindMetricsCriteriaCompatibilityTests {
                 Map.of(), Map.of("runtime", context));
         WindMetricsEvaluator<Object> evaluator = query -> query == null ? null : query.getQueryVariables().get("runtime");
 
-        assertSame(context, evaluator.evaluateWithCriteria(criteria));
-        assertNull(evaluator.evaluateWithCriteria(null));
+        assertSame(context, evaluator.evaluate(WindMetricsAggregationQuery.fromQuery(criteria)));
+        assertNull(evaluator.evaluate(WindMetricsAggregationQuery.fromQuery(null)));
         assertNull(evaluator.evaluate(null));
     }
 
     /**
      * 场景：旧入口不能表达独立维度时应明确拒绝。
      * 输入：维度 currency=USD，参数同名 currency=EUR。
-     * 流程：经默认适配调用旧 evaluator。
+     * 流程：显式转换条件后调用旧 evaluator。
      * 预期：抛参数异常且不进入求值，避免丢弃或合并两个命名空间。
      */
     @Test
@@ -112,31 +112,22 @@ class WindMetricsCriteriaCompatibilityTests {
         WindMetricsEvaluator<Object> evaluator = query -> {
             throw new AssertionError("Invalid projection must fail before evaluation");
         };
-        assertThrows(IllegalArgumentException.class, () -> evaluator.evaluateWithCriteria(criteria));
+        assertThrows(IllegalArgumentException.class, () -> evaluator.evaluate(WindMetricsAggregationQuery.fromQuery(criteria)));
     }
 
     /**
      * 场景：原生公共条件入口可区分同名维度和参数。
      * 输入：维度 currency=USD，参数 currency=EUR。
-     * 流程：调用重写的 evaluateWithCriteria 并分别读取两者。
+     * 流程：调用原生 MetricQuery 求值接口并分别读取两者。
      * 预期：按顺序得到 USD、EUR。
      */
     @Test
     void testNativeCriteriaEvaluatorReceivesDistinctNamespaces() {
         MetricQuery criteria = new MetricQuery("1", null, null,
                 Map.of("currency", "USD"), Map.of("currency", "EUR"));
-        WindMetricsEvaluator<List<Object>> evaluator = new WindMetricsEvaluator<>() {
-            @Override
-            public List<Object> evaluate(WindMetricsAggregationQuery query) {
-                return evaluateWithCriteria(query.asQuery());
-            }
-
-            @Override
-            public List<Object> evaluateWithCriteria(MetricQuery query) {
-                return List.of(query.dimensionValues().get("currency"), query.parameterValues().get("currency"));
-            }
-        };
-        assertEquals(List.of("USD", "EUR"), evaluator.evaluateWithCriteria(criteria));
+        WindMetricsValueEvaluator<List<Object>> evaluator = query ->
+                List.of(query.dimensionValues().get("currency"), query.parameterValues().get("currency"));
+        assertEquals(List.of("USD", "EUR"), evaluator.evaluate(criteria));
     }
 
     /**

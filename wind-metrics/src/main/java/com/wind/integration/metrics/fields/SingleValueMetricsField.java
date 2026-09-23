@@ -2,11 +2,13 @@ package com.wind.integration.metrics.fields;
 
 import com.wind.integration.metrics.WindMetricsEvaluator;
 import com.wind.integration.metrics.WindMetricsValue;
+import com.wind.integration.metrics.WindMetricsValueEvaluator;
 
 /**
  * 历史单值组合接口，同时声明读取、条件求值和数值修改。
  *
- * <p>读取型消费者使用 {@link WindMetricsValue}，重新求值使用 {@link WindMetricsEvaluator}。
+ * <p>读取型消费者使用 {@link WindMetricsValue}，新求值实现使用 {@link WindMetricsValueEvaluator}。
+ * 本接口继续继承旧求值签名以兼容已有实现，不要求旧实现改写条件类型。
  * 既有 SQL 实现不提供修改能力；保留本接口不表示所有实现都可修改。
  * 修改方法不自动具有完整桶提交、幂等写回或快照水位推进语义。</p>
  *

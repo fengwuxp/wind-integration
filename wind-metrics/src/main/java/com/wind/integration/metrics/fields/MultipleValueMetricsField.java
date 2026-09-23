@@ -2,6 +2,7 @@ package com.wind.integration.metrics.fields;
 
 import com.wind.integration.metrics.WindMetricsEvaluator;
 import com.wind.integration.metrics.WindMetricsValue;
+import com.wind.integration.metrics.WindMetricsValueEvaluator;
 import com.wind.integration.metrics.WindStructuredMetricsValue;
 import com.wind.jackson.WindJson;
 
@@ -14,7 +15,8 @@ import java.util.Optional;
 /**
  * 历史多字段组合接口，同时声明读取、条件求值和对象转换。
  *
- * <p>读取型消费者使用 {@link WindStructuredMetricsValue}，重新求值使用 {@link WindMetricsEvaluator}。
+ * <p>读取型消费者使用 {@link WindStructuredMetricsValue}，新求值实现使用 {@link WindMetricsValueEvaluator}。
+ * 本接口继续继承旧求值签名以兼容已有实现，不要求旧实现改写条件类型。
  * Map 或业务对象到字段映射的转换由具体实现承担；本接口的默认转换仅保留历史兼容，
  * 不要求公共值能力依赖 JSON。</p>
  *

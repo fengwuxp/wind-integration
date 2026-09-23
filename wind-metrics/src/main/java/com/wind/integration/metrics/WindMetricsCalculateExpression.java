@@ -9,6 +9,7 @@ import java.util.Map;
  * @author wuxp
  * @date 2025-06-17 14:25
  **/
+@Deprecated(forRemoval = true)
 public interface WindMetricsCalculateExpression<M> {
 
     /**

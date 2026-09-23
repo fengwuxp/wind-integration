@@ -14,7 +14,7 @@ import com.wind.integration.metrics.spec.MetricDefinitionObject;
  * <ul>
  *   <li>DSL：{@link MetricJdbcSqlCompiler} 使用宿主冻结的 {@link MetricJdbcMapping}，生成参数化 SQL、
  *       有序 {@link MetricJdbcParameterBinding} 和 measure projection。</li>
- *   <li>SQL：{@link FreemarkerSqlTemplateRenderer} 渲染受信模板，生成 SQL 文本；其 bindings 和
+ *   <li>SQL：{@link FreemarkerMetricSqlRenderer} 渲染受信模板，生成 SQL 文本；其 bindings 和
  *       projections 为空，不能把模板最终列自动当成可累计原始量。</li>
  * </ul>
  *

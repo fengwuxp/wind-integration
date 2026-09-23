@@ -42,10 +42,10 @@ class RoutingMetricSqlGeneratorTests {
 
     private final MetricSqlGenerator dsl = compiler;
 
-    private final MetricSqlGenerator sql = new FreemarkerSqlTemplateRenderer();
+    private final MetricSqlGenerator sql = new FreemarkerMetricSqlRenderer();
 
     private final MetricSqlGenerator generator =
-            new RoutingMetricSqlGenerator(compiler, new FreemarkerSqlTemplateRenderer());
+            new RoutingMetricSqlGenerator(compiler, new FreemarkerMetricSqlRenderer());
 
     /**
      * 场景：统一 DSL 生成入口使用已登记的事实映射。

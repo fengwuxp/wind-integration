@@ -42,13 +42,13 @@ import java.util.Objects;
  *
  * @author wuxp
  */
-public final class FreemarkerSqlTemplateRenderer implements MetricSqlGenerator {
+public final class FreemarkerMetricSqlRenderer implements MetricSqlGenerator {
 
     private static final DateTimeFormatter SQL_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final Configuration configuration;
 
-    public FreemarkerSqlTemplateRenderer() {
+    public FreemarkerMetricSqlRenderer() {
         Configuration configuration = new Configuration(Configuration.VERSION_2_3_34);
         configuration.setNumberFormat("computer");
         configuration.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);

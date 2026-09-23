@@ -13,20 +13,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * {@link FreemarkerSqlTemplateRenderer} 的公开契约用例。
+ * {@link FreemarkerMetricSqlRenderer} 的公开契约用例。
  *
  * <p>只观察 {@code renderSql} 的插值输出与异常，覆盖主体、参数、可选时间窗、数字格式与非法模板。
  * 渲染器使用 {@code ${...}} 直接插值，产出无参数绑定的 SQL 文本。</p>
  *
  * @author wuxp
  */
-class FreemarkerSqlTemplateRendererTests {
+class FreemarkerMetricSqlRendererTests {
 
     private static final LocalDateTime START = LocalDateTime.of(2026, 9, 1, 0, 0);
 
     private static final LocalDateTime END = START.plusDays(1);
 
-    private final FreemarkerSqlTemplateRenderer renderer = new FreemarkerSqlTemplateRenderer();
+    private final FreemarkerMetricSqlRenderer renderer = new FreemarkerMetricSqlRenderer();
 
     /**
      * 场景：SQL 模板可读取主体、参数和完整时间窗口。

@@ -8,23 +8,23 @@ import java.math.RoundingMode;
 import java.util.Map;
 
 /**
- * 指标表达式唯一允许调用的根方法集合。
+ * 一次表达式求值的只读输入。
  *
- * @param scale 当前结果精度
- * @param roundingMode 当前舍入方式
- * @param measureValues 仅含编译期已确认字段的本次求值快照
- * @param metricValues 仅含编译期已确认依赖的本次求值快照
+ * @param scale         当前结果精度
+ * @param roundingMode  当前舍入方式
+ * @param measureValues 本指标编译期确认的本地 measure 值
+ * @param metricValues  编译期确认的跨指标依赖值
  * @author wuxp
  * @since 2026-07-23
  */
-record MetricExpressionRoot(
+record ExpressionEvaluationContext(
         @Nullable Integer scale,
         @Nullable RoundingMode roundingMode,
         Map<String, ?> measureValues,
         Map<MetricValueReference, ?> metricValues) {
 
     /**
-     * 读取查询引擎已经计算并放入当前请求上下文的指标值。
+     * 读取宿主已经准备好的跨指标结果。
      *
      * @param metricCode 指标编码
      * @param valueField 结果字段
@@ -42,7 +42,7 @@ record MetricExpressionRoot(
     /**
      * 使用当前指标值声明的精度执行十进制除法。
      *
-     * @param numerator 分子
+     * @param numerator   分子
      * @param denominator 分母
      * @return 已按声明精度量化的商
      */
@@ -65,12 +65,10 @@ record MetricExpressionRoot(
             case Long number -> BigDecimal.valueOf(number);
             case BigInteger number -> new BigDecimal(number);
             case BigDecimal number -> number;
-            case null ->
-                    throw new IllegalArgumentException(
-                            "Metric calculation requires a numeric value");
-            default ->
-                    throw new IllegalArgumentException(
-                            "Metric calculation requires an exact numeric value");
+            case null -> throw new IllegalArgumentException(
+                    "Metric calculation requires a numeric value");
+            default -> throw new IllegalArgumentException(
+                    "Metric calculation requires an exact numeric value");
         };
     }
 }

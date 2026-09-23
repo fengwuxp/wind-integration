@@ -21,9 +21,11 @@ import java.util.TreeMap;
 import java.util.function.BiFunction;
 
 /**
- * 直接按指标 DSL 合并原始 measure、归一精确数值并完成最终空值处理。
+ * 指标 DSL 的纯值处理器，按固定阶段合并原始 measure、归一结果并处理正常空值。
  *
- * <p>输入定义须已通过 DSL 校验。本类不加载数据或解释表达式语言；表达式回调由宿主使用 本次冻结的 AST 和已计算依赖执行。分段合并不舍入、不计算表达式、不应用 orElse。
+ * <p>调用编排由宿主负责：先读取并校验所有原始 measure，再调用 {@link #merge}，最后调用
+ * {@link #calculate}。本类不加载数据、不选择 revision、不解释表达式语言；表达式回调由宿主
+ * 使用已编译句柄和已准备依赖执行。分段合并不舍入、不计算表达式、不应用 {@code orElse}。
  *
  * @author wuxp
  */

@@ -8,11 +8,11 @@ import java.math.RoundingMode;
 import java.util.Objects;
 
 /**
- * 单个指标值字段的类型、精度、计算来源和空结果规则。
+ * 单个指标值字段的类型、精度、计算来源和正常空结果规则。
  *
- * <p>{@code measure} 与 {@code expression} 必须且只能提供一个。十进制值最终使用
- * 4 至 6 位 {@code scale} 和 {@link RoundingMode#HALF_UP}；JSON 未填写时分别默认为
- * {@code 4} 和 {@code HALF_UP}。</p>
+ * <p>{@code measure} 与 {@code expression} 是互斥分支：前者产生可供合并的原始状态，
+ * 后者读取本地 measure 或宿主准备的依赖结果。分支合法性由所属定义校验；本 record 只保存
+ * 不可变声明。十进制值最终使用声明的 {@code scale} 和 {@link RoundingMode} 归一。</p>
  *
  * @param valueType 指标值类型
  * @param scale 十进制结果保留位数；非十进制类型为空

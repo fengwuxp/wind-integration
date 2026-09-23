@@ -1,5 +1,7 @@
 package com.wind.integration.metrics.expression;
 
+import org.jspecify.annotations.NullMarked;
+
 /**
  * 表达式中对另一个指标结果字段的确定性引用。
  *
@@ -8,8 +10,8 @@ package com.wind.integration.metrics.expression;
  * @author wuxp
  * @since 2026-07-24
  */
-public record MetricValueReference(String metricCode, String valueField)
-        implements Comparable<MetricValueReference> {
+@NullMarked
+public record MetricValueReference(String metricCode, String valueField) implements Comparable<MetricValueReference> {
 
     public MetricValueReference {
         if (metricCode == null || metricCode.isBlank()) {
@@ -23,8 +25,6 @@ public record MetricValueReference(String metricCode, String valueField)
     @Override
     public int compareTo(MetricValueReference other) {
         int metricCodeComparison = metricCode.compareTo(other.metricCode);
-        return metricCodeComparison != 0
-                ? metricCodeComparison
-                : valueField.compareTo(other.valueField);
+        return metricCodeComparison != 0 ? metricCodeComparison : valueField.compareTo(other.valueField);
     }
 }

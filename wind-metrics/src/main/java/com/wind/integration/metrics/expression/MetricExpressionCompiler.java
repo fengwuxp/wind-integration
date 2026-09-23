@@ -41,12 +41,20 @@ import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 /**
- * 将指标 SpEL 编译为受控 AST，并验证事实指标只能引用本指标 measure 字段。
+ * 将指标 SpEL 编译为受控 AST，并提取本地 measure 或跨指标依赖。
+ *
+ * <p>本类只做静态编译和结构校验：不加载指标、不选择 revision、不访问数据库，也不执行求值。
+ * {@link CompiledMetricExpression} 承接已经编译的句柄，宿主提供值后再求值。</p>
  *
  * @author wuxp
  * @since 2026-07-23
  */
 public final class MetricExpressionCompiler {
+
+    private enum ExpressionMode {
+        FACT,
+        DERIVED
+    }
 
     /** 单个指标表达式允许的最大字符数。 */
     static final int MAX_EXPRESSION_LENGTH = 2048;
@@ -66,9 +74,8 @@ public final class MetricExpressionCompiler {
      * @param path 表达式字段路径
      * @return 已校验表达式
      */
-    public CompiledMetricExpression compileFact(
-            MetricExpressionDsl definition, Set<String> measureValueFields, String path) {
-        return compile(definition, measureValueFields, path, false);
+    public CompiledMetricExpression compileFact(MetricExpressionDsl definition, Set<String> measureValueFields, String path) {
+        return compile(definition, measureValueFields, path, ExpressionMode.FACT);
     }
 
     /**
@@ -79,14 +86,14 @@ public final class MetricExpressionCompiler {
      * @return 已校验表达式及确定性依赖集合
      */
     public CompiledMetricExpression compileDerived(MetricExpressionDsl definition, String path) {
-        return compile(definition, Set.of(), path, true);
+        return compile(definition, Set.of(), path, ExpressionMode.DERIVED);
     }
 
     private static CompiledMetricExpression compile(
             MetricExpressionDsl definition,
             Set<String> measureValueFields,
             String path,
-            boolean derived) {
+            ExpressionMode mode) {
         if (definition.type() != MetricExpressionType.SPEL) {
             throw invalid(path + "/type", "Only SPEL expression is supported");
         }
@@ -115,8 +122,8 @@ public final class MetricExpressionCompiler {
                         path + "/value",
                         true,
                         1,
-                        derived);
-        if (derived && metricValueReferences.isEmpty()) {
+                        mode);
+        if (mode == ExpressionMode.DERIVED && metricValueReferences.isEmpty()) {
             throw invalid(
                     path + "/value", "Derived expression must reference at least one metric value");
         }
@@ -135,7 +142,7 @@ public final class MetricExpressionCompiler {
             String path,
             boolean terminal,
             int depth,
-            boolean derived) {
+            ExpressionMode mode) {
         if (depth > MAX_AST_DEPTH) {
             throw invalid(path, "Metric expression exceeds maximum AST depth");
         }
@@ -148,7 +155,7 @@ public final class MetricExpressionCompiler {
         }
         if (node instanceof MethodReference method) {
             if ("metric".equals(method.getName())) {
-                validateMetricReference(method, metricValueReferences, path, derived);
+                validateMetricReference(method, metricValueReferences, path, mode);
                 return false;
             }
             if (!terminal
@@ -166,7 +173,7 @@ public final class MetricExpressionCompiler {
                         path,
                         false,
                         depth + 1,
-                        derived);
+                        mode);
             }
             return true;
         }
@@ -186,7 +193,7 @@ public final class MetricExpressionCompiler {
                             path,
                             childTerminal,
                             depth + 1,
-                            derived);
+                            mode);
         }
         return ratio;
     }
@@ -195,8 +202,8 @@ public final class MetricExpressionCompiler {
             MethodReference method,
             Set<MetricValueReference> references,
             String path,
-            boolean derived) {
-        if (!derived
+            ExpressionMode mode) {
+        if (mode != ExpressionMode.DERIVED
                 || method.isNullSafe()
                 || method.getChildCount() != 2
                 || !(method.getChild(0) instanceof StringLiteral metricCodeLiteral)

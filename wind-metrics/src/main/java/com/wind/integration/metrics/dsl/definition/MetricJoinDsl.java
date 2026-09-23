@@ -8,7 +8,10 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 主事实源到关联事实源的受控等值关联。
+ * 主事实源到关联事实源的受控等值关联声明。
+ *
+ * <p>join 只表达逻辑别名、连接方式、基数和等值字段；物理表名、列名和连接执行由宿主
+ * 的冻结 binding 解释，DSL 不接受原始 SQL。</p>
  *
  * @param alias 关联事实在字段引用中的别名
  * @param fact 关联事实源编码

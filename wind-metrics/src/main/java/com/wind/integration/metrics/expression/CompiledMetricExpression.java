@@ -33,7 +33,7 @@ public final class CompiledMetricExpression {
     private static final MethodResolver INSTANCE_METHODS =
             DataBindingMethodResolver.forInstanceMethodInvocation();
 
-    private static final PropertyAccessor MEASURE_VALUES = new MeasureValueAccessor();
+    private static final PropertyAccessor VALUE_ACCESSOR = new ExpressionValueAccessor();
 
     private final SpelExpression expression;
 
@@ -105,28 +105,28 @@ public final class CompiledMetricExpression {
             Map<String, ?> measureValues,
             Map<MetricValueReference, ?> metricValues,
             String path) {
-        MetricExpressionRoot root =
-                new MetricExpressionRoot(
+        ExpressionEvaluationContext contextRoot =
+                new ExpressionEvaluationContext(
                         definition.scale(),
                         definition.roundingMode(),
                         referencedValues(localValueFields, measureValues, path),
                         referencedValues(metricValueReferences, metricValues, path));
         SimpleEvaluationContext context =
-                SimpleEvaluationContext.forPropertyAccessors(MEASURE_VALUES)
+                SimpleEvaluationContext.forPropertyAccessors(VALUE_ACCESSOR)
                         .withAssignmentDisabled()
                         .withMethodResolvers(
                                 (evaluationContext, target, name, arguments) ->
-                                        target instanceof MetricExpressionRoot
+                                        target instanceof ExpressionEvaluationContext
                                                         && ("ratio".equals(name) || "metric".equals(name))
                                                 ? INSTANCE_METHODS.resolve(
                                                         evaluationContext, target, name, arguments)
                                                 : null)
-                        .withRootObject(root)
+                        .withRootObject(contextRoot)
                         .build();
         try {
             Object result = expression.getValue(context);
             if (result != null) {
-                MetricExpressionRoot.exactDecimal(result);
+                ExpressionEvaluationContext.exactDecimal(result);
             }
             return (Number) result;
         } catch (EvaluationException | IllegalArgumentException exception) {
@@ -158,18 +158,18 @@ public final class CompiledMetricExpression {
     }
 
     /**
-     * Spring 可缓存访问器；每次从当前根对象读取，避免跨次求值共享数据。
+     * 只暴露编译期确认的本地 measure 属性；每次从当前求值根读取，避免跨次求值共享数据。
      */
-    private static final class MeasureValueAccessor implements PropertyAccessor {
+    private static final class ExpressionValueAccessor implements PropertyAccessor {
 
         @Override
         public Class<?>[] getSpecificTargetClasses() {
-            return new Class<?>[] {MetricExpressionRoot.class};
+            return new Class<?>[] {ExpressionEvaluationContext.class};
         }
 
         @Override
         public boolean canRead(EvaluationContext context, Object target, String name) {
-            return target instanceof MetricExpressionRoot root
+            return target instanceof ExpressionEvaluationContext root
                     && root.measureValues().containsKey(name);
         }
 
@@ -179,8 +179,8 @@ public final class CompiledMetricExpression {
             if (!canRead(context, target, name)) {
                 throw new AccessException("Metric measure value is not readable");
             }
-            Object value = ((MetricExpressionRoot) target).measureValues().get(name);
-            return new TypedValue(value == null ? null : MetricExpressionRoot.exactDecimal(value));
+            Object value = ((ExpressionEvaluationContext) target).measureValues().get(name);
+            return new TypedValue(value == null ? null : ExpressionEvaluationContext.exactDecimal(value));
         }
 
         @Override

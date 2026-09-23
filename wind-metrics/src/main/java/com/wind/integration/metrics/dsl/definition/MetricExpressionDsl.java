@@ -6,9 +6,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Objects;
 
 /**
- * 指标派生计算表达式。
+ * 指标字段的受限派生表达式声明。
  *
- * <p>Codec 只校验表达式类型和非空文本，不负责执行表达式。</p>
+ * <p>Codec 只恢复表达式类型和文本；实际白名单校验、依赖提取和求值由 expression 包完成。
+ * 表达式不携带依赖 revision，也不负责加载指标或访问数据。</p>
  *
  * @param type 表达式语言类型
  * @param value 表达式文本

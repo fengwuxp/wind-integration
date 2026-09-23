@@ -8,7 +8,10 @@ import org.jspecify.annotations.Nullable;
 import java.util.Objects;
 
 /**
- * 从事实源聚合得到的基础度量。
+ * 从事实源聚合得到的原始 measure 声明。
+ *
+ * <p>它描述在候选记录集合上如何聚合，不保存聚合结果。{@code filter} 只约束当前 measure，
+ * 不改变其他 measure 的候选集合；是否可跨分段合并由聚合类型和计算器合同决定。</p>
  *
  * @param aggregation 聚合函数
  * @param field 被聚合字段；{@code COUNT} 时为空，其他聚合函数必填

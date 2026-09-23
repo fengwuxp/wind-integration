@@ -1,8 +1,6 @@
 package com.wind.integration.metrics.jdbc;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.spec.MetricDSLDefinition;
-import com.wind.integration.metrics.spec.MetricDefinitionObject;
 import com.wind.integration.metrics.dsl.definition.MetricJoinDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinOnDsl;
 import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
@@ -19,10 +17,11 @@ import com.wind.integration.metrics.dsl.filter.SetMetricFilterDsl;
 import com.wind.integration.metrics.enums.MetricAggregation;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricJoinType;
-import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricSortDirection;
+import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.query.MetricQuery;
-
+import com.wind.integration.metrics.spec.MetricDSLDefinition;
+import com.wind.integration.metrics.spec.MetricDefinitionObject;
 import org.jooq.Condition;
 import org.jooq.Field;
 import org.jooq.Param;
@@ -55,15 +54,31 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
- * 将事实指标原 DSL、单次查询条件和冻结物理映射编译为指定方言的参数化 SQL。
+ * 将事实指标 DSL、单次查询条件和冻结物理映射编译为指定方言的参数化 SQL。
  *
  * <p>宿主负责基础 DSL、字段兼容、JOIN 唯一性和稳定排序校验；本类不发现实体、不查询数据库，
  * 也不选择发布修订。实例持有固定方言、时区、行数上限，以及按 (code, revision) 注册的冻结物理映射缓存；
  * 单次编译的其余状态均为局部变量。
+ * SQL 生成只返回 {@link MetricSqlDescriptor}，不把 JDBC 执行、结果读取或最终表达式计算混入编译器。
  *
  * @author wuxp
  */
 public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
+
+    /** 单次编译已经固定的声明、绑定和投影上下文；不跨查询缓存。 */
+    private record CompilationPlan(
+            MetricDSLDefinition definition,
+            MetricQuery query,
+            MetricJdbcBinding binding,
+            MetricRowSelectionDsl rowSelection,
+            int rowSelectionLimit,
+            List<MetricJoinDsl> joins,
+            Map<String, String> aliases,
+            Function<String, Field<Object>> columns,
+            Map<String, MetricMeasureDsl> measures,
+            Map<String, String> selectedColumns,
+            Function<String, Field<Object>> projectionColumns) {
+    }
 
     private static final int DEFAULT_MAX_ROW_SELECTION_LIMIT = 1000;
 
@@ -77,7 +92,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
 
     private final MetricJdbcValueNormalizer metricJdbcValueNormalizer;
 
-    private final MetricJdbcFilterRenderer metricJdbcFilterRenderer;
+    private final MetricJdbcPredicateRenderer metricJdbcPredicateRenderer;
 
     private final ConcurrentMap<String, MetricJdbcBinding> bindings = new ConcurrentHashMap<>();
 
@@ -95,7 +110,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
      *
      * <p>实际 LIMIT 来自 DSL 固定值或查询参数；超过本上限时拒绝编译，不截断查询行数。
      *
-     * @param timeZone 指标时区，不能使用查询过程中变化的默认时区
+     * @param timeZone             指标时区，不能使用查询过程中变化的默认时区
      * @param maxRowSelectionLimit 正数，与宿主定义验证使用的上限一致
      */
     public MetricJdbcSqlCompiler(ZoneId timeZone, int maxRowSelectionLimit) {
@@ -105,9 +120,9 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
     /**
      * 显式指定 SQL 方言；只构造 SQL，不创建连接、执行查询或持有第三方 AST。
      *
-     * @param timeZone 宿主冻结的指标时区
+     * @param timeZone             宿主冻结的指标时区
      * @param maxRowSelectionLimit 正数行选择上限
-     * @param dialect 目标数据库方言，当前支持 MYSQL、POSTGRES、H2
+     * @param dialect              目标数据库方言，当前支持 MYSQL、POSTGRES、H2
      */
     public MetricJdbcSqlCompiler(ZoneId timeZone, int maxRowSelectionLimit, SQLDialect dialect) {
         Objects.requireNonNull(dialect, "dialect must not be null");
@@ -120,64 +135,84 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         }
         this.maxRowSelectionLimit = maxRowSelectionLimit;
         metricJdbcValueNormalizer = new MetricJdbcValueNormalizer(Objects.requireNonNull(timeZone, "timeZone must not be null"));
-        metricJdbcFilterRenderer = new MetricJdbcFilterRenderer(metricJdbcValueNormalizer);
+        metricJdbcPredicateRenderer = new MetricJdbcPredicateRenderer(metricJdbcValueNormalizer);
     }
 
     /**
      * 编译单个事实指标；表达式字段由宿主在 measure 加载后求值，不进入 SQL 投影。
      *
+     * <p>编排顺序固定为：校验查询 -> 固定事实/join/measure 投影 -> 构造来源和谓词 ->
+     * 渲染参数化 SQL。每次调用的参数、别名和投影均为局部状态。</p>
+     *
      * @param definition 同次基础和物理校验使用的原声明引用
-     * @param query 正式 DSL 查询条件
-     * @param binding 同次校验冻结的物理映射，不得执行 IO
+     * @param query      正式 DSL 查询条件
+     * @param binding    同次校验冻结的物理映射，不得执行 IO
      * @return SQL、占位符顺序参数以及 measure 投影
      * @throws MetricValidationException 定义形态、查询条件或字段值不受支持时抛出
      */
     public MetricSqlDescriptor compile(MetricDSLDefinition definition, MetricQuery query, MetricJdbcBinding binding) {
-        validateQuery(definition, query);
-        MetricRowSelectionDsl selection = definition.rowSelection();
-        int rowSelectionLimit = selection == null
-                ? 0 : resolveRowSelectionLimit(selection.limit(), query.parameterValues());
-        Objects.requireNonNull(binding, "binding must not be null");
-
-        List<MetricJoinDsl> orderedJoins = definition.joins().stream()
-                .sorted(Comparator.comparing(MetricJoinDsl::alias)).toList();
-        Map<String, String> aliases = aliases(orderedJoins);
-        Function<String, Field<Object>> columns = field -> column(binding, aliases, field);
-        Map<String, MetricMeasureDsl> measures = measures(definition);
-        Map<String, String> selectedColumns = selection == null ? Map.of() : selectedFields(selection, measures);
-        Function<String, Field<Object>> projectionColumns = selection == null
-                ? columns : field -> DSL.field(DSL.name("r", selectedColumns.get(field)));
+        CompilationPlan plan = plan(definition, query, binding);
 
         Map<String, MetricSqlBinding> parameters = new LinkedHashMap<>();
         Map<String, String> resultProjections = new LinkedHashMap<>();
-        List<Field<?>> projections = new ArrayList<>();
-        for (Map.Entry<String, MetricMeasureDsl> entry : measures.entrySet()) {
-            String name = entry.getKey();
-            validateAlias(name);
-            projections.add(projection(binding, entry.getValue(), projectionColumns, parameters).as(DSL.name(name)));
-            resultProjections.put(name, name);
-        }
-        Table<?> source = source(orderedJoins, binding, aliases, columns);
-        List<Condition> conditions = predicates(definition, query, binding, columns, parameters);
-        SelectQuery<?> sql = DSL.using(dialect).selectQuery();
-        sql.addSelect(projections);
-        if (selection == null) {
-            sql.addFrom(source);
-            sql.addConditions(conditions);
-        } else {
-            sql.addFrom(rowSelection(selection, selectedColumns, source, conditions, rowSelectionLimit,
-                    binding, columns, parameters));
-        }
+        List<Field<?>> projections = projections(plan, parameters, resultProjections);
+        Table<?> source = buildSource(plan.joins(), plan.binding(), plan.aliases(), plan.columns());
+        List<Condition> conditions = buildPredicates(plan.definition(), plan.query(), plan.binding(), plan.columns(), parameters);
+        SelectQuery<?> sql = assembleQuery(plan, source, conditions, projections, parameters);
         List<MetricSqlBinding> bindings = new ArrayList<>();
         String rendered = render(sql, parameters, bindings);
         return new MetricSqlDescriptor(rendered, bindings, resultProjections);
+    }
+
+    private CompilationPlan plan(MetricDSLDefinition definition, MetricQuery query, MetricJdbcBinding binding) {
+        validateQuery(definition, query);
+        Objects.requireNonNull(binding, "binding must not be null");
+        MetricRowSelectionDsl selection = definition.rowSelection();
+        int limit = selection == null ? 0 : resolveRowSelectionLimit(selection.limit(), query.parameterValues());
+        List<MetricJoinDsl> joins = definition.joins().stream()
+                .sorted(Comparator.comparing(MetricJoinDsl::alias)).toList();
+        Map<String, String> aliases = resolveAliases(joins);
+        Function<String, Field<Object>> columns = field -> column(binding, aliases, field);
+        Map<String, MetricMeasureDsl> measures = resolveMeasures(definition);
+        Map<String, String> selectedColumns = selection == null ? Map.of() : resolveSelectedFields(selection, measures);
+        Function<String, Field<Object>> projectionColumns = selection == null
+                ? columns : field -> DSL.field(DSL.name("r", selectedColumns.get(field)));
+        return new CompilationPlan(definition, query, binding, selection, limit, joins, aliases, columns,
+                measures, selectedColumns, projectionColumns);
+    }
+
+    private List<Field<?>> projections(CompilationPlan plan, Map<String, MetricSqlBinding> parameters,
+                                       Map<String, String> resultProjections) {
+        List<Field<?>> projections = new ArrayList<>();
+        for (Map.Entry<String, MetricMeasureDsl> entry : plan.measures().entrySet()) {
+            String name = entry.getKey();
+            validateAlias(name);
+            projections.add(renderAggregate(plan.binding(), entry.getValue(), plan.projectionColumns(), parameters)
+                    .as(DSL.name(name)));
+            resultProjections.put(name, name);
+        }
+        return projections;
+    }
+
+    private SelectQuery<?> assembleQuery(CompilationPlan plan, Table<?> source, List<Condition> conditions,
+                                         List<Field<?>> projections, Map<String, MetricSqlBinding> parameters) {
+        SelectQuery<?> sql = DSL.using(dialect).selectQuery();
+        sql.addSelect(projections);
+        if (plan.rowSelection() == null) {
+            sql.addFrom(source);
+            sql.addConditions(conditions);
+        } else {
+            sql.addFrom(renderRowSelection(plan.rowSelection(), plan.selectedColumns(), source, conditions,
+                    plan.rowSelectionLimit(), plan.binding(), plan.columns(), parameters));
+        }
+        return sql;
     }
 
     /**
      * 注册某定义修订的冻结物理映射，供 {@link #render} 内部按 (code, revision) 获取。
      *
      * @param definition DSL 定义，提供编码与修订
-     * @param binding 该修订冻结的物理映射，不得执行 IO
+     * @param binding    该修订冻结的物理映射，不得执行 IO
      */
     public void registerBinding(MetricDSLDefinition definition, MetricJdbcBinding binding) {
         Objects.requireNonNull(definition, "definition must not be null");
@@ -189,10 +224,10 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
      * 实现 {@link MetricQuerySqlRender}，按 DSL 模式编译查询，物理映射从内部缓存获取。
      *
      * @param definition 必须是 {@link MetricDSLDefinition}
-     * @param query 查询条件
+     * @param query      查询条件
      * @return 参数化 SQL、有序绑定与投影
      * @throws IllegalArgumentException 定义不是 DSL 形态
-     * @throws IllegalStateException 未注册对应 (code, revision) 的物理映射
+     * @throws IllegalStateException    未注册对应 (code, revision) 的物理映射
      */
     @Override
     public MetricSqlDescriptor render(MetricDefinitionObject definition, MetricQuery query) {
@@ -217,20 +252,20 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
      * <p>columnResolver 由受信宿主代码构建列引用 SQL，例如 p.column 或 r.c0，
      * 不得接收 HTTP/DSL 提供的原始 SQL。过滤需已通过定义与字段校验。
      *
-     * @param binding 冻结物理字段映射
-     * @param filter 已验证的原过滤 DSL
-     * @param bindings 接收按占位符次序编码的参数；失败时不追加半组参数
+     * @param binding        冻结物理字段映射
+     * @param filter         已验证的原过滤 DSL
+     * @param bindings       接收按占位符次序编码的参数；失败时不追加半组参数
      * @param columnResolver 逻辑字段引用到受控列引用的转换
      * @return 参数化谓词
      */
     public String renderValidatedFilter(MetricJdbcBinding binding, MetricFilterDsl filter,
-                                       List<MetricSqlBinding> bindings, Function<String, String> columnResolver) {
+                                        List<MetricSqlBinding> bindings, Function<String, String> columnResolver) {
         Objects.requireNonNull(binding, "binding must not be null");
         Objects.requireNonNull(filter, "filter must not be null");
         Objects.requireNonNull(bindings, "bindings must not be null");
         Objects.requireNonNull(columnResolver, "columnResolver must not be null");
         Map<String, MetricSqlBinding> parameters = new LinkedHashMap<>();
-        Condition predicate = metricJdbcFilterRenderer.render(binding, filter, parameters,
+        Condition predicate = metricJdbcPredicateRenderer.render(binding, filter, parameters,
                 field -> DSL.field(columnResolver.apply(field)));
         List<MetricSqlBinding> ordered = new ArrayList<>();
         String sql = render(predicate, parameters, ordered);
@@ -238,7 +273,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         return sql;
     }
 
-    private Table<?> rowSelection(MetricRowSelectionDsl selection, Map<String, String> selectedColumns,
+    private Table<?> renderRowSelection(MetricRowSelectionDsl selection, Map<String, String> selectedColumns,
                                   Table<?> source, List<Condition> predicates, int limit, MetricJdbcBinding binding,
                                   Function<String, Field<Object>> columns, Map<String, MetricSqlBinding> parameters) {
         SelectQuery<?> sql = DSL.using(dialect).selectQuery();
@@ -248,7 +283,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         sql.addFrom(source);
         sql.addConditions(predicates);
         if (selection.filter() != null) {
-            sql.addConditions(metricJdbcFilterRenderer.render(binding, selection.filter(), parameters, columns));
+            sql.addConditions(metricJdbcPredicateRenderer.render(binding, selection.filter(), parameters, columns));
         }
         List<SortField<?>> orderBy = selection.orderBy().stream().<SortField<?>>map(order -> {
             Field<?> field = columns.apply(order.field());
@@ -261,7 +296,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         return sql.asTable(DSL.name("r"));
     }
 
-    private Field<?> projection(MetricJdbcBinding binding, MetricMeasureDsl measure,
+    private Field<?> renderAggregate(MetricJdbcBinding binding, MetricMeasureDsl measure,
                                 Function<String, Field<Object>> columns, Map<String, MetricSqlBinding> parameters) {
         boolean count = measure.aggregation() == MetricAggregation.COUNT;
         if (count && measure.filter() == null) {
@@ -269,13 +304,13 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         }
         Field<?> argument = count ? DSL.inline(1) : columns.apply(measure.field());
         if (measure.filter() != null) {
-            Condition predicate = metricJdbcFilterRenderer.render(binding, measure.filter(), parameters, columns);
+            Condition predicate = metricJdbcPredicateRenderer.render(binding, measure.filter(), parameters, columns);
             argument = DSL.when(predicate, argument);
         }
         return DSL.aggregate(measure.aggregation().name(), SQLDataType.DECIMAL, argument);
     }
 
-    private List<Condition> predicates(MetricDSLDefinition definition, MetricQuery query, MetricJdbcBinding binding,
+    private List<Condition> buildPredicates(MetricDSLDefinition definition, MetricQuery query, MetricJdbcBinding binding,
                                        Function<String, Field<Object>> columns,
                                        Map<String, MetricSqlBinding> parameters) {
         List<Condition> result = new ArrayList<>();
@@ -297,7 +332,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         return result;
     }
 
-    private static Table<?> source(List<MetricJoinDsl> joins, MetricJdbcBinding binding,
+    private static Table<?> buildSource(List<MetricJoinDsl> joins, MetricJdbcBinding binding,
                                    Map<String, String> aliases, Function<String, Field<Object>> columns) {
         Table<?> source = DSL.table(DSL.name(physical(binding.tableName("")))).as(DSL.name("p"));
         for (MetricJoinDsl join : joins) {
@@ -314,7 +349,9 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         return source;
     }
 
-    /** 绑定身份独立于值相等性，避免等值参数或方言重排丢失 JDBC 类型。 */
+    /**
+     * 绑定身份独立于值相等性，避免等值参数或方言重排丢失 JDBC 类型。
+     */
     static Field<Object> parameter(Map<String, MetricSqlBinding> parameters, MetricSqlBinding binding) {
         String name = "v" + parameters.size();
         parameters.put(name, binding);
@@ -338,7 +375,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         return DSL.using(DSL.using(dialect, settings).configuration().derive(listener)).render(part);
     }
 
-    private static Map<String, String> aliases(List<MetricJoinDsl> orderedJoins) {
+    private static Map<String, String> resolveAliases(List<MetricJoinDsl> orderedJoins) {
         Map<String, String> result = new LinkedHashMap<>();
         result.put("", "p");
         for (int index = 0; index < orderedJoins.size(); index++) {
@@ -347,9 +384,8 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         return result;
     }
 
-    private static Map<String, MetricMeasureDsl> measures(MetricDSLDefinition definition) {
-        Map<String, MetricValueDsl> values = definition.valueShape() == MetricValueShape.SCALAR
-                ? Map.of("value", definition.value()) : new TreeMap<>(definition.fields());
+    private static Map<String, MetricMeasureDsl> resolveMeasures(MetricDSLDefinition definition) {
+        Map<String, MetricValueDsl> values = definition.valueShape() == MetricValueShape.SCALAR ? Map.of("value", definition.value()) : new TreeMap<>(definition.fields());
         Map<String, MetricMeasureDsl> result = new LinkedHashMap<>();
         for (Map.Entry<String, MetricValueDsl> entry : values.entrySet()) {
             MetricMeasureDsl measure = entry.getValue().measure();
@@ -363,8 +399,8 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         return result;
     }
 
-    private static Map<String, String> selectedFields(MetricRowSelectionDsl selection,
-                                                     Map<String, MetricMeasureDsl> measures) {
+    private static Map<String, String> resolveSelectedFields(MetricRowSelectionDsl selection,
+                                                      Map<String, MetricMeasureDsl> measures) {
         Map<String, String> result = new LinkedHashMap<>();
         Set<String> references = new TreeSet<>();
         for (MetricMeasureDsl measure : measures.values()) {
@@ -372,7 +408,7 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
                 references.add(measure.field());
             }
             if (measure.filter() != null) {
-                filterFields(measure.filter(), references);
+                collectFilterFields(measure.filter(), references);
             }
         }
         if (references.isEmpty()) {
@@ -384,14 +420,14 @@ public final class MetricJdbcSqlCompiler implements MetricQuerySqlRender {
         return result;
     }
 
-    private static void filterFields(MetricFilterDsl filter, Set<String> fields) {
+    private static void collectFilterFields(MetricFilterDsl filter, Set<String> fields) {
         switch (filter) {
             case ComparisonMetricFilterDsl comparison -> fields.add(comparison.fieldRef());
             case SetMetricFilterDsl set -> fields.add(set.fieldRef());
             case NullMetricFilterDsl nullFilter -> fields.add(nullFilter.fieldRef());
             case LogicalMetricFilterDsl logical -> {
                 for (MetricFilterDsl operand : logical.operands()) {
-                    filterFields(operand, fields);
+                    collectFilterFields(operand, fields);
                 }
             }
         }

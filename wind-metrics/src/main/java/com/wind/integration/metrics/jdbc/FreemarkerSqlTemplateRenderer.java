@@ -40,13 +40,13 @@ import java.util.Objects;
  *
  * @author wuxp
  */
-public final class MetricSqlTemplateRenderer implements MetricQuerySqlRender {
+public final class FreemarkerSqlTemplateRenderer implements MetricQuerySqlRender {
 
     private static final DateTimeFormatter SQL_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final Configuration configuration;
 
-    public MetricSqlTemplateRenderer() {
+    public FreemarkerSqlTemplateRenderer() {
         Configuration configuration = new Configuration(Configuration.VERSION_2_3_34);
         configuration.setNumberFormat("computer");
         configuration.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);

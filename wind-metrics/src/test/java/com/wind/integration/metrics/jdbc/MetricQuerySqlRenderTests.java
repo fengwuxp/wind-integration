@@ -42,10 +42,10 @@ class MetricQuerySqlRenderTests {
 
     private final MetricQuerySqlRender dsl = compiler;
 
-    private final MetricQuerySqlRender sql = new MetricSqlTemplateRenderer();
+    private final MetricQuerySqlRender sql = new FreemarkerSqlTemplateRenderer();
 
     private final MetricQuerySqlRender composite =
-            new CompositeMetricQuerySqlRender(compiler, new MetricSqlTemplateRenderer());
+            new CompositeMetricQuerySqlRender(compiler, new FreemarkerSqlTemplateRenderer());
 
     /**
      * 场景：统一 DSL 渲染入口使用已登记的事实映射。

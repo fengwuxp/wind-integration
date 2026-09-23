@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * 指标 JDBC 过滤条件渲染器，将指标 DSL 过滤条件翻译为 jOOQ SQL 条件表达式。
+ * 指标 JDBC 谓词渲染器，将指标 DSL 过滤条件翻译为 jOOQ SQL 条件表达式。
  *
  * <h2>核心职责</h2>
  * <ul>
@@ -36,11 +36,10 @@ import java.util.function.Function;
  * </ul>
  *
  * <h2>使用场景</h2>
- * <p>被以下三种查询共用：
+ * <p>被事实查询和有限行集查询共用：
  * <ul>
  *   <li>实时查询：直接从数据源表查询</li>
  *   <li>有限行集查询：先过滤再聚合的查询</li>
- *   <li>物化查询：从快照表查询</li>
  * </ul>
  *
  * <h2>设计约束</h2>
@@ -48,11 +47,11 @@ import java.util.function.Function;
  *
  * @author wuxp
  */
-final class MetricJdbcFilterRenderer {
+final class MetricJdbcPredicateRenderer {
 
     private final MetricJdbcValueNormalizer normalizer;
 
-    MetricJdbcFilterRenderer(MetricJdbcValueNormalizer normalizer) {
+    MetricJdbcPredicateRenderer(MetricJdbcValueNormalizer normalizer) {
         this.normalizer = normalizer;
     }
 

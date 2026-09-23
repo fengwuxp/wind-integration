@@ -8,10 +8,10 @@ import com.wind.integration.metrics.spec.MetricSqlDefinition;
 import java.util.Objects;
 
 /**
- * 聚合 DSL 与 SQL 两种 {@link MetricQuerySqlRender} 实现的统一入口。
+ * 按定义类型编排 DSL 与 SQL 两种 {@link MetricQuerySqlRender} 实现的统一入口。
  *
- * <p>按 {@link MetricDefinitionObject} 的 sealed 类型判断分发到对应实现，不持有额外状态、
- * 不选择修订、不查询数据库。</p>
+ * <p>它只做一次类型分派和空值校验：DSL 交给编译器，SQL 交给模板渲染器；不持有额外业务状态、
+ * 不选择修订、不查询数据库，也不把两种 SQL 语义合并成一条执行路径。</p>
  *
  * @author wuxp
  */

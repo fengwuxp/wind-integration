@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * 以 {@code docs/metrics/legacy-sit-2026-09-16/SCENARIOS.md} 的真实指标为输入，
+ * 以本类固定的消费、退款、授权等业务指标场景为输入，
  * 验证 {@link MetricJdbcSqlCompiler} 对复杂场景的当前覆盖边界。
  *
  * <p>用例直接将 {@link MetricDSLDefinition} 交给编译器，与夹具提供的冻结 {@link MetricJdbcMapping}、

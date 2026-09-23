@@ -16,8 +16,12 @@ public enum MetricJoinType implements DescriptiveEnum {
 
     @Schema(description = "内连接")
     INNER("内连接"),
+
     @Schema(description = "左连接")
-    LEFT("左连接");
+    LEFT("左连接"),
+
+    @Schema(description = "右连接")
+    RIGHT("右连接");
 
     /** 枚举描述。 */
     private final String desc;

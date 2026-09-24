@@ -66,8 +66,9 @@ class DataIsolationQueryInterceptorIntegrationTests {
         }
     }
 
+    /** 列表查询同时遵守 SIT 环境与测试数据上下文，离开上下文后恢复正式查询范围。 */
     @Test
-    void baseMapperQueryUsesEnvAndTestContextConditions() throws Exception {
+    void testBaseMapperQueryUsesEnvAndTestContextConditions() throws Exception {
         List<DataEntity> records = inTestContext(() -> selectList(QueryWrapper.create()));
 
         assertEquals(List.of(1L), records.stream().map(DataEntity::getId).sorted().toList());
@@ -76,8 +77,9 @@ class DataIsolationQueryInterceptorIntegrationTests {
         assertEquals(List.of(1L, 2L), formalRecords.stream().map(DataEntity::getId).sorted().toList());
     }
 
+    /** 游标读取同样过滤其他环境及非测试记录，不能绕过列表查询的隔离条件。 */
     @Test
-    void baseMapperCursorUsesIsolationConditions() throws Exception {
+    void testBaseMapperCursorUsesIsolationConditions() throws Exception {
         List<Long> ids = inTestContext(() -> {
             try (SqlSession session = sqlSessionFactory.openSession()) {
                 Cursor<DataEntity> cursor = session.getMapper(DataMapper.class)

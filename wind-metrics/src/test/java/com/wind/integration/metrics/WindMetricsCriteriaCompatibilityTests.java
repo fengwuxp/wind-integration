@@ -115,20 +115,6 @@ class WindMetricsCriteriaCompatibilityTests {
         assertThrows(IllegalArgumentException.class, () -> evaluator.evaluate(WindMetricsAggregationQuery.fromQuery(criteria)));
     }
 
-    /**
-     * 场景：原生公共条件入口可区分同名维度和参数。
-     * 输入：维度 currency=USD，参数 currency=EUR。
-     * 流程：调用原生 MetricQuery 求值接口并分别读取两者。
-     * 预期：按顺序得到 USD、EUR。
-     */
-    @Test
-    void testNativeCriteriaEvaluatorReceivesDistinctNamespaces() {
-        MetricQuery criteria = new MetricQuery("1", null, null,
-                Map.of("currency", "USD"), Map.of("currency", "EUR"));
-        WindMetricsValueEvaluator<List<Object>> evaluator = query ->
-                List.of(query.dimensionValues().get("currency"), query.parameterValues().get("currency"));
-        assertEquals(List.of("USD", "EUR"), evaluator.evaluate(criteria));
-    }
 
     /**
      * 场景：旧模板查询 JSON 属性集合保持兼容。

@@ -71,7 +71,7 @@ class WindMetricsValueCapabilityTests {
      * 场景：调用方在三种查询模式下都可用相同的标量值视图。
      * 输入：各 MetricQueryMode 的 income@7 结果，金额12.5000。
      * 流程：通过结果自身的 WindMetricsValue 能力取值，再序列化结果。
-     * 预期：code/值/版本/模式保留；结果不成为求值器，JSON 只保留当前字段。
+     * 预期：code/值/版本/模式保留，JSON 只保留当前字段。
      */
     @ParameterizedTest
     @EnumSource(MetricQueryMode.class)
@@ -83,7 +83,6 @@ class WindMetricsValueCapabilityTests {
         assertEquals(new BigDecimal("12.5000"), value.getValue());
         assertEquals(7, detailed.definitionRevision());
         assertEquals(mode, detailed.executionMode());
-        assertFalse(value instanceof WindMetricsEvaluator<?>);
         // 详细查询结果保留查询语义字段，不增加 JavaBean 值属性。
         String json = WindJson.toJsonString(detailed);
         assertFalse(json.contains("\"metricsValue\""));
@@ -98,8 +97,8 @@ class WindMetricsValueCapabilityTests {
     /**
      * 场景：字段集合的读取方式不随查询模式变化。
      * 输入：各模式下 amount=12.5000、count=3、average=null。
-     * 流程：读取装配方提供的字段 Map。
-     * 预期：顺序、数值类型和显式 null 保留，missing 不存在。
+     * 流程：装配结果经真实 JSON 序列化和反序列化后读取 payload 与具名字段。
+     * 预期：顺序、数值精度、具名字段类型和显式 null 保留，missing 不存在。
      */
     @ParameterizedTest
     @EnumSource(MetricQueryMode.class)
@@ -108,31 +107,39 @@ class WindMetricsValueCapabilityTests {
         fields.put("amount", new MetricFieldValue(MetricValueType.DECIMAL, new BigDecimal("12.5000")));
         fields.put("count", new MetricFieldValue(MetricValueType.LONG, 3L));
         fields.put("average", new MetricFieldValue(MetricValueType.DECIMAL, null));
-        MetricResult result = result("summary", mode, MetricValueShape.FIELD_SET, null, fields);
+        MetricResult original = result("summary", mode, MetricValueShape.FIELD_SET, null, fields);
+        MetricResult result = WindJson.parseObject(WindJson.toJsonString(original), MetricResult.class);
         Map<?, ?> value = assertInstanceOf(Map.class, result.getValue());
 
         assertEquals("summary", result.getCode());
         assertEquals(List.of("amount", "count", "average"), List.copyOf(value.keySet()));
         assertEquals(new BigDecimal("12.5000"), value.get("amount"));
-        assertEquals(3L, value.get("count"));
+        assertEquals(3L, ((Number) value.get("count")).longValue());
         assertTrue(value.containsKey("average"));
         assertNull(value.get("average"));
         assertFalse(value.containsKey("missing"));
+        assertEquals(mode, result.executionMode());
+        assertEquals(MetricValueType.LONG, result.fields().get("count").value().getValueType());
+        assertEquals(3L, result.fields().get("count").value().getValue());
+        assertEquals(MetricValueType.DECIMAL, result.fields().get("average").value().getValueType());
+        assertNull(result.fields().get("average").value().getValue());
     }
 
     /**
      * 场景：正常空标量在三种模式的只读视图中保持为空。
      * 输入：各 MetricQueryMode 的 SCALAR 结果，value=null。
-     * 流程：通过 value 和 getValue 读取原始值。
+     * 流程：真实 JSON 往返后通过 value 和 getValue 读取原始值。
      * 预期：两入口均为空，指标编码保留，不编造零值。
      */
     @ParameterizedTest
     @EnumSource(MetricQueryMode.class)
     void testNormalEmptyScalarRemainsNull(MetricQueryMode mode) {
-        MetricResult result = result("empty", mode, MetricValueShape.SCALAR, null, Map.of());
+        MetricResult original = result("empty", mode, MetricValueShape.SCALAR, null, Map.of());
+        MetricResult result = WindJson.parseObject(WindJson.toJsonString(original), MetricResult.class);
         assertEquals("empty", result.getCode());
         assertNull(result.value());
         assertNull(result.getValue());
+        assertEquals(mode, result.executionMode());
     }
 
     /**

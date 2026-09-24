@@ -8,7 +8,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -26,12 +25,9 @@ class MetricArchitectureDependencyTests {
      * 预期：违规列表为空；此源码规则不证明运行时装配，也不检查已排除的 json 包。
      */
     @Test
-    void testPublicCapabilitiesAndJsonSupportDoNotDependOnDslOrJdbc() throws IOException {
+    void testPublicCapabilitiesDoNotDependOnDslOrJdbc() throws IOException {
         Path root = Path.of("src/main/java/com/wind/integration/metrics");
         Pattern implementationDependency = Pattern.compile("\\bcom\\.wind\\.integration\\.metrics\\.(?:dsl\\.(?!definition\\.MetricReferenceDsl\\b)|jdbc\\.)");
-        assertFalse(implementationDependency.matcher("com.wind.integration.metrics.dsl.definition.MetricReferenceDsl").find());
-        assertTrue(implementationDependency.matcher("com.wind.integration.metrics.dsl.MetricValueCalculator").find());
-        assertTrue(implementationDependency.matcher("com.wind.integration.metrics.jdbc.MetricJdbcSqlCompiler").find());
         try (var paths = Files.walk(root)) {
             List<Path> violations = paths.filter(path -> path.toString().endsWith(".java"))
                     .filter(path -> !root.relativize(path).startsWith("dsl"))

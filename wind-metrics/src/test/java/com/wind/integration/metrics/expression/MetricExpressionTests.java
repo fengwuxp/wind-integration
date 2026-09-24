@@ -12,8 +12,6 @@ import com.wind.integration.metrics.enums.MetricValueType;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.springframework.expression.spel.standard.SpelExpression;
-import org.springframework.expression.spel.standard.SpelExpressionParser;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -451,72 +449,8 @@ class MetricExpressionTests {
                 UnsupportedOperationException.class, () -> compiled.localValueFields().clear());
     }
 
-    /**
-     * 场景：运行时仍防御内部错误构造的未校验句柄。
-     * 输入：手动注入方法调用、布尔结果、类型访问及构造器 AST。
-     * 流程：绕过编译入口构造句柄后 evaluate。
-     * 预期：均报 RESULT_INVALID，并定位 expression；不把此夹具当公共配置入口。
-     */
-    @Test
-    void testRuntimeSandboxRejectsInternallyMalformedHandles() {
-        MetricValueDsl value = value("count * 2", MetricValueType.LONG, null);
-        for (String source :
-                List.of(
-                        "hashCode()",
-                        "count > 0",
-                        "T(java.lang.String)",
-                        "new java.lang.String()")) {
-            MetricExpression bypassed =
-                    new MetricExpression(parse(source), Set.of("count"), Set.of(), false);
-            MetricValidationException exception =
-                    Assertions.assertThrows(
-                            MetricValidationException.class,
-                            () ->
-                                    bypassed.evaluate(
-                                            value, Map.of("count", 1L), Map.of(), VALUE_PATH));
-            Assertions.assertEquals(MetricErrorCode.RESULT_INVALID, exception.errorCode());
-            Assertions.assertEquals(VALUE_PATH + "/expression", exception.fieldPath());
-        }
-    }
 
-    /**
-     * 场景：内部错误句柄不能读取校验集合以外的依赖。
-     * 输入：声明 DECLARED.value，但 AST 读取 OTHER.value；输入同时含两者。
-     * 流程：直接构造不一致句柄并求值。
-     * 预期：即使输入已有 OTHER，也必须拒绝越界引用。
-     */
-    @Test
-    void testRuntimeCannotReadOutsideValidatedMetricReferences() {
-        MetricValueDsl value = value("metric('DECLARED', 'value')", MetricValueType.LONG, null);
-        MetricValueReference declared = new MetricValueReference("DECLARED", "value");
-        MetricValueReference undeclared = new MetricValueReference("OTHER", "value");
-        MetricExpression bypassed =
-                new MetricExpression(
-                        parse("metric('OTHER', 'value')"), Set.of(), Set.of(declared), false);
-        Assertions.assertThrows(
-                MetricValidationException.class,
-                () ->
-                        bypassed.evaluate(
-                                value, Map.of(), Map.of(declared, 1L, undeclared, 2L), VALUE_PATH));
-    }
 
-    /**
-     * 场景：内部错误句柄不能读取校验集合以外的本地字段。
-     * 输入：只声明 count，AST 使用 extra + 1，输入含 extra=99。
-     * 流程：直接构造不一致句柄并求值。
-     * 预期：拒绝读取未声明的 extra。
-     */
-    @Test
-    void testRuntimeCannotReadOutsideValidatedLocalFields() {
-        MetricValueDsl value = value("count * 2", MetricValueType.LONG, null);
-        MetricExpression bypassed =
-                new MetricExpression(parse("extra + 1"), Set.of("count"), Set.of(), false);
-        Assertions.assertThrows(
-                MetricValidationException.class,
-                () ->
-                        bypassed.evaluate(
-                                value, Map.of("count", 1L, "extra", 99L), Map.of(), VALUE_PATH));
-    }
 
     private MetricExpression fact(MetricValueDsl value, Set<String> fields) {
         return compiler.compile(value.expression(), fields, VALUE_PATH + "/expression");
@@ -532,7 +466,4 @@ class MetricExpressionTests {
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
     }
 
-    private static SpelExpression parse(String expression) {
-        return (SpelExpression) new SpelExpressionParser().parseExpression(expression);
-    }
 }

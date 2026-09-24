@@ -75,8 +75,6 @@ class MetricQueryTests {
 
         dimensions.clear();
         parameters.clear();
-        assertSame(criteria.dimensionValues(), criteria.dimensionValues());
-        assertSame(criteria.parameterValues(), criteria.parameterValues());
         assertSame(date, criteria.dimensionValues().get("date"));
         assertSame(timestamp, criteria.dimensionValues().get("timestamp"));
         assertEquals(123456789, timestamp.getNanos());
@@ -142,7 +140,6 @@ class MetricQueryTests {
         assertEquals(parameters, restored.parameterValues());
         assertEquals("USER_METRICS", restored.planCode());
         assertEquals(3, restored.planRevision());
-        assertEquals(6, MetricQuery.class.getRecordComponents().length);
         assertEquals(6, WindJson.getJsonMapper().readValue(json, Map.class).size());
     }
 

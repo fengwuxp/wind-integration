@@ -29,7 +29,8 @@ import java.util.Objects;
  * 无下界不隐含业务原点；宿主结合请求或已知覆盖起点确定有限的物化、读取范围。
  * 目标边界不代表已生成快照，缺片、缺字段或不连续覆盖不能当作合法尾部滞后。</p>
  *
- * <p>同一计划的成员共享全部分段及保存目标。宿主发布时校验定义的模式、主体、维度、时间口径
+ * <p>草稿允许暂时没有成员；宿主保存时校验成员编码唯一性，发布及执行时要求成员非空。
+ * 同一计划的成员共享全部分段及保存目标。宿主发布时校验定义的模式、主体、维度、时间口径
  * 和可合并状态；宽表还须校验成员字段及类型，并按相同实际区间整组提交。
  * 快照查询由宿主在本次一致性读取边界内通过成员关系解析唯一已发布计划，固定来源顺序、实际边界和读取路线；
  * 无候选不可读，多候选冲突失败。查询不把 {@code YEAR}/{@code MONTH} 枚举成理论时间片，
@@ -39,7 +40,7 @@ import java.util.Objects;
  * @param schemaVersion Plan DSL 结构版本，只支持4；旧版本须显式迁移
  * @param executionMode 计划的物化结构分支，只允许 SNAPSHOT 或 SEGMENTED，不切换指标默认读取模式
  * @param dimensionKeyProviderCode 业务维度键提供方的逻辑注册编码
- * @param metrics 精确版本的独立指标，非空且编码唯一
+ * @param metrics 精确版本的指标引用；草稿可空，成员唯一性及发布资格由宿主按生命周期校验
  * @param snapshotGranularity 非分段快照必填的刷新及提交周期；分段模式不得设置
  * @param snapshotTarget 所有成员及快照分段共用的逻辑保存目标
  * @param segments 按近到远声明的规则；SNAPSHOT 模式为空
@@ -52,7 +53,7 @@ public record MetricMaterializationPlanDsl(
         @Schema(description = "Plan DSL 结构版本，只支持4") Integer schemaVersion,
         @Schema(description = "计划的物化结构分支，不切换指标默认读取模式") MetricQueryMode executionMode,
         @Schema(description = "业务维度键提供方的逻辑注册编码") String dimensionKeyProviderCode,
-        @Schema(description = "精确版本的独立指标，非空且编码唯一") List<MetricReferenceDsl> metrics,
+        @Schema(description = "物化快照关联的指标集合") List<MetricReferenceDsl> metrics,
         @Nullable @Schema(description = "非分段快照必填的刷新及提交周期；分段模式为空") MetricSnapshotGranularity snapshotGranularity,
         @JsonProperty(required = true) @Schema(description = "成员及快照分段共用的逻辑保存目标") MetricSnapshotTargetDsl snapshotTarget,
         @Schema(description = "按近到远声明的分段；SNAPSHOT 模式为空") List<MetricSegmentDsl> segments) {
@@ -75,9 +76,7 @@ public record MetricMaterializationPlanDsl(
         if (dimensionKeyProviderCode.isBlank()) {
             throw invalid("/dimensionKeyProviderCode", "Dimension key provider code must not be blank");
         }
-        if (metrics.isEmpty() || metrics.stream().map(MetricReferenceDsl::metricCode).distinct().count() != metrics.size()) {
-            throw invalid("/metrics", "Plan metrics must be nonempty and unique by metricCode");
-        }
+
         if (executionMode == MetricQueryMode.SNAPSHOT) {
             if (snapshotGranularity == null) {
                 throw invalid("/snapshotGranularity", "SNAPSHOT mode requires a refresh and commit granularity");

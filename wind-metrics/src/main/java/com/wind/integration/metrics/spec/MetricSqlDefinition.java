@@ -1,53 +1,39 @@
 package com.wind.integration.metrics.spec;
 
-import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDsl;
-import com.wind.integration.metrics.enums.MetricDerivationType;
-import com.wind.integration.metrics.enums.MetricValueShape;
-import io.swagger.v3.oas.annotations.media.Schema;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.wind.integration.metrics.MetricValidationException;
+import com.wind.integration.metrics.enums.MetricDefinitionType;
+import com.wind.integration.metrics.enums.MetricErrorCode;
+import org.jspecify.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 /**
- * 通过 SQL 定义的指标（仅支持实时查询）
+ * 声明取得指标计算输入的 SQL 模板，值口径与精确依赖由 {@link MetricDefinition} 保存。
  *
- * <p>SQL 模板指标不支持快照物化，适用于复杂查询逻辑或跨数据源场景。</p>
+ * <p>模板返回共同 value/fields 中非表达式字段的同名列。声明 measure 时，列值已是该聚合的
+ * 原始状态；不再根据 field/filter 二次聚合。是否可合并、物化由状态能力决定，不由 SQL 名称决定。
+ * 旧 SQL 没有值声明时仅按宿主原实时兼容路径读取，不猜测其类型、精度和累计能力。</p>
  *
- * @param code        稳定且唯一的指标编码
- * @param revision    定义修订号，与编码共同唯一标识一个定义实例
- * @param valueShape  指标值结构
- * @param subjectType 主体类型
- * @param dimensions  聚合维度列表
- * @param parameters  查询参数定义
- * @param sqlTemplate SQL 模板文本
+ * @param sqlTemplate 受信 SQL 模板；渲染器负责模板语法，仓储负责实际执行
  * @author wuxp
- * @date 2026-09-16
  */
-@Schema(description = "通过 SQL 定义的指标")
-public record MetricSqlDefinition(
-        @Schema(description = "稳定且唯一的指标编码") String code,
-        @Schema(description = "定义修订号，与编码共同唯一标识一个定义实例") int revision,
-        @Schema(description = "指标值结构") MetricValueShape valueShape,
-        @Schema(description = "主体类型") String subjectType,
-        @Schema(description = "聚合维度列表") List<String> dimensions,
-        @Schema(description = "查询参数定义") Map<String, MetricQueryParameterDsl> parameters,
-        @Schema(description = "SQL 模板文本") String sqlTemplate) implements MetricDefinitionObject {
+public record MetricSqlDefinition(String sqlTemplate) implements MetricValueQueryDefinition {
 
     public MetricSqlDefinition {
-        Objects.requireNonNull(code, "code must not be null");
-        Objects.requireNonNull(valueShape, "valueShape must not be null");
-        Objects.requireNonNull(subjectType, "subjectType must not be null");
         Objects.requireNonNull(sqlTemplate, "sqlTemplate must not be null");
-        dimensions = List.copyOf(dimensions);
-        parameters = Collections.unmodifiableMap(new LinkedHashMap<>(parameters));
     }
 
     @Override
-    public MetricDerivationType derivationType() {
-        return MetricDerivationType.RAW;
+    public MetricDefinitionType type() {
+        return MetricDefinitionType.SQL;
+    }
+    // 拒绝错层规则，避免保存时静默丢失共同口径或读取策略。
+    @SuppressWarnings({"PMD.UnusedPrivateMethod", "PMD.UnusedFormalParameter"})
+    @JsonAnySetter
+    private void rejectUnknownProperty(String name, @Nullable Object ignored) {
+        throw new MetricValidationException(MetricErrorCode.DSL_VALUE_INVALID,
+                "/metric/valueQuery/" + name.replace("~", "~0").replace("/", "~1"), "Unknown value query property");
     }
 
 }

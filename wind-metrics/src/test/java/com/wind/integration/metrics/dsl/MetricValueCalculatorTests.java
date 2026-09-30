@@ -1,17 +1,15 @@
 package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.spec.MetricDSLDefinition;
 import com.wind.integration.metrics.dsl.definition.MetricExpressionDsl;
-import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
 import com.wind.integration.metrics.dsl.definition.MetricOrElseDsl;
+import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
+import com.wind.integration.metrics.dsl.definition.MetricTimeDsl;
 import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
 import com.wind.integration.metrics.dsl.definition.selection.MetricLimitDsl;
 import com.wind.integration.metrics.dsl.definition.selection.MetricRowSelectionDsl;
-import com.wind.integration.metrics.expression.MetricExpression;
-import com.wind.integration.metrics.expression.MetricExpressionCompiler;
 import com.wind.integration.metrics.dsl.literal.DecimalMetricLiteralDsl;
 import com.wind.integration.metrics.enums.MetricAggregation;
 import com.wind.integration.metrics.enums.MetricErrorCode;
@@ -19,13 +17,18 @@ import com.wind.integration.metrics.enums.MetricExpressionType;
 import com.wind.integration.metrics.enums.MetricOrElseMode;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
-
+import com.wind.integration.metrics.expression.MetricExpression;
+import com.wind.integration.metrics.expression.MetricExpressionCompiler;
+import com.wind.integration.metrics.spec.MetricDSLDefinition;
+import com.wind.integration.metrics.spec.MetricDefinition;
+import com.wind.integration.metrics.spec.MetricSqlDefinition;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -55,7 +58,7 @@ class MetricValueCalculatorTests {
     void testMergeBeforeRoundingAndExpressions() {
         MetricValueDsl amount =
                 measure(MetricAggregation.SUM, MetricValueType.DECIMAL, MetricOrElseMode.NULL);
-        MetricDSLDefinition definition =
+        MetricDefinition definition =
                 fields(Map.of("amount", amount, "doubleAmount", expression()));
         Map<String, Number> raw =
                 calculator.merge(
@@ -64,7 +67,7 @@ class MetricValueCalculatorTests {
                                 Map.of("amount", new BigDecimal("0.00004")),
                                 Map.of("amount", new BigDecimal("0.00004"))));
         Assertions.assertEquals(new BigDecimal("0.00008"), raw.get("amount"));
-        Map<String, Number> result =
+        Map<String, Object> result =
                 calculator.calculate(
                         definition,
                         raw,
@@ -86,7 +89,7 @@ class MetricValueCalculatorTests {
      */
     @Test
     void testMergeSumCountMinMaxAndNull() {
-        MetricDSLDefinition definition =
+        MetricDefinition definition =
                 fields(
                         Map.of(
                                 "count",
@@ -155,7 +158,7 @@ class MetricValueCalculatorTests {
     void testAllNullStaysNullUntilFinalOrElse() {
         for (MetricAggregation aggregation :
                 List.of(MetricAggregation.SUM, MetricAggregation.MIN, MetricAggregation.MAX)) {
-            MetricDSLDefinition definition =
+            MetricDefinition definition =
                     scalar(measure(aggregation, MetricValueType.DECIMAL, MetricOrElseMode.ZERO));
             Map<String, Number> raw =
                     calculator.merge(
@@ -179,7 +182,7 @@ class MetricValueCalculatorTests {
      */
     @Test
     void testExpressionsSeeMeasuresBeforeOrElseAndCannotMutateThem() {
-        MetricDSLDefinition definition =
+        MetricDefinition definition =
                 fields(
                         Map.of(
                                 "amount",
@@ -189,7 +192,7 @@ class MetricValueCalculatorTests {
                                         MetricOrElseMode.ZERO),
                                 "ratio",
                                 expression()));
-        Map<String, Number> result =
+        Map<String, Object> result =
                 calculator.calculate(
                         definition,
                         Collections.singletonMap("amount", null),
@@ -214,7 +217,7 @@ class MetricValueCalculatorTests {
      */
     @Test
     void testCountRejectsNullFractionAndMissingFields() {
-        MetricDSLDefinition definition =
+        MetricDefinition definition =
                 scalar(
                         measure(
                                 MetricAggregation.COUNT,
@@ -243,7 +246,7 @@ class MetricValueCalculatorTests {
      */
     @Test
     void testCountAccumulatesExactlyBeforeFinalRangeCheck() {
-        MetricDSLDefinition definition =
+        MetricDefinition definition =
                 scalar(
                         measure(
                                 MetricAggregation.COUNT,
@@ -309,7 +312,7 @@ class MetricValueCalculatorTests {
      */
     @Test
     void testMergeRejectsFloatingPointAndBadSegments() {
-        MetricDSLDefinition definition =
+        MetricDefinition definition =
                 scalar(
                         measure(
                                 MetricAggregation.SUM,
@@ -334,7 +337,7 @@ class MetricValueCalculatorTests {
      */
     @Test
     void testAvgIsAllowedForSingleQueryAndRejectedForMerge() {
-        MetricDSLDefinition definition =
+        MetricDefinition definition =
                 scalar(
                         measure(
                                 MetricAggregation.AVG,
@@ -364,35 +367,26 @@ class MetricValueCalculatorTests {
      * 场景：限制行数的定义不支持跨桶合并。
      * 输入：COUNT 定义配置 limit=10，单次聚合值3。
      * 流程：先校验可合并性，再做单次 calculate。
-     * 预期：合并校验在 /metric/rowSelection 失败；单次结果仍为3。
+     * 预期：合并校验在 /metric/valueQuery/rowSelection 失败；单次结果仍为3。
      */
     @Test
     void testRowSelectionRejectsBucketMerge() {
-        MetricDSLDefinition original =
+        MetricDefinition original =
                 scalar(
                         measure(
                                 MetricAggregation.COUNT,
                                 MetricValueType.LONG,
                                 MetricOrElseMode.NULL));
-        MetricDSLDefinition limited =
-                new MetricDSLDefinition(
-                        original.code(),
-                        original.revision(),
-                        original.valueShape(),
-                        original.fact(),
-                        original.joins(),
-                        original.subject(),
-                        original.time(),
-                        original.dimensions(),
-                        original.parameters(),
-                        new MetricRowSelectionDsl(null, List.of(), new MetricLimitDsl(10, null)),
-                        original.value(),
-                        original.fields());
+        MetricDefinition limited =
+                new MetricDefinition(original.code(), original.revision(), original.valueShape(),
+                        original.subject(), original.dimensions(), original.parameters(),
+                        new MetricDSLDefinition(((MetricDSLDefinition) original.valueQuery()).fact(), ((MetricDSLDefinition) original.valueQuery()).joins(), ((MetricDSLDefinition) original.valueQuery()).time(), new MetricRowSelectionDsl(null, List.of(), new MetricLimitDsl(10, null))),
+                        original.value(), original.fields(), List.of());
         MetricValidationException exception =
                 Assertions.assertThrows(
                         MetricValidationException.class,
                         () -> calculator.validateMergeable(limited));
-        Assertions.assertEquals("/metric/rowSelection", exception.fieldPath());
+        Assertions.assertEquals("/metric/valueQuery/rowSelection", exception.fieldPath());
         Assertions.assertEquals(
                 3L,
                 calculator
@@ -408,24 +402,11 @@ class MetricValueCalculatorTests {
      */
     @Test
     void testDerivedExpressionUsesEmptyMeasuresAndNormalizesResult() {
-        MetricDSLDefinition definition =
-                new MetricDSLDefinition(
-                        "DERIVED",
-                        1,
-                        MetricValueShape.SCALAR,
-                        null,
-                        List.of(),
-                        new MetricSubjectDsl("GLOBAL", null),
-                        null,
-                        List.of(),
-                        Map.of(),
-                        null,
-                        new MetricValueDsl(MetricValueType.DECIMAL, 4, RoundingMode.HALF_UP, null,
+        MetricDefinition definition =
+                new MetricDefinition("DERIVED", 1, MetricValueShape.SCALAR, new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(), null, new MetricValueDsl(MetricValueType.DECIMAL, 4, RoundingMode.HALF_UP, null,
                                 new MetricExpressionDsl(MetricExpressionType.SPEL, "metric('BASE', 'value')"),
-                                new MetricOrElseDsl(MetricOrElseMode.NULL, null)),
-                        Map.of(),
-                        List.of(new MetricReferenceDsl("BASE", 1)));
-        Map<String, Number> result =
+                                new MetricOrElseDsl(MetricOrElseMode.NULL, null)), Map.of(), List.of(new MetricReferenceDsl("BASE", 1)));
+        Map<String, Object> result =
                 calculator.calculate(
                         definition,
                         Map.of(),
@@ -461,7 +442,7 @@ class MetricValueCalculatorTests {
                         null,
                         expression.expression(),
                         new MetricOrElseDsl(MetricOrElseMode.ZERO, null));
-        MetricDSLDefinition definition =
+        MetricDefinition definition =
                 fields(
                         Map.of(
                                 "count",
@@ -542,7 +523,7 @@ class MetricValueCalculatorTests {
                         new MetricExpressionDsl(
                                 MetricExpressionType.SPEL, "count == 0 ? null : ratio(sum, count)"),
                         new MetricOrElseDsl(MetricOrElseMode.ZERO, null));
-        MetricDSLDefinition definition =
+        MetricDefinition definition =
                 fields(
                         Map.of(
                                 "count",
@@ -568,7 +549,7 @@ class MetricValueCalculatorTests {
                         List.of(
                                 Map.of("sum", new BigDecimal("400"), "count", 1L),
                                 Map.of("sum", new BigDecimal("200"), "count", 9L)));
-        Map<String, Number> result =
+        Map<String, Object> result =
                 calculator.calculate(
                         definition,
                         merged,
@@ -619,35 +600,66 @@ class MetricValueCalculatorTests {
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
     }
 
-    private static MetricDSLDefinition scalar(MetricValueDsl value) {
-        return new MetricDSLDefinition(
-                "TOTAL",
-                1,
-                MetricValueShape.SCALAR,
-                "ORDER",
-                List.of(),
-                new MetricSubjectDsl("GLOBAL", null),
-                null,
-                List.of(),
-                Map.of(),
-                null,
-                value,
-                Map.of());
+    /**
+     * 场景：SQL 可直接返回状态文本和最近事件时间，不能强转为 Number。
+     * 输入：STRING=ACTIVE、带纳秒的 TIMESTAMP，另一次 STRING 为正常 null。
+     * 流程：使用共同定义进入最终计算，不配置表达式或累计状态。
+     * 预期：类型和值原样保留，null 不变；这些字段不能参与快照原始量合并。
+     */
+    @Test
+    void testSqlDirectTextAndTimestampUseDeclaredTypes() {
+        MetricOrElseDsl nullValue = new MetricOrElseDsl(MetricOrElseMode.NULL, null);
+        MetricValueDsl text = new MetricValueDsl(MetricValueType.STRING, null, null, null, null, nullValue);
+        MetricValueDsl time = new MetricValueDsl(MetricValueType.TIMESTAMP, null, null, null, null, nullValue);
+        MetricDefinition definition = new MetricDefinition("STATUS", 2, MetricValueShape.FIELD_SET,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(), new MetricSqlDefinition("SELECT state, time"),
+                null, Map.of("state", text, "time", time), List.of());
+        LocalDateTime occurred = LocalDateTime.of(2026, 9, 30, 12, 0, 0, 123456789);
+        Map<String, Object> input = new LinkedHashMap<>(Map.of("state", "ACTIVE", "time", occurred));
+        Assertions.assertEquals(input, calculator.calculate(definition, input,
+                (field, values) -> { throw new AssertionError("No expression is declared"); }));
+        input.put("state", null);
+        Assertions.assertEquals(input, calculator.calculate(definition, input, (field, values) -> null));
+        Assertions.assertThrows(MetricValidationException.class, () -> calculator.validateMergeable(definition));
+        Assertions.assertThrows(MetricValidationException.class, () -> calculator.normalize(text, 3L, "/state"));
+        Assertions.assertThrows(MetricValidationException.class, () -> calculator.normalize(time, occurred.toString(), "/time"));
     }
 
-    private static MetricDSLDefinition fields(Map<String, MetricValueDsl> fields) {
-        return new MetricDSLDefinition(
-                "SUMMARY",
-                1,
-                MetricValueShape.FIELD_SET,
-                "ORDER",
-                List.of(),
-                new MetricSubjectDsl("GLOBAL", null),
-                null,
-                List.of(),
-                Map.of(),
-                null,
-                null,
-                fields);
+    /**
+     * 场景：SQL 的直接数值可参与本地表达式，但没有聚合声明时不能被当作累计状态。
+     * 输入：DECIMAL amount=1.23456789，声明精度4，本地表达式 amount * 2。
+     * 流程：先归一直接值，再使用真实编译表达式；另尝试合并与缺失字段输入。
+     * 预期：保持既定阶段顺序，amount=1.2346、double=2.4692；缺状态或缺字段明确拒绝。
+     */
+    @Test
+    void testSqlDirectNumericExpressionDoesNotImplyMergeability() {
+        MetricOrElseDsl nullValue = new MetricOrElseDsl(MetricOrElseMode.NULL, null);
+        MetricValueDsl amount = new MetricValueDsl(MetricValueType.DECIMAL, 4, RoundingMode.HALF_UP, null, null, nullValue);
+        MetricValueDsl doubled = new MetricValueDsl(MetricValueType.DECIMAL, 4, RoundingMode.HALF_UP, null,
+                new MetricExpressionDsl(MetricExpressionType.SPEL, "amount * 2"), nullValue);
+        MetricDefinition definition = new MetricDefinition("DOUBLE", 1, MetricValueShape.FIELD_SET,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(), new MetricSqlDefinition("SELECT amount"),
+                null, Map.of("amount", amount, "double", doubled), List.of());
+        var expression = new MetricExpressionCompiler().compile(doubled.expression(), Set.of("amount"), "/metric/fields/double");
+        Assertions.assertEquals(Map.of("amount", new BigDecimal("1.2346"), "double", new BigDecimal("2.4692")),
+                calculator.calculate(definition, Map.of("amount", new BigDecimal("1.23456789")),
+                        (field, values) -> expression.evaluate(doubled, values, Map.of(), "/metric/fields/double")));
+        Assertions.assertThrows(MetricValidationException.class, () -> calculator.validateMergeable(definition));
+        Assertions.assertThrows(MetricValidationException.class,
+                () -> calculator.calculate(definition, Map.of(), (field, values) -> null));
+    }
+
+    private static MetricDefinition scalar(MetricValueDsl value) {
+        return new MetricDefinition("TOTAL", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                new MetricDSLDefinition("ORDER", List.of(), new MetricTimeDsl("createdAt"), null),
+                value, Map.of(), List.of());
+    }
+
+    private static MetricDefinition fields(Map<String, MetricValueDsl> fields) {
+        return new MetricDefinition("SUMMARY", 1, MetricValueShape.FIELD_SET,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                new MetricDSLDefinition("ORDER", List.of(), new MetricTimeDsl("createdAt"), null),
+                null, fields, List.of());
     }
 }

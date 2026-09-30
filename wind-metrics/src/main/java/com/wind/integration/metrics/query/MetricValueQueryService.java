@@ -1,10 +1,13 @@
 package com.wind.integration.metrics.query;
 
+import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 按生效或指定 DSL 定义修订查询最终指标值，支持单查及共同条件下的批量查询。
@@ -69,6 +72,43 @@ public interface MetricValueQueryService {
      */
     @NotNull
     MetricResult query(@NotBlank String metricCode, @NotNull @Positive Integer definitionRevision, @NotNull MetricQuery query);
+
+    /**
+     * 按精确已发布引用沿正常获准路线查询，用于派生依赖及已固定版本的正式读取。
+     *
+     * <p>与三参实时试算不同，本入口保留该精确修订的快照或分段路线。依赖递归须复用根查询的
+     * 一致性视图、查询条件和计算上下文，不追随 current，不为每个依赖另开独立事务。</p>
+     *
+     * @param reference 精确编码与修订，须满足宿主发布和读取资格
+     * @param query 本次完整查询条件
+     * @return 精确修订的最终值和实际 RAW 来源
+     * @throws UnsupportedOperationException 宿主尚未实现该能力；不能退化成实时试算
+     */
+    @NotNull
+    default MetricResult query(@NotNull MetricReferenceDsl reference, @NotNull MetricQuery query) {
+        throw new UnsupportedOperationException("Exact-reference route query is not implemented");
+    }
+
+    /**
+     * 为物化读取精确 RAW 定义在增量半开窗内的完整、可合并数值原始量。
+     *
+     * <p>在调用方的一致性边界内做一次事实取值，不选 current、不读旧快照、不计算最终表达式，
+     * 不舍入、不应用 orElse。专用物化工厂将结果与旧完整快照合并后装配保存目标，仓储提交后
+     * 才确认水位。缺字段不同于正常 null，COUNT 不得为 null。</p>
+     *
+     * <p>派生、缺原始量声明、AVG、有限行集、非数值状态或参数化状态身份不明确时必须拒绝。
+     * 本入口不写快照，不推进水位，不独立于物化调用方另开读取事务。</p>
+     *
+     * @param reference 精确已发布 RAW 定义
+     * @param query 主体、完整维度及明确的增量半开窗
+     * @return 字段集合恰好等于定义原始量集合的 Map，保留完整精度与正常 null
+     * @throws UnsupportedOperationException 宿主尚未实现原始量能力
+     * @throws RuntimeException 资格、状态能力、查询条件或任一原始量不合法
+     */
+    @NotNull
+    default Map<String, @Nullable Number> queryMeasures(@NotNull MetricReferenceDsl reference, @NotNull MetricQuery query) {
+        throw new UnsupportedOperationException("Exact-reference measure query is not implemented");
+    }
 
     /**
      * 使用共同条件，按输入顺序逐项查询各指标的生效定义。

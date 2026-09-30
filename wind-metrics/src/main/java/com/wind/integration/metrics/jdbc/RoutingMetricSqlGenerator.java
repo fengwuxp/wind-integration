@@ -2,7 +2,7 @@ package com.wind.integration.metrics.jdbc;
 
 import com.wind.integration.metrics.query.MetricQuery;
 import com.wind.integration.metrics.spec.MetricDSLDefinition;
-import com.wind.integration.metrics.spec.MetricDefinitionObject;
+import com.wind.integration.metrics.spec.MetricDefinition;
 import com.wind.integration.metrics.spec.MetricSqlDefinition;
 
 import java.util.Objects;
@@ -27,12 +27,13 @@ public final class RoutingMetricSqlGenerator implements MetricSqlGenerator {
     }
 
     @Override
-    public MetricSqlDescriptor generate(MetricDefinitionObject definition, MetricQuery query) {
+    public MetricSqlDescriptor generate(MetricDefinition definition, MetricQuery query) {
         Objects.requireNonNull(definition, "definition must not be null");
         Objects.requireNonNull(query, "query must not be null");
-        return switch (definition) {
+        return switch (definition.valueQuery()) {
             case MetricDSLDefinition ignored -> dsl.generate(definition, query);
             case MetricSqlDefinition ignored -> sql.generate(definition, query);
+            case null -> throw new IllegalArgumentException("Derived metric has no native value query");
         };
     }
 }

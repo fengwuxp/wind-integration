@@ -15,10 +15,10 @@ import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricExpressionType;
 import com.wind.integration.metrics.enums.MetricOrElseMode;
 import com.wind.integration.metrics.enums.MetricQueryMode;
+import com.wind.integration.metrics.enums.MetricSnapshotGranularity;
 import com.wind.integration.metrics.enums.MetricSnapshotStorageType;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
-import com.wind.integration.metrics.enums.MetricSnapshotGranularity;
 import com.wind.integration.metrics.expression.MetricExpressionCompiler;
 import com.wind.integration.metrics.expression.MetricValueReference;
 import com.wind.jackson.WindJson;
@@ -49,7 +49,7 @@ class MetricVersionReferenceTests {
      */
     @Test
     void testRawSpecRoundTripIncludesDefinitionType() {
-        assertSpecRoundTrip(new MetricDefinitionSpec.MetricDSLDefinitionSpec(1, raw()));
+        assertSpecRoundTrip(new MetricDefinitionSpec(1, raw()));
     }
 
     /**
@@ -60,32 +60,36 @@ class MetricVersionReferenceTests {
      */
     @Test
     void testSqlSpecRoundTripIncludesDefinitionType() {
-        MetricSqlDefinition definition = new MetricSqlDefinition("COUNT", 1, MetricValueShape.SCALAR,
-                "GLOBAL", List.of(), Map.of(), "SELECT COUNT(*) FROM orders");
-        MetricDefinitionSpec<?> spec = new MetricDefinitionSpec.MetricSqlDefinitionSpec(1, definition);
+        MetricDefinition definition = new MetricDefinition("COUNT", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                new MetricSqlDefinition("SELECT COUNT(*) FROM orders"),
+                null, Map.of(), List.of());
+        MetricDefinitionSpec spec = new MetricDefinitionSpec(1, definition);
         assertSpecRoundTrip(spec);
         Map<?, ?> body = WindJson.parseObject(WindJson.toJsonString(spec.definition()), Map.class);
-        Assertions.assertFalse(body.containsKey("dependencies"));
+        Assertions.assertEquals(List.of(), body.get("dependencies"));
     }
 
     /**
      * 场景：派生 Spec 自含精确引用，可还原后执行配置表达式。
-     * 输入：schema4，APPROVED@2 与 TOTAL@7，结果值1和3。
+     * 输入：旧 schema4 与共同 schema6，APPROVED@2 与 TOTAL@7，结果值1和3。
      * 流程：完整 JSON 往返，再编译并执行 ratio。
      * 预期：两个绑定版本原样保留，输出0.333333。
      */
     @Test
     void testDerivedSpecRetainsExactRevisionsAndEvaluatesRatio() {
-        MetricDSLDefinition definition = derived("ratio(metric('APPROVED', 'value'), metric('TOTAL', 'value'))",
+        MetricDefinition definition = derived("ratio(metric('APPROVED', 'value'), metric('TOTAL', 'value'))",
                 List.of(new MetricReferenceDsl("APPROVED", 2), new MetricReferenceDsl("TOTAL", 7)));
-        MetricDefinitionSpec<?> restored = assertSpecRoundTrip(new MetricDefinitionSpec.MetricDSLDefinitionSpec(4, definition));
-        MetricDSLDefinition result = (MetricDSLDefinition) restored.definition();
-        Assertions.assertEquals(List.of(new MetricReferenceDsl("APPROVED", 2), new MetricReferenceDsl("TOTAL", 7)),
-                result.dependencies());
-        var expression = new MetricExpressionCompiler().compile(result.value().expression(), Set.of(), "/metric/value/expression");
-        Assertions.assertEquals(new BigDecimal("0.333333"), expression.evaluate(result.value(), Map.of(),
-                Map.of(new MetricValueReference("APPROVED", "value"), 1L,
-                        new MetricValueReference("TOTAL", "value"), 3L), "/metric/value"));
+        for (int schema : List.of(4, 6)) {
+            MetricDefinitionSpec restored = assertSpecRoundTrip(new MetricDefinitionSpec(schema, definition));
+            MetricDefinition result = restored.definition();
+            Assertions.assertEquals(List.of(new MetricReferenceDsl("APPROVED", 2), new MetricReferenceDsl("TOTAL", 7)),
+                    result.dependencies());
+            var expression = new MetricExpressionCompiler().compile(result.value().expression(), Set.of(), "/metric/value/expression");
+            Assertions.assertEquals(new BigDecimal("0.333333"), expression.evaluate(result.value(), Map.of(),
+                    Map.of(new MetricValueReference("APPROVED", "value"), 1L,
+                            new MetricValueReference("TOTAL", "value"), 3L), "/metric/value"));
+        }
     }
 
     /**
@@ -99,12 +103,13 @@ class MetricVersionReferenceTests {
         Map<String, MetricValueDsl> fields = Map.of(
                 "rate", expression("ratio(metric('SUMMARY', 'approved'), metric('SUMMARY', 'total'))"),
                 "total", expression("metric('SUMMARY', 'total') + metric('SUMMARY', 'total')"));
-        MetricDSLDefinition definition = new MetricDSLDefinition("SUMMARY_VIEW", 1, MetricValueShape.FIELD_SET,
-                null, List.of(), new MetricSubjectDsl("GLOBAL", null), null, List.of(), Map.of(), null, null,
-                fields, List.of(new MetricReferenceDsl("SUMMARY", 3)));
-        MetricDefinitionSpec<?> restored = assertSpecRoundTrip(new MetricDefinitionSpec.MetricDSLDefinitionSpec(4, definition));
+        MetricDefinition definition = new MetricDefinition("SUMMARY_VIEW", 1, MetricValueShape.FIELD_SET,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                null,
+                null, fields, List.of(new MetricReferenceDsl("SUMMARY", 3)));
+        MetricDefinitionSpec restored = assertSpecRoundTrip(new MetricDefinitionSpec(4, definition));
         Assertions.assertEquals(List.of(new MetricReferenceDsl("SUMMARY", 3)),
-                ((MetricDSLDefinition) restored.definition()).dependencies());
+                restored.definition().dependencies());
     }
 
     /**
@@ -115,10 +120,10 @@ class MetricVersionReferenceTests {
      */
     @Test
     void testBindingsCoverAllValueFields() {
-        assertBindingInvalid(() -> new MetricDSLDefinition("SUMMARY_VIEW", 1, MetricValueShape.FIELD_SET,
-                null, List.of(), new MetricSubjectDsl("GLOBAL", null), null, List.of(), Map.of(), null, null,
-                Map.of("first", expression("metric('FIRST', 'value')"), "second", expression("metric('SECOND', 'value')")),
-                List.of(new MetricReferenceDsl("FIRST", 1))));
+        assertBindingInvalid(() -> new MetricDefinition("SUMMARY_VIEW", 1, MetricValueShape.FIELD_SET,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                null,
+                null, Map.of("first", expression("metric('FIRST', 'value')"), "second", expression("metric('SECOND', 'value')")), List.of(new MetricReferenceDsl("FIRST", 1))));
     }
 
     /**
@@ -170,7 +175,7 @@ class MetricVersionReferenceTests {
     @Test
     void testDependenciesAreAnImmutableSnapshot() {
         List<MetricReferenceDsl> bindings = new ArrayList<>(List.of(new MetricReferenceDsl("BASE", 8)));
-        MetricDSLDefinition definition = derived("metric('BASE', 'value')", bindings);
+        MetricDefinition definition = derived("metric('BASE', 'value')", bindings);
         bindings.clear();
         Assertions.assertEquals(List.of(new MetricReferenceDsl("BASE", 8)), definition.dependencies());
         Assertions.assertThrows(UnsupportedOperationException.class, () -> definition.dependencies().clear());
@@ -202,11 +207,11 @@ class MetricVersionReferenceTests {
      */
     @Test
     void testRawCannotBindDependencies() {
-        MetricDSLDefinition definition = raw();
-        assertBindingInvalid(() -> new MetricDSLDefinition(definition.code(), definition.revision(), definition.valueShape(),
-                definition.fact(), definition.joins(), definition.subject(), definition.time(), definition.dimensions(),
-                definition.parameters(), definition.rowSelection(), definition.value(), definition.fields(),
-                List.of(new MetricReferenceDsl("BASE", 1))));
+        MetricDefinition definition = raw();
+        assertBindingInvalid(() -> new MetricDefinition(definition.code(), definition.revision(), definition.valueShape(),
+                definition.subject(), definition.dimensions(), definition.parameters(),
+                definition.valueQuery(),
+                definition.value(), definition.fields(), List.of(new MetricReferenceDsl("BASE", 1))));
     }
 
     /**
@@ -224,7 +229,7 @@ class MetricVersionReferenceTests {
                 if (encoding.equals("missing")) {
                     body.remove("dependencies");
                 }
-                MetricDefinitionSpec<?> restored = parseSpec(schema, body);
+                MetricDefinitionSpec restored = parseSpec(schema, body);
                 Assertions.assertEquals(raw(), restored.definition());
             }
         }
@@ -247,41 +252,42 @@ class MetricVersionReferenceTests {
         Assertions.assertEquals(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED,
                 jsonValidationFailure(() -> parseSpec(3, body)).errorCode());
         Assertions.assertEquals(List.of(new MetricReferenceDsl("BASE", 1)),
-                ((MetricDSLDefinition) parseSpec(4, body).definition()).dependencies());
+                (parseSpec(4, body).definition()).dependencies());
     }
 
     /**
-     * 场景：旧12参数构造器不能继续创建无绑定的派生定义。
-     * 输入：无 fact，表达式引用 BASE.value，使用旧构造器。
+     * 场景：共同定义不能创建无绑定的派生指标。
+     * 输入：无 fact，表达式引用 BASE.value，依赖列表为空。
      * 流程：构造 DSL 定义。
      * 预期：报 dependencies 校验错误。
      */
     @Test
     void testLegacyConstructorCannotCreateUnboundDerivedDefinition() {
-        assertBindingInvalid(() -> new MetricDSLDefinition("DERIVED", 1, MetricValueShape.SCALAR,
-                null, List.of(), new MetricSubjectDsl("GLOBAL", null), null, List.of(), Map.of(), null,
-                expression("metric('BASE', 'value')"), Map.of()));
+        assertBindingInvalid(() -> new MetricDefinition("DERIVED", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                null,
+                expression("metric('BASE', 'value')"), Map.of(), List.of()));
     }
 
     /**
      * 场景：定义 schema 的兼容范围必须显式校验。
      * 输入：RAW 使用 null/-1/0/6，已绑定 DERIVED 使用1/2/3。
-     * 流程：构造 MetricDSLDefinitionSpec。
+     * 流程：构造共同定义协议。
      * 预期：均报 DSL_SCHEMA_VERSION_UNSUPPORTED；RAW 错误定位 /schemaVersion。
      */
     @Test
     void testDefinitionSchemaBoundaryIsExplicit() {
         for (Integer schema : java.util.Arrays.asList(null, -1, 0, 5)) {
             MetricValidationException failure = Assertions.assertThrows(MetricValidationException.class,
-                    () -> new MetricDefinitionSpec.MetricDSLDefinitionSpec(schema, raw()));
+                    () -> new MetricDefinitionSpec(schema, raw()));
             Assertions.assertEquals(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED, failure.errorCode());
             Assertions.assertEquals("/schemaVersion", failure.fieldPath());
         }
-        MetricDSLDefinition derived = derived("metric('BASE', 'value')", List.of(new MetricReferenceDsl("BASE", 1)));
+        MetricDefinition derived = derived("metric('BASE', 'value')", List.of(new MetricReferenceDsl("BASE", 1)));
         for (int schema : List.of(1, 2, 3)) {
             Assertions.assertEquals(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED,
                     Assertions.assertThrows(MetricValidationException.class,
-                            () -> new MetricDefinitionSpec.MetricDSLDefinitionSpec(schema, derived)).errorCode());
+                            () -> new MetricDefinitionSpec(schema, derived)).errorCode());
         }
     }
 
@@ -301,24 +307,36 @@ class MetricVersionReferenceTests {
     }
 
     /**
-     * 场景：计划不能使用错误 schema 或不确定的成员集合。
-     * 输入：schema2/3/5、空成员、重复 BASE@1 或 BASE@1/2。
+     * 场景：计划不能使用未支持的结构版本。
+     * 输入：schema2/3/5 与已固定的 BASE@1。
      * 流程：分别构造 Plan。
-     * 预期：错误 schema 报版本错误；空成员或重复 code 报 DSL_PLAN_INVALID。
+     * 预期：报版本错误，不猜测旧分段格式。
      */
     @Test
-    void testPlanRejectsUnsupportedSchemaEmptyAndDuplicateMembers() {
+    void testPlanRejectsUnsupportedSchema() {
         for (int schema : List.of(2, 3, 5)) {
             Assertions.assertEquals(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED,
                     Assertions.assertThrows(MetricValidationException.class,
                             () -> plan(schema, List.of(new MetricReferenceDsl("BASE", 1)))).errorCode());
         }
-        Assertions.assertEquals(MetricErrorCode.DSL_PLAN_INVALID,
-                Assertions.assertThrows(MetricValidationException.class, () -> plan(4, List.of())).errorCode());
-        for (int revision : List.of(1, 2)) {
-            Assertions.assertEquals(MetricErrorCode.DSL_PLAN_INVALID,
-                    Assertions.assertThrows(MetricValidationException.class,
-                            () -> plan(4, List.of(new MetricReferenceDsl("BASE", 1), new MetricReferenceDsl("BASE", revision)))).errorCode());
+    }
+
+    /**
+     * 场景：计划正文同时用于草稿和发布，JSON 边界必须完整交还待校验的成员内容。
+     * 输入：空成员草稿，以及重复选择 BASE@1/BASE@2 的待校验草稿。
+     * 流程：公共 Plan JSON 序列化再还原。
+     * 预期：成员列表原样保留，不能静默去重、猜版本或提前套发布条件；
+     * 宿主另以真实服务测试验证保存拒绝重复编码、发布和执行拒绝空成员。
+     */
+    @Test
+    void testPlanJsonPreservesDraftMembersForLifecycleValidation() {
+        for (List<MetricReferenceDsl> members : List.<List<MetricReferenceDsl>>of(List.of(),
+                List.of(new MetricReferenceDsl("BASE", 1), new MetricReferenceDsl("BASE", 2)))) {
+            MetricMaterializationPlanDsl draft = plan(4, members);
+            MetricMaterializationPlanDsl restored = WindJson.parseObject(WindJson.toJsonString(draft), MetricMaterializationPlanDsl.class);
+
+            Assertions.assertEquals(draft, restored);
+            Assertions.assertEquals(members, restored.metrics());
         }
     }
 
@@ -345,18 +363,21 @@ class MetricVersionReferenceTests {
         }
     }
 
-    private static MetricDSLDefinition raw() {
+    private static MetricDefinition raw() {
         MetricValueDsl value = new MetricValueDsl(MetricValueType.LONG, null, null,
                 new MetricMeasureDsl(MetricAggregation.COUNT, null, null), null,
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
-        return new MetricDSLDefinition("BASE", 1, MetricValueShape.SCALAR,
-                "ORDERS", List.of(), new MetricSubjectDsl("GLOBAL", null), new MetricTimeDsl("created_at"),
-                List.of(), Map.of(), null, value, Map.of());
+        return new MetricDefinition("BASE", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                new MetricDSLDefinition("ORDERS", List.of(), new MetricTimeDsl("created_at"), null),
+                value, Map.of(), List.of());
     }
 
-    private static MetricDSLDefinition derived(String expression, List<MetricReferenceDsl> bindings) {
-        return new MetricDSLDefinition("DERIVED", 1, MetricValueShape.SCALAR, null, List.of(),
-                new MetricSubjectDsl("GLOBAL", null), null, List.of(), Map.of(), null, expression(expression), Map.of(), bindings);
+    private static MetricDefinition derived(String expression, List<MetricReferenceDsl> bindings) {
+        return new MetricDefinition("DERIVED", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                null,
+                expression(expression), Map.of(), bindings);
     }
 
     private static MetricValueDsl expression(String expression) {
@@ -376,14 +397,15 @@ class MetricVersionReferenceTests {
         Assertions.assertEquals("/metric/dependencies", failure.fieldPath());
     }
 
-    private static Map<String, Object> definitionProperties(MetricDSLDefinition definition) {
-        Map<?, ?> properties = WindJson.parseObject(WindJson.toJsonString(definition), Map.class);
+    private static Map<String, Object> definitionProperties(MetricDefinition definition) {
+        Map<?, ?> envelope = WindJson.parseObject(WindJson.toJsonString(new MetricDefinitionSpec(4, definition)), Map.class);
+        Map<?, ?> properties = (Map<?, ?>) envelope.get("definition");
         Map<String, Object> result = new LinkedHashMap<>();
         properties.forEach((key, value) -> result.put((String) key, value));
         return result;
     }
 
-    private static MetricDefinitionSpec<?> parseSpec(int schema, Map<String, Object> body) {
+    private static MetricDefinitionSpec parseSpec(int schema, Map<String, Object> body) {
         return WindJson.parseObject(WindJson.toJsonString(Map.of("schemaVersion", schema,
                 "definitionType", "DSL", "definition", body)), MetricDefinitionSpec.class);
     }
@@ -398,11 +420,16 @@ class MetricVersionReferenceTests {
         throw new AssertionError("Expected a DSL validation failure from JSON construction", failure);
     }
 
-    private static MetricDefinitionSpec<?> assertSpecRoundTrip(MetricDefinitionSpec<?> specification) {
+    private static MetricDefinitionSpec assertSpecRoundTrip(MetricDefinitionSpec specification) {
         String json = WindJson.toJsonString(specification);
         Map<?, ?> properties = WindJson.parseObject(json, Map.class);
-        Assertions.assertEquals(specification.definitionType().name(), properties.get("definitionType"));
-        MetricDefinitionSpec<?> restored = WindJson.parseObject(json, MetricDefinitionSpec.class);
+        if (specification.schemaVersion() == MetricDefinitionSpec.SCHEMA_VERSION) {
+            Assertions.assertFalse(properties.containsKey("definitionType"));
+        } else {
+            Assertions.assertEquals(specification.definition().valueQuery() instanceof MetricSqlDefinition ? "SQL" : "DSL",
+                    properties.get("definitionType"));
+        }
+        MetricDefinitionSpec restored = WindJson.parseObject(json, MetricDefinitionSpec.class);
         Assertions.assertEquals(specification, restored);
         return restored;
     }

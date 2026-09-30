@@ -29,6 +29,10 @@ import com.wind.integration.metrics.expression.MetricExpression;
 import com.wind.integration.metrics.expression.MetricExpressionCompiler;
 import com.wind.integration.metrics.query.MetricQuery;
 import com.wind.integration.metrics.spec.MetricDSLDefinition;
+import com.wind.integration.metrics.spec.MetricDefinition;
+import com.wind.integration.metrics.spec.MetricDefinitionSpec;
+import com.wind.integration.metrics.spec.MetricSqlDefinition;
+import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -114,7 +118,7 @@ class MetricJdbcSqlCompilerExecutionTests {
         insert(5, "user-2", "USD", START, "1000", "SETTLED");
         insert(6, "user-1", "EUR", START, "1000", "SETTLED");
         insert(7, "user-1", "USD", START, "1000", "DECLINED");
-        MetricDSLDefinition definition = definition(List.of("currency"), Map.of(), null,
+        MetricDefinition definition = definition(List.of("currency"), Map.of(), null,
                 Map.of("totalCount", measure(MetricAggregation.COUNT, null), "count", measure(MetricAggregation.COUNT, settled()),
                         "sum", measure(MetricAggregation.SUM, settled())));
 
@@ -137,9 +141,9 @@ class MetricJdbcSqlCompilerExecutionTests {
         List<MetricOrderByDsl> order = List.of(new MetricOrderByDsl("occurredAt", MetricSortDirection.ASC),
                 new MetricOrderByDsl("id", MetricSortDirection.ASC));
         Map<String, MetricValueDsl> fields = Map.of("sum", measure(MetricAggregation.SUM, null));
-        MetricDSLDefinition parameterized = definition(List.of(), Map.of("limit", new MetricQueryParameterDsl(MetricValueType.INTEGER, 1, 10)),
+        MetricDefinition parameterized = definition(List.of(), Map.of("limit", new MetricQueryParameterDsl(MetricValueType.INTEGER, 1, 10)),
                 new MetricRowSelectionDsl(settled(), order, new MetricLimitDsl(null, "limit")), fields);
-        MetricDSLDefinition fixed = definition(List.of(), Map.of(),
+        MetricDefinition fixed = definition(List.of(), Map.of(),
                 new MetricRowSelectionDsl(settled(), order, new MetricLimitDsl(2, null)), fields);
 
         assertEquals(new BigDecimal("3.0000000000"), execute(parameterized,
@@ -155,7 +159,7 @@ class MetricJdbcSqlCompilerExecutionTests {
     @Test
     void testEmptyIncrementDoesNotResetSavedMinimum() throws SQLException {
         insert(1, "user-1", "USD", START, "7", "SETTLED");
-        MetricDSLDefinition definition = definition(Map.of("count", measure(MetricAggregation.COUNT, null),
+        MetricDefinition definition = definition(Map.of("count", measure(MetricAggregation.COUNT, null),
                 "sum", measure(MetricAggregation.SUM, null), "minimum", measure(MetricAggregation.MIN, null)));
         Map<String, Number> previous = execute(definition, query("user-1", START, MIDDLE));
         Map<String, Number> increment = execute(definition, query("user-1", MIDDLE, END));
@@ -164,7 +168,7 @@ class MetricJdbcSqlCompilerExecutionTests {
         assertNull(increment.get("sum"));
         assertNull(increment.get("minimum"));
         MetricValueCalculator calculator = new MetricValueCalculator();
-        Map<String, Number> result = calculator.calculate(definition, calculator.merge(definition, List.of(previous, increment)),
+        Map<String, Object> result = calculator.calculate(definition, calculator.merge(definition, List.of(previous, increment)),
                 (field, raw) -> { throw new AssertionError("No expression is declared"); });
         assertEquals(1L, result.get("count"));
         assertEquals(new BigDecimal("7.0000"), result.get("minimum"));
@@ -182,7 +186,7 @@ class MetricJdbcSqlCompilerExecutionTests {
         MetricValueDsl average = new MetricValueDsl(MetricValueType.DECIMAL, 4, RoundingMode.HALF_UP, null,
                 new MetricExpressionDsl(MetricExpressionType.SPEL, "count == 0 ? null : ratio(sum, count)"),
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
-        MetricDSLDefinition definition = definition(Map.of("count", measure(MetricAggregation.COUNT, null),
+        MetricDefinition definition = definition(Map.of("count", measure(MetricAggregation.COUNT, null),
                 "sum", measure(MetricAggregation.SUM, null), "average", average));
         MetricExpression expression = new MetricExpressionCompiler().compile(average.expression(), Set.of("sum", "count"), "/metric/fields/average/expression");
         MetricValueCalculator calculator = new MetricValueCalculator();
@@ -190,13 +194,89 @@ class MetricJdbcSqlCompilerExecutionTests {
                 execute(definition, query("user-1", MIDDLE, END))));
 
         assertEquals(new BigDecimal("600.0000000006"), merged.get("sum"));
-        Map<String, Number> result = calculator.calculate(definition, merged,
+        Map<String, Object> result = calculator.calculate(definition, merged,
                 (field, raw) -> expression.evaluate(average, raw, Map.of(), "/metric/fields/average"));
-        Map<String, Number> full = calculator.calculate(definition, execute(definition, query("user-1", START, END)),
+        Map<String, Object> full = calculator.calculate(definition, execute(definition, query("user-1", START, END)),
                 (field, raw) -> expression.evaluate(average, raw, Map.of(), "/metric/fields/average"));
         assertEquals(full, result);
         assertEquals(3L, result.get("count"));
         assertEquals(new BigDecimal("200.0000"), result.get("average"));
+    }
+
+    /**
+     * 场景：SQL 与 DSL 只改变原始量取值方式，跨段累计和本地表达式使用相同流程。
+     * 输入：两日三笔付款 400.0000000001、100.0000000002、100.0000000003，另有其他主体干扰。
+     * 流程：共同定义 JSON 往返；分别执行 DSL/SQL 两段取值，合并 SUM/COUNT，再运行真实均值表达式。
+     * 预期：两种取值的全精度原始量相等，累计结果等于全窗查询；最终均值200.0000。
+     */
+    @Test
+    void testSqlAndDslShareMergeAndExpressionPipeline() throws SQLException {
+        insert(1, "user-1", "USD", START, "400.0000000001", "SETTLED");
+        insert(2, "user-1", "USD", MIDDLE, "100.0000000002", "SETTLED");
+        insert(3, "user-1", "USD", MIDDLE.plusHours(1), "100.0000000003", "SETTLED");
+        insert(4, "user-2", "USD", START, "9000", "SETTLED");
+        MetricValueDsl average = new MetricValueDsl(MetricValueType.DECIMAL, 4, RoundingMode.HALF_UP, null,
+                new MetricExpressionDsl(MetricExpressionType.SPEL, "ratio(sum, count)"),
+                new MetricOrElseDsl(MetricOrElseMode.NULL, null));
+        MetricDefinition dsl = definition(Map.of("count", measure(MetricAggregation.COUNT, null),
+                "sum", measure(MetricAggregation.SUM, null), "average", average));
+        Map<String, MetricValueDsl> sqlFields = new LinkedHashMap<>(dsl.fields());
+        MetricValueDsl sum = dsl.fields().get("sum");
+        sqlFields.put("sum", new MetricValueDsl(sum.valueType(), sum.scale(), sum.roundingMode(),
+                new MetricMeasureDsl(MetricAggregation.SUM, null, null), null, sum.orElse()));
+        MetricDefinition sql = new MetricDefinition("SQL_PAYMENT", 7, dsl.valueShape(),
+                new MetricSubjectDsl("USER", null), List.of(), Map.of(), new MetricSqlDefinition("""
+                    SELECT COUNT(*) AS "count", SUM(amount) AS "sum" FROM payment_fact
+                    WHERE subject_id = '${subjectId}' AND occurred_at >= '${startTime}' AND occurred_at < '${endTime}'
+                    """), null, sqlFields, List.of());
+        sql = WindJson.parseObject(WindJson.toJsonString(new MetricDefinitionSpec(6, sql)), MetricDefinitionSpec.class).definition();
+        FreemarkerMetricSqlRenderer renderer = new FreemarkerMetricSqlRenderer();
+        MetricValueCalculator calculator = new MetricValueCalculator();
+        Map<String, Number> sqlFirst = execute(renderer.generate(sql, query("user-1", START, MIDDLE)));
+        Map<String, Number> sqlSecond = execute(renderer.generate(sql, query("user-1", MIDDLE, END)));
+        assertEquals(execute(dsl, query("user-1", START, MIDDLE)), sqlFirst);
+        assertEquals(execute(dsl, query("user-1", MIDDLE, END)), sqlSecond);
+        Map<String, Number> merged = calculator.merge(sql, List.of(sqlFirst, sqlSecond));
+        assertEquals(new BigDecimal("600.0000000006"), merged.get("sum"));
+        MetricExpression expression = new MetricExpressionCompiler().compile(average.expression(), Set.of("sum", "count"), "/metric/fields/average");
+        Map<String, Object> result = calculator.calculate(sql, merged,
+                (field, inputs) -> expression.evaluate(average, inputs, Map.of(), "/metric/fields/average"));
+        assertEquals(calculator.calculate(dsl, execute(dsl, query("user-1", START, END)),
+                (field, inputs) -> expression.evaluate(average, inputs, Map.of(), "/metric/fields/average")), result);
+        assertEquals(new BigDecimal("200.0000"), result.get("average"));
+    }
+
+    /**
+     * 场景：同一秒内的付款增量仍是有效半开窗口，SQL 与 DSL 必须保留相同时间边界。
+     * 输入：[00:00:00.250,00:00:00.750)，起点及终点前各一笔；另有起点前、终点和其他主体的干扰记录。
+     * 流程：分别经真实 DSL 编译和 SQL 模板渲染，在 H2 读取原始 COUNT/SUM。
+     * 预期：两种方式都只包含两笔，金额3.00018；边界不能被截成整秒，也不能误包含终点。
+     */
+    @Test
+    void testSqlAndDslKeepMillisecondHalfOpenWindow() throws SQLException {
+        LocalDateTime start = START.plusNanos(250_000_000);
+        LocalDateTime end = START.plusNanos(750_000_000);
+        insert(1, "user-1", "USD", start.minusNanos(1), "9000", "SETTLED");
+        insert(2, "user-1", "USD", start, "1.00009", "SETTLED");
+        insert(3, "user-1", "USD", end.minusNanos(1), "2.00009", "SETTLED");
+        insert(4, "user-1", "USD", end, "9000", "SETTLED");
+        insert(5, "user-2", "USD", start, "9000", "SETTLED");
+        MetricValueDsl count = measure(MetricAggregation.COUNT, null);
+        MetricValueDsl dslSum = measure(MetricAggregation.SUM, null);
+        MetricDefinition dsl = definition(Map.of("count", count, "sum", dslSum));
+        MetricValueDsl sqlSum = new MetricValueDsl(dslSum.valueType(), dslSum.scale(), dslSum.roundingMode(),
+                new MetricMeasureDsl(MetricAggregation.SUM, null, null), null, dslSum.orElse());
+        MetricDefinition sql = new MetricDefinition("SQL_PAYMENT", 7, MetricValueShape.FIELD_SET,
+                new MetricSubjectDsl("USER", null), List.of(), Map.of(),
+                new MetricSqlDefinition("""
+                    SELECT COUNT(*) AS "count", SUM(amount) AS "sum" FROM payment_fact
+                    WHERE subject_id = '${subjectId}' AND occurred_at >= '${startTime}' AND occurred_at < '${endTime}'
+                    """), null, Map.of("count", count, "sum", sqlSum), List.of());
+        Map<String, Number> expected = Map.of("count", 2L, "sum", new BigDecimal("3.0001800000"));
+        MetricQuery query = query("user-1", start, end);
+
+        assertEquals(expected, execute(dsl, query));
+        assertEquals(expected, execute(new FreemarkerMetricSqlRenderer().generate(sql, query)));
     }
 
     /** 含 SQL 特殊字符的主体作为参数值绑定，只统计该主体，不能改变 WHERE 范围。 */
@@ -220,15 +300,19 @@ class MetricJdbcSqlCompilerExecutionTests {
         insert(2, "account-2", "USD", START, "1000", "SETTLED");
         MetricJoinDsl join = new MetricJoinDsl("account", "Account", MetricJoinType.INNER, MetricJoinCardinality.MANY_TO_ONE,
                 List.of(new MetricJoinOnDsl("subjectId", "externalId")));
-        MetricDSLDefinition definition = new MetricDSLDefinition("PAYMENT", 1, MetricValueShape.FIELD_SET, "Payment", List.of(join),
-                new MetricSubjectDsl("USER", "account.ownerId"), new MetricTimeDsl("occurredAt"), List.of(), Map.of(), null, null,
-                Map.of("sum", measure(MetricAggregation.SUM, null)));
+        MetricDefinition definition = new MetricDefinition("PAYMENT", 1, MetricValueShape.FIELD_SET,
+                new MetricSubjectDsl("USER", "account.ownerId"), List.of(), Map.of(),
+                new MetricDSLDefinition("Payment", List.of(join), new MetricTimeDsl("occurredAt"), null),
+                null, Map.of("sum", measure(MetricAggregation.SUM, null)), List.of());
 
         assertEquals(new BigDecimal("7.0000000000"), execute(definition, query("user-1", START, END)).get("sum"));
     }
 
-    private Map<String, Number> execute(MetricDSLDefinition definition, MetricQuery query) throws SQLException {
-        MetricSqlDescriptor sql = compiler.compile(definition, query, mapping);
+    private Map<String, Number> execute(MetricDefinition definition, MetricQuery query) throws SQLException {
+        return execute(compiler.compile(definition, query, mapping));
+    }
+
+    private Map<String, Number> execute(MetricSqlDescriptor sql) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(sql.sql())) {
             for (int index = 0; index < sql.bindings().size(); index++) {
                 MetricJdbcParameterBinding binding = sql.bindings().get(index);
@@ -281,14 +365,16 @@ class MetricJdbcSqlCompilerExecutionTests {
                 null, new MetricOrElseDsl(MetricOrElseMode.ZERO, null));
     }
 
-    private static MetricDSLDefinition definition(Map<String, MetricValueDsl> fields) {
+    private static MetricDefinition definition(Map<String, MetricValueDsl> fields) {
         return definition(List.of(), Map.of(), null, fields);
     }
 
-    private static MetricDSLDefinition definition(List<String> dimensions, Map<String, MetricQueryParameterDsl> parameters,
+    private static MetricDefinition definition(List<String> dimensions, Map<String, MetricQueryParameterDsl> parameters,
                                                   MetricRowSelectionDsl selection, Map<String, MetricValueDsl> fields) {
-        return new MetricDSLDefinition("PAYMENT", 1, MetricValueShape.FIELD_SET, "Payment", List.of(), new MetricSubjectDsl("USER", "subjectId"),
-                new MetricTimeDsl("occurredAt"), dimensions, parameters, selection, null, fields);
+        return new MetricDefinition("PAYMENT", 1, MetricValueShape.FIELD_SET,
+                new MetricSubjectDsl("USER", "subjectId"), dimensions, parameters,
+                new MetricDSLDefinition("Payment", List.of(), new MetricTimeDsl("occurredAt"), selection),
+                null, fields, List.of());
     }
 
     /** 宿主字段映射替身；编译、参数绑定、SQL 执行、合并和表达式均使用真实代码。 */

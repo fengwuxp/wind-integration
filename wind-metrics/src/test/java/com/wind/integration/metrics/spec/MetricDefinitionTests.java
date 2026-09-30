@@ -31,7 +31,7 @@ import java.util.Set;
  * @author wuxp
  * @since 2026-09-20
  */
-class MetricDefinitionObjectTests {
+class MetricDefinitionTests {
 
     private static final String VALUE_PATH = "/metric/value";
 
@@ -53,14 +53,13 @@ class MetricDefinitionObjectTests {
         MetricValueDsl doubled = new MetricValueDsl(MetricValueType.LONG, null, null, null,
                 new MetricExpressionDsl(MetricExpressionType.SPEL, "count * 2"),
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
-        MetricDSLDefinition definition = roundTrip(new MetricDSLDefinition(
-                "ORDER_SUMMARY", 1, MetricValueShape.FIELD_SET, "ORDER", List.of(),
-                new MetricSubjectDsl("GLOBAL", null), new MetricTimeDsl("created_at"),
-                List.of(), Map.of(), null, null, Map.of("count", count, "doubled", doubled)),
-                MetricDSLDefinition.class);
+        MetricDefinition definition = roundTrip(new MetricDefinition("ORDER_SUMMARY", 1, MetricValueShape.FIELD_SET,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                new MetricDSLDefinition("ORDER", List.of(), new MetricTimeDsl("created_at"), null),
+                null, Map.of("count", count, "doubled", doubled), List.of()),
+                MetricDefinition.class);
 
-        MetricDefinitionObject contract = definition;
-        Assertions.assertEquals(MetricDerivationType.RAW, contract.derivationType());
+        Assertions.assertEquals(MetricDerivationType.RAW, definition.derivationType());
         var compiled = compiler.compile(doubled.expression(), Set.of("count"), VALUE_PATH);
         Assertions.assertEquals(Map.of("count", 3L, "doubled", 6L),
                 calculator.calculate(definition, Map.of("count", 3L),
@@ -75,10 +74,9 @@ class MetricDefinitionObjectTests {
      */
     @Test
     void testDerivedJsonKeepsDependenciesAndCalculatedResult() {
-        MetricDSLDefinition definition = roundTrip(
-                derivedDefinition("metric('BASE', 'value') * 2"), MetricDSLDefinition.class);
-        MetricDefinitionObject contract = definition;
-        Assertions.assertEquals(MetricDerivationType.DERIVED, contract.derivationType());
+        MetricDefinition definition = roundTrip(
+                derivedDefinition("metric('BASE', 'value') * 2"), MetricDefinition.class);
+        Assertions.assertEquals(MetricDerivationType.DERIVED, definition.derivationType());
         var compiled = compiler.compile(definition.value().expression(), Set.of(), VALUE_PATH);
         MetricValueReference dependency = new MetricValueReference("BASE", "value");
 
@@ -91,14 +89,15 @@ class MetricDefinitionObjectTests {
     /**
      * 场景：SQL 定义保留原生分类。
      * 输入：ORDER_COUNT 的 COUNT SQL 模板。
-     * 流程：序列化并反序列化 MetricSqlDefinition。
+     * 流程：序列化并反序列化 MetricDefinition。
      * 预期：对象相等、分类为 RAW，JSON 不额外存储 derivationType。
      */
     @Test
     void testSqlTemplateRemainsRawAfterJsonRoundTrip() {
-        MetricDefinitionObject definition = roundTrip(new MetricSqlDefinition(
-                "ORDER_COUNT", 1, MetricValueShape.SCALAR, "GLOBAL", List.of(), Map.of(),
-                "SELECT COUNT(*) FROM t_order"), MetricSqlDefinition.class);
+        MetricDefinition definition = roundTrip(new MetricDefinition("ORDER_COUNT", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                new MetricSqlDefinition("SELECT COUNT(*) FROM t_order"),
+                null, Map.of(), List.of()), MetricDefinition.class);
 
         Assertions.assertEquals(MetricDerivationType.RAW, definition.derivationType());
     }
@@ -117,16 +116,17 @@ class MetricDefinitionObjectTests {
         }
     }
 
-    private static MetricDSLDefinition derivedDefinition(String expression) {
+    private static MetricDefinition derivedDefinition(String expression) {
         MetricValueDsl value = new MetricValueDsl(MetricValueType.LONG, null, null, null,
                 new MetricExpressionDsl(MetricExpressionType.SPEL, expression),
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
-        return new MetricDSLDefinition("DOUBLE_COUNT", 1, MetricValueShape.SCALAR, null, List.of(),
-                new MetricSubjectDsl("GLOBAL", null), null, List.of(), Map.of(), null, value, Map.of(),
-                List.of(new MetricReferenceDsl("BASE", 1)));
+        return new MetricDefinition("DOUBLE_COUNT", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                null,
+                value, Map.of(), List.of(new MetricReferenceDsl("BASE", 1)));
     }
 
-    private static <T extends MetricDefinitionObject> T roundTrip(T definition, Class<T> type) {
+    private static <T extends MetricDefinition> T roundTrip(T definition, Class<T> type) {
         String json = WindJson.toJsonString(definition);
         Map<?, ?> fields = WindJson.parseObject(json, Map.class);
         Assertions.assertFalse(fields.containsKey("derivationType"));

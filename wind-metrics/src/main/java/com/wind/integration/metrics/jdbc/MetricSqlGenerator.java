@@ -1,7 +1,7 @@
 package com.wind.integration.metrics.jdbc;
 
 import com.wind.integration.metrics.query.MetricQuery;
-import com.wind.integration.metrics.spec.MetricDefinitionObject;
+import com.wind.integration.metrics.spec.MetricDefinition;
 
 /**
  * 根据已选定的指标定义和查询条件生成 SQL 描述的公共能力。
@@ -14,8 +14,8 @@ import com.wind.integration.metrics.spec.MetricDefinitionObject;
  * <ul>
  *   <li>DSL：{@link MetricJdbcSqlCompiler} 使用宿主冻结的 {@link MetricJdbcMapping}，生成参数化 SQL、
  *       有序 {@link MetricJdbcParameterBinding} 和 measure projection。</li>
- *   <li>SQL：{@link FreemarkerMetricSqlRenderer} 渲染受信模板，生成 SQL 文本；其 bindings 和
- *       projections 为空，不能把模板最终列自动当成可累计原始量。</li>
+ *   <li>SQL：{@link FreemarkerMetricSqlRenderer} 渲染受信模板，bindings 为空；按共同值声明输出
+ *       非表达式字段的同名 projections，旧 SQL 无声明时为空；累计资格仍须按 measure 状态校验。</li>
  * </ul>
  *
  * <h2>使用流程</h2>
@@ -39,5 +39,5 @@ public interface MetricSqlGenerator {
      * @throws IllegalArgumentException 定义分支、条件或模板不支持
      * @throws IllegalStateException 冻结物理映射缺失或 SQL 描述无法成立
      */
-    MetricSqlDescriptor generate(MetricDefinitionObject definition, MetricQuery query);
+    MetricSqlDescriptor generate(MetricDefinition definition, MetricQuery query);
 }

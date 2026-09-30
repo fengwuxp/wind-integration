@@ -2,12 +2,12 @@ package com.wind.integration.metrics.jdbc;
 
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.dsl.definition.MetricExpressionDsl;
-import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinOnDsl;
 import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
 import com.wind.integration.metrics.dsl.definition.MetricOrElseDsl;
 import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDsl;
+import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
 import com.wind.integration.metrics.dsl.definition.MetricTimeDsl;
 import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
@@ -32,6 +32,7 @@ import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
 import com.wind.integration.metrics.query.MetricQuery;
 import com.wind.integration.metrics.spec.MetricDSLDefinition;
+import com.wind.integration.metrics.spec.MetricDefinition;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -52,7 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * 以本类固定的消费、退款、授权等业务指标场景为输入，
  * 验证 {@link MetricJdbcSqlCompiler} 对复杂场景的当前覆盖边界。
  *
- * <p>用例直接将 {@link MetricDSLDefinition} 交给编译器，与夹具提供的冻结 {@link MetricJdbcMapping}、
+ * <p>用例直接将 {@link MetricDefinition} 交给编译器，与夹具提供的冻结 {@link MetricJdbcMapping}、
  * {@link MetricQuery} 一起产出参数化 SQL，断言文本、有序绑定及拒绝边界；不连接数据库，
  * 也不验证定义版本服务。以下为 DSL 模式相对 18 组场景的可表达性，
  * 其余未列出者需 SQL 模式或业务事实适配：</p>
@@ -69,7 +70,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * </table>
  *
  * <p>COUNT DISTINCT(S11/S12)、UNION(S12/S13)、多事件时间列(S13)、相关子查询/去重关联(S15)
- * 在 DSL 类型系统中无对应结构，无法构造出可编译定义，需 SQL 模式（{@code MetricSqlDefinition.sqlTemplate}）
+ * 在 DSL 类型系统中无对应结构，无法构造出可编译定义，需 SQL 模式（{@code MetricDefinition.sqlTemplate}）
  * 或业务事实提供者适配，不由本测试伪造。</p>
  *
  * @author wuxp
@@ -96,7 +97,7 @@ class MetricJdbcSqlCompilerScenarioTests {
     void testS09FixedCurrencyPaymentTotalWithinWindow() {
         MetricMeasureDsl measure = measure(MetricAggregation.SUM, "pay_amount",
                 and(eq("payment_order_state", str("Success")), eq("pay_currency", str("USD"))));
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .subject(new MetricSubjectDsl("TENANT", "tenant_id"))
                 .time(new MetricTimeDsl("gmt_create"))
                 .value(value(measure))
@@ -135,7 +136,7 @@ class MetricJdbcSqlCompilerScenarioTests {
                         eq("state", intLit(7)), eq("hide_to_customer", intLit(0))),
                 List.of(new MetricOrderByDsl("authorization_time", MetricSortDirection.ASC)),
                 new MetricLimitDsl(null, "firstNPens"));
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .subject(new MetricSubjectDsl("VCC", "vcc_id"))
                 .time(new MetricTimeDsl("authorization_time"))
                 .parameters(Map.of("firstNPens", parameter(null, null)))
@@ -182,7 +183,7 @@ class MetricJdbcSqlCompilerScenarioTests {
         MetricMeasureDsl measure = measure(MetricAggregation.SUM, "recharge_amount",
                 and(eq("business_scene", str("FEE_SUPPLEMENTARY_DEDUCTION")),
                         eq("recharge_currency", str("USD")), eq("state", intLit(2))));
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .subject(new MetricSubjectDsl("USER", "u.id"))
                 .time(new MetricTimeDsl("gmt_create"))
                 .joins(List.of(new MetricJoinDsl("u", "t_user", MetricJoinType.INNER,
@@ -227,7 +228,7 @@ class MetricJdbcSqlCompilerScenarioTests {
     void testS16TaggedTransactionCount() {
         MetricMeasureDsl measure = measure(MetricAggregation.COUNT, null,
                 and(eq("tag_name", str("WISE_LE")), eq("tag_value", str("300"))));
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .subject(new MetricSubjectDsl("USER", "user_id"))
                 .time(new MetricTimeDsl("gmt_create"))
                 .value(value(measure))
@@ -260,7 +261,7 @@ class MetricJdbcSqlCompilerScenarioTests {
      */
     @Test
     void testGlobalCountScenarioAllowsOmittedOptionalQueryContainers() {
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .subject(new MetricSubjectDsl("GLOBAL", null))
                 .time(new MetricTimeDsl("gmt_create"))
                 .value(value(measure(MetricAggregation.COUNT, null, null)))
@@ -280,7 +281,7 @@ class MetricJdbcSqlCompilerScenarioTests {
      * 场景：S03/S04/S08 类派生公式不由事实 SQL 编译器直接执行。
      * 输入：无 fact 的 ratio 定义，绑定 APPROVED@1 和 TOTAL@2。
      * 流程：将合法派生定义交给事实 compile。
-     * 预期：在 /metric/fact 报执行模式不支持；该拒绝不代表派生查询服务不支持表达式。
+     * 预期：在 /metric/valueQuery 报执行模式不支持；该拒绝不代表派生查询服务不支持表达式。
      */
     @Test
     void testDerivedRatioMetricIsRejected() {
@@ -288,11 +289,12 @@ class MetricJdbcSqlCompilerScenarioTests {
                 new MetricExpressionDsl(MetricExpressionType.SPEL,
                         "ratio(metric('APPROVED', 'value'), metric('TOTAL', 'value'))"),
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
-        MetricDSLDefinition definition = new MetricDSLDefinition("RATIO", 1, MetricValueShape.SCALAR,
-                null, List.of(), new MetricSubjectDsl("GLOBAL", null), null, List.of(), Map.of(),
-                null, value, Map.of(), List.of(new MetricReferenceDsl("APPROVED", 1), new MetricReferenceDsl("TOTAL", 2)));
+        MetricDefinition definition = new MetricDefinition("RATIO", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                null,
+                value, Map.of(), List.of(new MetricReferenceDsl("APPROVED", 1), new MetricReferenceDsl("TOTAL", 2)));
 
-        assertValidation(MetricErrorCode.METRIC_EXECUTION_MODE_UNSUPPORTED, "/metric/fact",
+        assertValidation(MetricErrorCode.METRIC_EXECUTION_MODE_UNSUPPORTED, "/metric/valueQuery",
                 () -> compiler().compile(definition, query(), binding(
                         table("", "t_vcc"),
                         column("gmt_create", "gmt_create", Instant.class, Types.TIMESTAMP))));
@@ -306,7 +308,7 @@ class MetricJdbcSqlCompilerScenarioTests {
      */
     @Test
     void testWindowlessMetricIsRejected() {
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .subject(new MetricSubjectDsl("VCC", "vcc_id"))
                 .time(new MetricTimeDsl("gmt_create"))
                 .build();
@@ -524,9 +526,11 @@ class MetricJdbcSqlCompilerScenarioTests {
             return this;
         }
 
-        MetricDSLDefinition build() {
-            return new MetricDSLDefinition("metric_code", 1, shape, fact, joins, subject, time, dimensions,
-                    parameters, rowSelection, scalarValue, fields);
+        MetricDefinition build() {
+            return new MetricDefinition("metric_code", 1, shape,
+                    subject, dimensions, parameters,
+                    new MetricDSLDefinition(fact, joins, time, rowSelection),
+                    scalarValue, fields, List.of());
         }
     }
 }

@@ -1,18 +1,21 @@
 package com.wind.integration.metrics.dsl;
 
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.spec.MetricDSLDefinition;
 import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
 import com.wind.integration.metrics.dsl.literal.DecimalMetricLiteralDsl;
 import com.wind.integration.metrics.dsl.literal.IntegralMetricLiteralDsl;
 import com.wind.integration.metrics.enums.MetricAggregation;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricValueShape;
-
+import com.wind.integration.metrics.enums.MetricValueType;
+import com.wind.integration.metrics.spec.MetricDSLDefinition;
+import com.wind.integration.metrics.spec.MetricDefinition;
+import com.wind.integration.metrics.spec.MetricSqlDefinition;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,7 +24,7 @@ import java.util.TreeMap;
 import java.util.function.BiFunction;
 
 /**
- * 指标 DSL 的纯值处理器，按固定阶段合并原始 measure、归一结果并处理正常空值。
+ * 共同指标定义的纯值处理器，按固定阶段合并原始 measure、归一结果并处理正常空值。
  *
  * <p>调用编排由宿主负责：先读取并校验所有原始 measure，再调用 {@link #merge}，最后调用
  * {@link #calculate}。本类不加载数据、不选择 revision、不解释表达式语言；表达式回调由宿主
@@ -37,16 +40,25 @@ public final class MetricValueCalculator {
      * @param definition 已校验的原始事实指标定义
      * @throws MetricValidationException 派生指标、无 measure、rowSelection 或 AVG 不支持分段合并
      */
-    public void validateMergeable(MetricDSLDefinition definition) {
+    public void validateMergeable(MetricDefinition definition) {
         if (definition.derivationType().isDerived()) {
-            throw invalid("/metric/fact", "Derived metric has no fact measures to merge");
+            throw invalid("/metric/valueQuery", "Derived metric has no fact measures to merge");
         }
-        if (definition.rowSelection() != null) {
+        if (definition.valueQuery() instanceof MetricDSLDefinition dsl && dsl.rowSelection() != null) {
             throw new MetricValidationException(
                     MetricErrorCode.METRIC_EXECUTION_MODE_UNSUPPORTED,
-                    "/metric/rowSelection",
+                    "/metric/valueQuery/rowSelection",
                     "Metric rowSelection only supports a REALTIME query segment");
         }
+        values(definition).forEach((field, value) -> {
+            if (value.expression() == null && value.measure() == null) {
+                throw invalid(path(definition, field), "Direct values do not declare mergeable state");
+            }
+            if (value.valueType() == MetricValueType.STRING
+                    || value.valueType() == MetricValueType.TIMESTAMP) {
+                throw invalid(path(definition, field), "Only numeric state supports snapshot merging");
+            }
+        });
         Map<String, MetricValueDsl> measures = measures(definition);
         if (measures.isEmpty()) {
             throw invalid("/metric/value", "Fact metric does not contain measure values");
@@ -70,7 +82,7 @@ public final class MetricValueCalculator {
      * @return 按字段名排序的不可修改 Map；COUNT 不为空，其余聚合允许全空结果
      */
     public Map<String, @Nullable Number> merge(
-            MetricDSLDefinition definition,
+            MetricDefinition definition,
             List<? extends Map<String, ? extends @Nullable Number>> segments) {
         validateMergeable(definition);
         if (segments.isEmpty()) {
@@ -101,19 +113,34 @@ public final class MetricValueCalculator {
     }
 
     /**
-     * 按声明类型与精度归一单个数值，不处理 orElse。
+     * 按声明类型与精度归一单个值，不处理 orElse。
      *
      * @param definition 原始值定义
-     * @param value 精确 Number 或正常 null；不接受 Float、Double 或自定义 Number
+     * @param value 精确 Number、String、LocalDateTime 或正常 null；数值不接受 Float、Double
      * @param path 用于报告错误的 JSON Pointer
-     * @return Integer、Long、BigDecimal 或正常 null；溢出与小数截断显式失败
+     * @return 声明类型的值或正常 null；类型不符、溢出与小数截断显式失败
      */
-    public @Nullable Number normalize(
-            MetricValueDsl definition, @Nullable Number value, String path) {
+    public @Nullable Object normalize(
+            MetricValueDsl definition, @Nullable Object value, String path) {
         if (value == null) {
             return null;
         }
-        BigDecimal decimal = exactDecimal(value, path);
+        if (definition.valueType() == MetricValueType.STRING) {
+            if (value instanceof String) {
+                return value;
+            }
+            throw invalid(path, "STRING value must be a String");
+        }
+        if (definition.valueType() == MetricValueType.TIMESTAMP) {
+            if (value instanceof LocalDateTime) {
+                return value;
+            }
+            throw invalid(path, "TIMESTAMP value must be a LocalDateTime");
+        }
+        if (!(value instanceof Number number)) {
+            throw invalid(path, "Numeric value must be a Number");
+        }
+        BigDecimal decimal = exactDecimal(number, path);
         try {
             return switch (definition.valueType()) {
                 case INTEGER -> decimal.toBigIntegerExact().intValueExact();
@@ -134,60 +161,64 @@ public final class MetricValueCalculator {
     }
 
     /**
-     * 在所有 measure 就绪后，依次归一 measure、计算表达式、应用最终 orElse。
+     * 在所有原始取值就绪后，依次归一值、计算表达式、应用最终 orElse。
      *
      * @param definition 已校验的原始定义；派生指标不提供原始 measure
-     * @param rawMeasures 原始 measure 值，字段缺失不同于正常 null
+     * @param rawMeasures 原始取值：measure 与 SQL 直接字段，字段缺失不同于正常 null
      * @param expressionEvaluator 使用字段名与只读 measure Map 求值；输入尚未应用 orElse， 返回精确 Number 或正常
      *     null，计算异常直接传播
      * @return 完整指标字段结果；SCALAR 使用 value 字段，FIELD_SET 按字段名排序，容器不可修改
      */
-    public Map<String, @Nullable Number> calculate(
-            MetricDSLDefinition definition,
-            Map<String, ? extends @Nullable Number> rawMeasures,
+    public Map<String, @Nullable Object> calculate(
+            MetricDefinition definition,
+            Map<String, ?> rawMeasures,
             BiFunction<String, Map<String, @Nullable Number>, ?> expressionEvaluator) {
         Map<String, MetricValueDsl> values = values(definition);
-        Map<String, MetricValueDsl> measures = measures(definition);
-        if (definition.derivationType().isDerived() && !measures.isEmpty()) {
-            throw invalid("/metric/value", "Derived metric must use expressions only");
-        }
-        requireFields(measures, rawMeasures);
-        Map<String, @Nullable Number> normalized = new LinkedHashMap<>();
-        measures.forEach(
-                (field, value) -> {
-                    @Nullable Number rawValue = rawMeasures.get(field);
-                    if (value.measure().aggregation() == MetricAggregation.COUNT
-                            && rawValue == null) {
-                        throw invalid(
-                                path(definition, field), "COUNT measure value must not be null");
-                    }
-                    normalized.put(field, normalize(value, rawValue, path(definition, field)));
-                });
-        Map<String, @Nullable Number> expressionInputs = Collections.unmodifiableMap(normalized);
-        Map<String, @Nullable Number> result = new LinkedHashMap<>();
-        values.forEach(
-                (field, value) -> {
-                    String path = path(definition, field);
-                    @Nullable Number source = normalized.get(field);
-                    if (value.expression() != null) {
-                        @Nullable Object evaluated =
-                                expressionEvaluator.apply(field, expressionInputs);
-                        if (evaluated != null && !(evaluated instanceof Number)) {
-                            throw invalid(
-                                    path + "/expression",
-                                    "Metric expression result must be numeric");
-                        }
-                        source = normalize(value, (Number) evaluated, path + "/expression");
-                    }
-                    result.put(field, source);
-                });
+        Map<String, MetricValueDsl> inputs = new LinkedHashMap<>();
+        values.forEach((field, value) -> {
+            if (value.expression() == null) {
+                if (value.measure() == null && !(definition.valueQuery() instanceof MetricSqlDefinition)) {
+                    throw invalid(path(definition, field), "DSL inputs require measure declarations");
+                }
+                inputs.put(field, value);
+            }
+        });
+        requireFields(inputs, rawMeasures);
+        Map<String, @Nullable Object> normalized = new LinkedHashMap<>();
+        Map<String, @Nullable Number> numericInputs = new LinkedHashMap<>();
+        inputs.forEach((field, value) -> {
+            Object raw = rawMeasures.get(field);
+            if (value.measure() != null && value.measure().aggregation() == MetricAggregation.COUNT && raw == null) {
+                throw invalid(path(definition, field), "COUNT measure value must not be null");
+            }
+            Object normalizedValue = normalize(value, raw, path(definition, field));
+            normalized.put(field, normalizedValue);
+            if (value.valueType() != MetricValueType.STRING
+                    && value.valueType() != MetricValueType.TIMESTAMP) {
+                numericInputs.put(field, (Number) normalizedValue);
+            }
+        });
+        Map<String, @Nullable Number> expressionInputs = Collections.unmodifiableMap(numericInputs);
+        Map<String, @Nullable Object> result = new LinkedHashMap<>();
+        values.forEach((field, value) -> {
+            String path = path(definition, field);
+            Object source = normalized.get(field);
+            if (value.expression() != null) {
+                Object evaluated = expressionEvaluator.apply(field, expressionInputs);
+                if (evaluated != null && !(evaluated instanceof Number)) {
+                    throw invalid(path + "/expression", "Metric expression result must be numeric");
+                }
+                source = normalize(value, evaluated, path + "/expression");
+            }
+            result.put(field, source);
+        });
         result.replaceAll(
                 (field, source) -> applyOrElse(values.get(field), source, path(definition, field)));
         return Collections.unmodifiableMap(result);
     }
 
-    private @Nullable Number applyOrElse(
-            MetricValueDsl definition, @Nullable Number source, String path) {
+    private @Nullable Object applyOrElse(
+            MetricValueDsl definition, @Nullable Object source, String path) {
         if (source != null) {
             return source;
         }
@@ -258,13 +289,18 @@ public final class MetricValueCalculator {
         throw invalid(path, "Metric value must use an exact numeric type");
     }
 
-    private static Map<String, MetricValueDsl> values(MetricDSLDefinition definition) {
+    private static Map<String, MetricValueDsl> values(MetricDefinition definition) {
+        boolean missingScalar = definition.valueShape() == MetricValueShape.SCALAR && definition.value() == null;
+        boolean missingFields = definition.valueShape() == MetricValueShape.FIELD_SET && definition.fields().isEmpty();
+        if (missingScalar || missingFields) {
+            throw invalid("/metric/value", "Value declarations are required for shared calculation");
+        }
         return definition.valueShape() == MetricValueShape.SCALAR
                 ? Map.of("value", definition.value())
                 : new TreeMap<>(definition.fields());
     }
 
-    private static Map<String, MetricValueDsl> measures(MetricDSLDefinition definition) {
+    private static Map<String, MetricValueDsl> measures(MetricDefinition definition) {
         Map<String, MetricValueDsl> result = new LinkedHashMap<>();
         values(definition)
                 .forEach(
@@ -278,13 +314,13 @@ public final class MetricValueCalculator {
 
     private static void requireFields(
             Map<String, MetricValueDsl> measures,
-            @Nullable Map<String, ? extends @Nullable Number> values) {
+            @Nullable Map<String, ?> values) {
         if (values == null || !measures.keySet().equals(values.keySet())) {
             throw invalid("/metric/values", "Metric measure fields do not match definition");
         }
     }
 
-    private static String path(MetricDSLDefinition definition, String field) {
+    private static String path(MetricDefinition definition, String field) {
         return definition.valueShape() == MetricValueShape.SCALAR
                 ? "/metric/value"
                 : "/metric/fields/" + field.replace("~", "~0").replace("/", "~1");

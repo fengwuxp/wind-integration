@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * @author wuxp
  * @since 2026-09-22
  */
-class MetricDSLDefinitionTests {
+class MetricDefinitionCompatibilityTests {
 
     /**
      * 场景：计算定义不复制宿主读取模式或计划分段。
@@ -32,7 +32,7 @@ class MetricDSLDefinitionTests {
     @Test
     void testDefinitionRoundTripWithoutReadPolicy() {
         for (int schema = 1; schema <= 4; schema++) {
-            MetricDefinitionSpec<?> restored = parse(schema, raw());
+            MetricDefinitionSpec restored = parse(schema, raw());
             assertFalse(properties(restored.definition()).containsKey("executionMode"));
             assertFalse(properties(restored.definition()).containsKey("segments"));
             assertEquals(restored, WindJson.parseObject(WindJson.toJsonString(restored), MetricDefinitionSpec.class));
@@ -70,7 +70,7 @@ class MetricDSLDefinitionTests {
         Map<String, Object> body = raw();
         body.put("rowSelection", Map.of("orderBy", List.of(Map.of("field", "id", "direction", "DESC")),
                 "limit", Map.of("value", 10)));
-        MetricDefinitionSpec<?> restored = parse(4, body);
+        MetricDefinitionSpec restored = parse(4, body);
         assertEquals(restored, WindJson.parseObject(WindJson.toJsonString(restored), MetricDefinitionSpec.class));
         assertFalse(properties(restored.definition()).containsKey("executionMode"));
     }
@@ -100,7 +100,7 @@ class MetricDSLDefinitionTests {
         body.put("value", Map.of("valueType", "LONG", "expression", Map.of("type", "SPEL", "value", "metric('BASE', 'value')"),
                 "orElse", Map.of("mode", "NULL")));
         body.put("dependencies", List.of(Map.of("metricCode", "BASE", "definitionRevision", 1)));
-        MetricDSLDefinition definition = (MetricDSLDefinition) parse(4, body).definition();
+        MetricDefinition definition = parse(4, body).definition();
         assertTrue(definition.derivationType().isDerived());
         assertEquals(1, definition.dependencies().size());
         body.put("executionMode", "REALTIME");
@@ -124,7 +124,7 @@ class MetricDSLDefinitionTests {
         return body;
     }
 
-    private static MetricDefinitionSpec<?> parse(int schema, Map<String, Object> body) {
+    private static MetricDefinitionSpec parse(int schema, Map<String, Object> body) {
         return WindJson.parseObject(WindJson.toJsonString(Map.of("definitionType", "DSL", "schemaVersion", schema, "definition", body)),
                 MetricDefinitionSpec.class);
     }

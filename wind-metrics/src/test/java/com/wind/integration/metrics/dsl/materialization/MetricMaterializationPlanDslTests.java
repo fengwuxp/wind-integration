@@ -1,11 +1,12 @@
 package com.wind.integration.metrics.dsl.materialization;
 
+import com.wind.integration.metrics.spec.MetricDefinition;
+import com.wind.integration.metrics.spec.MetricDSLDefinition;
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
 import com.wind.integration.metrics.enums.MetricErrorCode;
 import com.wind.integration.metrics.enums.MetricSegmentSourceType;
 import com.wind.integration.metrics.enums.MetricSnapshotGranularity;
-import com.wind.integration.metrics.spec.MetricDSLDefinition;
 import com.wind.integration.metrics.spec.MetricDefinitionSpec;
 import com.wind.jackson.WindJson;
 import org.jspecify.annotations.Nullable;
@@ -47,10 +48,10 @@ class MetricMaterializationPlanDslTests {
      */
     @Test
     void testCompleteDesignExamplesBindExactDefinitions() throws IOException {
-        Map<MetricReferenceDsl, MetricDSLDefinition> definitions = new LinkedHashMap<>();
+        Map<MetricReferenceDsl, MetricDefinition> definitions = new LinkedHashMap<>();
         for (String name : List.of("definition-approved-count.json", "definition-total-count.json")) {
-            MetricDefinitionSpec<?> spec = WindJson.parseObject(example(name), MetricDefinitionSpec.class);
-            MetricDSLDefinition definition = (MetricDSLDefinition) spec.definition();
+            MetricDefinitionSpec spec = WindJson.parseObject(example(name), MetricDefinitionSpec.class);
+            MetricDefinition definition = spec.definition();
             definitions.put(new MetricReferenceDsl(definition.code(), definition.revision()), definition);
             assertEquals(spec, WindJson.parseObject(WindJson.toJsonString(spec), MetricDefinitionSpec.class));
             assertFalse(properties(definition).containsKey("executionMode"));
@@ -60,11 +61,11 @@ class MetricMaterializationPlanDslTests {
             MetricMaterializationPlanDsl plan = WindJson.parseObject(example(name), MetricMaterializationPlanDsl.class);
             assertEquals(plan, parse(properties(plan)));
             assertEquals(definitions.keySet(), new HashSet<>(plan.metrics()));
-            MetricDSLDefinition first = definitions.get(plan.metrics().getFirst());
+            MetricDefinition first = definitions.get(plan.metrics().getFirst());
             for (MetricReferenceDsl reference : plan.metrics()) {
-                MetricDSLDefinition definition = definitions.get(reference);
+                MetricDefinition definition = definitions.get(reference);
                 assertEquals(first.subject(), definition.subject());
-                assertEquals(first.time(), definition.time());
+                assertEquals(((MetricDSLDefinition) first.valueQuery()).time(), ((MetricDSLDefinition) definition.valueQuery()).time());
                 assertEquals(first.dimensions(), definition.dimensions());
             }
         }

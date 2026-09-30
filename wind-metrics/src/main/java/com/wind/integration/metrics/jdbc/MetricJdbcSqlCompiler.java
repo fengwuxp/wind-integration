@@ -21,7 +21,7 @@ import com.wind.integration.metrics.enums.MetricSortDirection;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.query.MetricQuery;
 import com.wind.integration.metrics.spec.MetricDSLDefinition;
-import com.wind.integration.metrics.spec.MetricDefinitionObject;
+import com.wind.integration.metrics.spec.MetricDefinition;
 import org.jooq.Condition;
 import org.jooq.Field;
 import org.jooq.Param;
@@ -70,7 +70,7 @@ public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
 
     /** 单次编译已经固定的声明、绑定和投影上下文；不跨查询缓存。 */
     private record CompilationPlan(
-            MetricDSLDefinition definition,
+            MetricDefinition definition,
             MetricQuery query,
             MetricJdbcMapping binding,
             MetricRowSelectionDsl rowSelection,
@@ -153,7 +153,7 @@ public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
      * @return SQL、占位符顺序参数以及 measure 投影
      * @throws MetricValidationException 定义形态、查询条件或字段值不受支持时抛出
      */
-    public MetricSqlDescriptor compile(MetricDSLDefinition definition, MetricQuery query, MetricJdbcMapping binding) {
+    public MetricSqlDescriptor compile(MetricDefinition definition, MetricQuery query, MetricJdbcMapping binding) {
         CompilationPlan plan = plan(definition, query, binding);
 
         Map<String, MetricJdbcParameterBinding> parameters = new LinkedHashMap<>();
@@ -167,12 +167,12 @@ public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
         return new MetricSqlDescriptor(rendered, bindings, resultProjections);
     }
 
-    private CompilationPlan plan(MetricDSLDefinition definition, MetricQuery query, MetricJdbcMapping binding) {
+    private CompilationPlan plan(MetricDefinition definition, MetricQuery query, MetricJdbcMapping binding) {
         validateQuery(definition, query);
         Objects.requireNonNull(binding, "binding must not be null");
-        MetricRowSelectionDsl selection = definition.rowSelection();
+        MetricRowSelectionDsl selection = dsl(definition).rowSelection();
         int limit = selection == null ? 0 : resolveRowSelectionLimit(selection.limit(), query.parameterValues());
-        List<MetricJoinDsl> joins = definition.joins().stream()
+        List<MetricJoinDsl> joins = dsl(definition).joins().stream()
                 .sorted(Comparator.comparing(MetricJoinDsl::alias)).toList();
         Map<String, String> aliases = resolveAliases(joins);
         Function<String, Field<Object>> columns = field -> column(binding, aliases, field);
@@ -220,7 +220,7 @@ public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
      * @param definition DSL 定义，提供编码与修订
      * @param binding    该修订冻结的物理映射，不得执行 IO
      */
-    public void registerBinding(MetricDSLDefinition definition, MetricJdbcMapping binding) {
+    public void registerBinding(MetricDefinition definition, MetricJdbcMapping binding) {
         Objects.requireNonNull(definition, "definition must not be null");
         Objects.requireNonNull(binding, "binding must not be null");
         bindings.put(key(definition.code(), definition.revision()), binding);
@@ -229,23 +229,27 @@ public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
     /**
      * 实现 {@link MetricSqlGenerator}，按 DSL 模式编译查询，物理映射从内部缓存获取。
      *
-     * @param definition 必须是 {@link MetricDSLDefinition}
+     * @param definition 共同定义，其取值声明必须为 {@link MetricDSLDefinition}
      * @param query      查询条件
      * @return 参数化 SQL、有序绑定与投影
      * @throws IllegalArgumentException 定义不是 DSL 形态
      * @throws IllegalStateException    未注册对应 (code, revision) 的物理映射
      */
     @Override
-    public MetricSqlDescriptor generate(MetricDefinitionObject definition, MetricQuery query) {
-        if (!(definition instanceof MetricDSLDefinition dsl)) {
-            throw new IllegalArgumentException("DSL compiler requires a MetricDSLDefinition, but was "
-                    + definition.getClass().getSimpleName());
-        }
-        MetricJdbcMapping binding = bindings.get(key(dsl.code(), dsl.revision()));
+    public MetricSqlDescriptor generate(MetricDefinition definition, MetricQuery query) {
+        dsl(definition);
+        MetricJdbcMapping binding = bindings.get(key(definition.code(), definition.revision()));
         if (binding == null) {
-            throw new IllegalStateException("No binding registered for metric " + dsl.code() + "@" + dsl.revision());
+            throw new IllegalStateException("No binding registered for metric " + definition.code() + "@" + definition.revision());
         }
-        return compile(dsl, query, binding);
+        return compile(definition, query, binding);
+    }
+
+    private static MetricDSLDefinition dsl(MetricDefinition definition) {
+        if (definition.valueQuery() instanceof MetricDSLDefinition dsl) {
+            return dsl;
+        }
+        throw new IllegalArgumentException("DSL compiler requires a DSL value query");
     }
 
     private static String key(String code, int revision) {
@@ -316,7 +320,7 @@ public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
         return DSL.aggregate(measure.aggregation().name(), SQLDataType.DECIMAL, argument);
     }
 
-    private List<Condition> buildPredicates(MetricDSLDefinition definition, MetricQuery query, MetricJdbcMapping binding,
+    private List<Condition> buildPredicates(MetricDefinition definition, MetricQuery query, MetricJdbcMapping binding,
                                        Function<String, Field<Object>> columns,
                                        Map<String, MetricJdbcParameterBinding> parameters) {
         List<Condition> result = new ArrayList<>();
@@ -325,7 +329,7 @@ public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
             result.add(columns.apply(field).eq(parameter(parameters,
                     metricJdbcValueNormalizer.subject(binding, field, (String) query.subjectId()))));
         }
-        String timeField = definition.time().field();
+        String timeField = dsl(definition).time().field();
         result.add(columns.apply(timeField).ge(parameter(parameters,
                 metricJdbcValueNormalizer.time(binding, timeField, query.startTime()))));
         result.add(columns.apply(timeField).lt(parameter(parameters,
@@ -390,7 +394,7 @@ public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
         return result;
     }
 
-    private static Map<String, MetricMeasureDsl> resolveMeasures(MetricDSLDefinition definition) {
+    private static Map<String, MetricMeasureDsl> resolveMeasures(MetricDefinition definition) {
         Map<String, MetricValueDsl> values = definition.valueShape() == MetricValueShape.SCALAR ? Map.of("value", definition.value()) : new TreeMap<>(definition.fields());
         Map<String, MetricMeasureDsl> result = new LinkedHashMap<>();
         for (Map.Entry<String, MetricValueDsl> entry : values.entrySet()) {
@@ -439,12 +443,12 @@ public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
         }
     }
 
-    private static void validateQuery(MetricDSLDefinition definition, MetricQuery query) {
+    private static void validateQuery(MetricDefinition definition, MetricQuery query) {
         if (definition == null || query == null) {
             throw error(MetricErrorCode.QUERY_INVALID, "", "Metric definition and query must not be null");
         }
         if (definition.derivationType().isDerived()) {
-            throw error(MetricErrorCode.METRIC_EXECUTION_MODE_UNSUPPORTED, "/metric/fact",
+            throw error(MetricErrorCode.METRIC_EXECUTION_MODE_UNSUPPORTED, "/metric/valueQuery",
                     "Derived metric is not supported by JDBC SQL compiler");
         }
         if (query.startTime() == null) {
@@ -524,7 +528,7 @@ public final class MetricJdbcSqlCompiler implements MetricSqlGenerator {
         if (value > maxRowSelectionLimit || value <= 0) {
             boolean parameterized = limit.parameter() != null;
             throw error(parameterized ? MetricErrorCode.METRIC_PARAMETER_OUT_OF_RANGE : MetricErrorCode.DSL_VALUE_INVALID,
-                    parameterized ? "/parameterValues/" + escape(limit.parameter()) : "/metric/rowSelection/limit/value",
+                    parameterized ? "/parameterValues/" + escape(limit.parameter()) : "/metric/valueQuery/rowSelection/limit/value",
                     "Row selection limit is outside the system range");
         }
         return value;

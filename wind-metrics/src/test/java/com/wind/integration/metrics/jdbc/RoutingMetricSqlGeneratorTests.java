@@ -11,7 +11,7 @@ import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
 import com.wind.integration.metrics.query.MetricQuery;
 import com.wind.integration.metrics.spec.MetricDSLDefinition;
-import com.wind.integration.metrics.spec.MetricDefinitionObject;
+import com.wind.integration.metrics.spec.MetricDefinition;
 import com.wind.integration.metrics.spec.MetricSqlDefinition;
 import org.junit.jupiter.api.Test;
 
@@ -55,7 +55,7 @@ class RoutingMetricSqlGeneratorTests {
      */
     @Test
     void testDslGenerateResolvesRegisteredBindingAndDelegatesToCompiler() {
-        MetricDSLDefinition definition = dslDefinition();
+        MetricDefinition definition = dslDefinition();
         MetricJdbcMapping binding = binding();
         compiler.registerBinding(definition, binding);
 
@@ -70,8 +70,10 @@ class RoutingMetricSqlGeneratorTests {
      */
     @Test
     void testSqlGenerateReturnsInterpolatedSqlWithoutBindings() {
-        MetricDefinitionObject definition = new MetricSqlDefinition("code", 1, MetricValueShape.SCALAR,
-                "TENANT", List.of(), Map.of(), "SELECT * FROM `t` WHERE `tenant_id` = '${subjectId}'");
+        MetricDefinition definition = new MetricDefinition("code", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("TENANT", null), List.of(), Map.of(),
+                new MetricSqlDefinition("SELECT * FROM `t` WHERE `tenant_id` = '${subjectId}'"),
+                null, Map.of(), List.of());
 
         MetricSqlDescriptor result = sql.generate(definition, query("tenant-1"));
 
@@ -88,8 +90,10 @@ class RoutingMetricSqlGeneratorTests {
      */
     @Test
     void testDslGenerateRejectsSqlDefinition() {
-        MetricDefinitionObject definition = new MetricSqlDefinition("code", 1, MetricValueShape.SCALAR,
-                "TENANT", List.of(), Map.of(), "SELECT 1");
+        MetricDefinition definition = new MetricDefinition("code", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("TENANT", null), List.of(), Map.of(),
+                new MetricSqlDefinition("SELECT 1"),
+                null, Map.of(), List.of());
 
         assertThrows(IllegalArgumentException.class, () -> dsl.generate(definition, query()));
     }
@@ -113,24 +117,27 @@ class RoutingMetricSqlGeneratorTests {
      */
     @Test
     void testGenerateRoutesByDefinitionType() {
-        MetricDSLDefinition definition = dslDefinition();
+        MetricDefinition definition = dslDefinition();
         compiler.registerBinding(definition, binding());
 
         assertEquals(compiler.compile(definition, query(), binding()),
                 generator.generate(definition, query()));
 
-        MetricDefinitionObject sqlDefinition = new MetricSqlDefinition("code", 1, MetricValueShape.SCALAR,
-                "TENANT", List.of(), Map.of(), "SELECT '${subjectId}'");
+        MetricDefinition sqlDefinition = new MetricDefinition("code", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("TENANT", null), List.of(), Map.of(),
+                new MetricSqlDefinition("SELECT '${subjectId}'"),
+                null, Map.of(), List.of());
         assertEquals("SELECT 'tenant-1'", generator.generate(sqlDefinition, query("tenant-1")).sql());
     }
 
-    private static MetricDSLDefinition dslDefinition() {
+    private static MetricDefinition dslDefinition() {
         MetricValueDsl value = new MetricValueDsl(MetricValueType.INTEGER, null, null,
                 new MetricMeasureDsl(MetricAggregation.COUNT, null, null), null,
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
-        return new MetricDSLDefinition("code", 1, MetricValueShape.SCALAR, "order_fact", List.of(),
-                new MetricSubjectDsl(MetricSubjectDsl.GLOBAL, null), new MetricTimeDsl("created_at"),
-                List.of(), Map.of(), null, value, Map.of());
+        return new MetricDefinition("code", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl(MetricSubjectDsl.GLOBAL, null), List.of(), Map.of(),
+                new MetricDSLDefinition("order_fact", List.of(), new MetricTimeDsl("created_at"), null),
+                value, Map.of(), List.of());
     }
 
     private static MetricQuery query() {

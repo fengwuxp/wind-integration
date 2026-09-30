@@ -2,12 +2,12 @@ package com.wind.integration.metrics.jdbc;
 
 import com.wind.integration.metrics.MetricValidationException;
 import com.wind.integration.metrics.dsl.definition.MetricExpressionDsl;
-import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinDsl;
 import com.wind.integration.metrics.dsl.definition.MetricJoinOnDsl;
 import com.wind.integration.metrics.dsl.definition.MetricMeasureDsl;
 import com.wind.integration.metrics.dsl.definition.MetricOrElseDsl;
 import com.wind.integration.metrics.dsl.definition.MetricQueryParameterDsl;
+import com.wind.integration.metrics.dsl.definition.MetricReferenceDsl;
 import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
 import com.wind.integration.metrics.dsl.definition.MetricTimeDsl;
 import com.wind.integration.metrics.dsl.definition.MetricValueDsl;
@@ -33,6 +33,7 @@ import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.enums.MetricValueType;
 import com.wind.integration.metrics.query.MetricQuery;
 import com.wind.integration.metrics.spec.MetricDSLDefinition;
+import com.wind.integration.metrics.spec.MetricDefinition;
 import org.jooq.SQLDialect;
 import org.junit.jupiter.api.Test;
 
@@ -43,14 +44,14 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -185,7 +186,7 @@ class MetricJdbcSqlCompilerTests {
         MetricMeasureDsl measure = measure(MetricAggregation.SUM, "amount",
                 new ComparisonMetricFilterDsl(MetricFilterOperator.GT, "amount",
                         new IntegralMetricLiteralDsl(BigInteger.valueOf(100))));
-        MetricDSLDefinition definition = definition().value(value(measure)).build();
+        MetricDefinition definition = definition().value(value(measure)).build();
 
         MetricSqlDescriptor result = compiler().compile(definition, query(), binding());
 
@@ -206,7 +207,7 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testSubjectMetricFiltersBySubjectId() {
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .subject(new MetricSubjectDsl("USER", "user_id"))
                 .build();
 
@@ -229,7 +230,7 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testDimensionsRenderAsEqualityInSortedFieldOrder() {
-        MetricDSLDefinition definition = definition().dimensions(List.of("region", "channel")).build();
+        MetricDefinition definition = definition().dimensions(List.of("region", "channel")).build();
 
         MetricSqlDescriptor result = compiler().compile(definition,
                 query(Map.of("region", "CN", "channel", "APP")), binding());
@@ -252,7 +253,7 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testFieldSetRendersMultipleMeasuresInFieldOrder() {
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .shape(MetricValueShape.FIELD_SET)
                 .fields(Map.of(
                         "revenue", value(measure(MetricAggregation.SUM, "amount", null)),
@@ -278,7 +279,7 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testInnerJoinRendersJoinAliasAndConditions() {
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .joins(List.of(join(MetricJoinType.INNER)))
                 .build();
 
@@ -300,7 +301,7 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testLeftJoinRendersOuterJoin() {
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .joins(List.of(join(MetricJoinType.LEFT)))
                 .build();
 
@@ -325,7 +326,7 @@ class MetricJdbcSqlCompilerTests {
         MetricRowSelectionDsl selection = new MetricRowSelectionDsl(null,
                 List.of(new MetricOrderByDsl("created_at", MetricSortDirection.DESC)),
                 new MetricLimitDsl(10, null));
-        MetricDSLDefinition definition = definition().rowSelection(selection).build();
+        MetricDefinition definition = definition().rowSelection(selection).build();
 
         MetricSqlDescriptor result = compiler().compile(definition, query(), binding());
 
@@ -350,7 +351,7 @@ class MetricJdbcSqlCompilerTests {
         MetricRowSelectionDsl selection = new MetricRowSelectionDsl(null,
                 List.of(new MetricOrderByDsl("created_at", MetricSortDirection.DESC)),
                 new MetricLimitDsl(null, "entryLimit"));
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .parameters(Map.of("entryLimit", parameter(null, null)))
                 .rowSelection(selection)
                 .build();
@@ -376,13 +377,13 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testCompileRejectsInvalidSubjectAndWindow() {
-        MetricDSLDefinition subject = definition().subject(new MetricSubjectDsl("USER", "user_id")).build();
+        MetricDefinition subject = definition().subject(new MetricSubjectDsl("USER", "user_id")).build();
         for (Object subjectId : List.of(" ", 12L, List.of("user-1", "user-2"))) {
             MetricQuery query = new MetricQuery(subjectId, START, END, Map.of(), Map.of());
             assertValidation(MetricErrorCode.QUERY_INVALID, "/subjectId",
                     () -> compiler().compile(subject, query, binding()));
         }
-        MetricDSLDefinition global = definition().build();
+        MetricDefinition global = definition().build();
         assertValidation(MetricErrorCode.QUERY_INVALID, "/startTime",
                 () -> compiler().compile(global, new MetricQuery(null, null, END, Map.of(), Map.of()), binding()));
         assertValidation(MetricErrorCode.QUERY_INVALID, "/endTime",
@@ -401,14 +402,14 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testCompileRejectsInvalidDimensionAndParameterValues() {
-        MetricDSLDefinition global = definition().build();
+        MetricDefinition global = definition().build();
         assertDoesNotThrow(() -> compiler().compile(global,
                 new MetricQuery(null, START, END, null, null), binding()));
         assertValidation(MetricErrorCode.QUERY_INVALID, "/dimensionValues",
                 () -> compiler().compile(global, query(Map.of("unexpected", "x")), binding()));
         assertValidation(MetricErrorCode.METRIC_PARAMETER_UNEXPECTED, "/parameterValues/unexpected",
                 () -> compiler().compile(global, query(Map.of(), Map.of("unexpected", 2)), binding()));
-        MetricDSLDefinition dimension = definition().dimensions(List.of("region")).build();
+        MetricDefinition dimension = definition().dimensions(List.of("region")).build();
         assertValidation(MetricErrorCode.QUERY_INVALID, "/dimensionValues",
                 () -> compiler().compile(dimension, new MetricQuery(null, START, END, null, Map.of()), binding()));
         for (Object value : Arrays.asList(List.of("CN"), Map.of("code", "CN"), 1.5D, null)) {
@@ -416,7 +417,7 @@ class MetricJdbcSqlCompilerTests {
             assertValidation(MetricErrorCode.QUERY_INVALID, "/dimensionValues/region",
                     () -> compiler().compile(dimension, query(dimensions), binding()));
         }
-        MetricDSLDefinition parameter = definition().parameters(Map.of("entryLimit", parameter(1, 10))).build();
+        MetricDefinition parameter = definition().parameters(Map.of("entryLimit", parameter(1, 10))).build();
         assertValidation(MetricErrorCode.METRIC_PARAMETER_TYPE_MISMATCH, "/parameterValues",
                 () -> compiler().compile(parameter, new MetricQuery(null, START, END, Map.of(), null), binding()));
         for (Object value : Arrays.asList("2", 2L, 2.0D, List.of(2), null)) {
@@ -441,7 +442,7 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testCompileRejectsNullTemporalDimension() {
-        MetricDSLDefinition definition = definition().dimensions(List.of("created_at")).build();
+        MetricDefinition definition = definition().dimensions(List.of("created_at")).build();
         MetricQuery query = query(Collections.singletonMap("created_at", null));
         assertValidation(MetricErrorCode.QUERY_INVALID, "/dimensionValues/created_at",
                 () -> compiler().compile(definition, query, binding()));
@@ -465,17 +466,18 @@ class MetricJdbcSqlCompilerTests {
      * 场景：事实 SQL 编译器不负责跨指标表达式求值。
      * 输入：无 fact，BASE@1 的 value * 2 派生定义。
      * 流程：调用事实 compile。
-     * 预期：报 METRIC_EXECUTION_MODE_UNSUPPORTED，定位 /metric/fact。
+     * 预期：报 METRIC_EXECUTION_MODE_UNSUPPORTED，定位 /metric/valueQuery。
      */
     @Test
     void testCompileRejectsDerivedMetric() {
         MetricValueDsl value = new MetricValueDsl(MetricValueType.LONG, null, null, null,
                 new MetricExpressionDsl(MetricExpressionType.SPEL, "metric('BASE', 'value') * 2"),
                 new MetricOrElseDsl(MetricOrElseMode.NULL, null));
-        MetricDSLDefinition derived = new MetricDSLDefinition("DERIVED", 1, MetricValueShape.SCALAR,
-                null, List.of(), new MetricSubjectDsl("GLOBAL", null), null, List.of(), Map.of(),
-                null, value, Map.of(), List.of(new MetricReferenceDsl("BASE", 1)));
-        assertValidation(MetricErrorCode.METRIC_EXECUTION_MODE_UNSUPPORTED, "/metric/fact",
+        MetricDefinition derived = new MetricDefinition("DERIVED", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("GLOBAL", null), List.of(), Map.of(),
+                null,
+                value, Map.of(), List.of(new MetricReferenceDsl("BASE", 1)));
+        assertValidation(MetricErrorCode.METRIC_EXECUTION_MODE_UNSUPPORTED, "/metric/valueQuery",
                 () -> compiler().compile(derived, query(), binding()));
     }
 
@@ -487,7 +489,7 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testCompileRejectsSubjectTypeMismatch() {
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .subject(new MetricSubjectDsl("USER", "user_id"))
                 .build();
         MetricQuery query = MetricQuery.builder()
@@ -522,7 +524,7 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testCompileRejectsMissingSubjectIdForSubjectMetric() {
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .subject(new MetricSubjectDsl("USER", "user_id"))
                 .build();
 
@@ -538,7 +540,7 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testCompileRejectsDimensionKeyMismatch() {
-        MetricDSLDefinition definition = definition().dimensions(List.of("region")).build();
+        MetricDefinition definition = definition().dimensions(List.of("region")).build();
         MetricJdbcSqlCompiler compiler = compiler();
         MetricJdbcMapping binding = binding();
 
@@ -570,7 +572,7 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testCompileRejectsMissingParameter() {
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .parameters(Map.of("entryLimit", parameter(1, 10)))
                 .build();
 
@@ -586,7 +588,7 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testCompileRejectsOutOfRangeParameter() {
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .parameters(Map.of("entryLimit", parameter(1, 10)))
                 .build();
 
@@ -598,16 +600,16 @@ class MetricJdbcSqlCompilerTests {
      * 场景：固定选行数量不能绕过编译器上限。
      * 输入：rowSelection 固定 limit=5000，使用默认编译器上限。
      * 流程：调用 compile。
-     * 预期：报 DSL_VALUE_INVALID，定位 /metric/rowSelection/limit/value。
+     * 预期：报 DSL_VALUE_INVALID，定位 /metric/valueQuery/rowSelection/limit/value。
      */
     @Test
     void testCompileRejectsFixedRowSelectionLimitOutOfRange() {
         MetricRowSelectionDsl selection = new MetricRowSelectionDsl(null,
                 List.of(new MetricOrderByDsl("created_at", MetricSortDirection.DESC)),
                 new MetricLimitDsl(5000, null));
-        MetricDSLDefinition definition = definition().rowSelection(selection).build();
+        MetricDefinition definition = definition().rowSelection(selection).build();
 
-        assertValidation(MetricErrorCode.DSL_VALUE_INVALID, "/metric/rowSelection/limit/value",
+        assertValidation(MetricErrorCode.DSL_VALUE_INVALID, "/metric/valueQuery/rowSelection/limit/value",
                 () -> compiler().compile(definition, query(), binding()));
     }
 
@@ -622,7 +624,7 @@ class MetricJdbcSqlCompilerTests {
         MetricRowSelectionDsl selection = new MetricRowSelectionDsl(null,
                 List.of(new MetricOrderByDsl("created_at", MetricSortDirection.DESC)),
                 new MetricLimitDsl(null, "entryLimit"));
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .parameters(Map.of("entryLimit", parameter(null, null)))
                 .rowSelection(selection)
                 .build();
@@ -639,7 +641,7 @@ class MetricJdbcSqlCompilerTests {
      */
     @Test
     void testCompileRejectsMetricWithoutMeasures() {
-        MetricDSLDefinition definition = definition()
+        MetricDefinition definition = definition()
                 .shape(MetricValueShape.FIELD_SET)
                 .fields(Map.of())
                 .build();
@@ -839,7 +841,7 @@ class MetricJdbcSqlCompilerTests {
     }
 
     /**
-     * {@link MetricDSLDefinition} 的构建器，默认是一个全局 SCALAR COUNT 指标。
+     * {@link MetricDefinition} 的构建器，默认是一个全局 SCALAR COUNT 指标。
      */
     private static final class Definition {
 
@@ -909,9 +911,11 @@ class MetricJdbcSqlCompilerTests {
             return this;
         }
 
-        MetricDSLDefinition build() {
-            return new MetricDSLDefinition("metric_code", 1, shape, fact, joins, subject, time, dimensions,
-                    parameters, rowSelection, scalarValue, fields);
+        MetricDefinition build() {
+            return new MetricDefinition("metric_code", 1, shape,
+                    subject, dimensions, parameters,
+                    new MetricDSLDefinition(fact, joins, time, rowSelection),
+                    scalarValue, fields, List.of());
         }
     }
 

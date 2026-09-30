@@ -1,7 +1,9 @@
 package com.wind.integration.metrics.jdbc;
 
+import com.wind.integration.metrics.dsl.definition.MetricSubjectDsl;
 import com.wind.integration.metrics.enums.MetricValueShape;
 import com.wind.integration.metrics.query.MetricQuery;
+import com.wind.integration.metrics.spec.MetricDefinition;
 import com.wind.integration.metrics.spec.MetricSqlDefinition;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +38,7 @@ class FreemarkerMetricSqlRendererTests {
      */
     @Test
     void testRendersSubjectParameterAndWindowLiterals() {
-        MetricSqlDefinition definition = definition(
+        MetricDefinition definition = definition(
                 "SELECT SUM(`pay_amount`) AS total FROM `t_global_payment_income_detail`"
                         + " WHERE `tenant_id` = '${subjectId}' AND `pay_currency` = '${parameters['currency']}'"
                         + "<#if startTime?? && endTime??> AND `gmt_create` >= '${startTime}'"
@@ -49,6 +51,22 @@ class FreemarkerMetricSqlRendererTests {
     }
 
     /**
+     * 场景：原始事实的亚秒时间边界必须完整传入受信 SQL 模板。
+     * 输入：起点含9位小数秒，终点为同秒的 .9，模板使用左闭右开条件。
+     * 流程：调用公开渲染入口，观察最终可执行 SQL。
+     * 预期：保留完整端点，不舍入、不截断；整秒兼容由既有整日窗口用例验证。
+     */
+    @Test
+    void testRendersFractionalTimeBoundariesWithoutTruncation() {
+        MetricDefinition definition = definition("SELECT COUNT(*) FROM orders"
+                + " WHERE occurred_at >= '${startTime}' AND occurred_at < '${endTime}'");
+        MetricQuery query = new MetricQuery(null, START.plusNanos(123_456_789), START.plusNanos(900_000_000), null, null);
+
+        assertEquals("SELECT COUNT(*) FROM orders WHERE occurred_at >= '2026-09-01 00:00:00.123456789'"
+                + " AND occurred_at < '2026-09-01 00:00:00.9'", renderer.renderSql(definition, query));
+    }
+
+    /**
      * 场景：SQL 模板自行控制可选时间条件。
      * 输入：vcc-1，起止时间均为空，模板通过 if 判断 startTime。
      * 流程：调用 renderSql。
@@ -56,7 +74,7 @@ class FreemarkerMetricSqlRendererTests {
      */
     @Test
     void testOmitsOptionalWindowWhenTimeIsAbsent() {
-        MetricSqlDefinition definition = definition(
+        MetricDefinition definition = definition(
                 "SELECT COUNT(*) FROM `t_vcc` WHERE `vcc_id` = '${subjectId}'"
                         + "<#if startTime??> AND `gmt_create` >= '${startTime}'</#if>");
 
@@ -72,7 +90,7 @@ class FreemarkerMetricSqlRendererTests {
      */
     @Test
     void testRendersIntegersWithoutLocaleGrouping() {
-        MetricSqlDefinition definition = definition("SELECT * FROM `t_vcc` LIMIT ${parameters['firstNPens']}");
+        MetricDefinition definition = definition("SELECT * FROM `t_vcc` LIMIT ${parameters['firstNPens']}");
 
         assertEquals("SELECT * FROM `t_vcc` LIMIT 2147483647",
                 renderer.renderSql(definition, new MetricQuery(null, START, END, Map.of(), Map.of("firstNPens", 2147483647))));
@@ -86,13 +104,16 @@ class FreemarkerMetricSqlRendererTests {
      */
     @Test
     void testRejectsInvalidTemplateSyntax() {
-        MetricSqlDefinition definition = definition("SELECT ${unclosed");
+        MetricDefinition definition = definition("SELECT ${unclosed");
 
         assertThrows(IllegalArgumentException.class, () -> renderer.renderSql(definition, query("tenant-1")));
     }
 
-    private static MetricSqlDefinition definition(String sqlTemplate) {
-        return new MetricSqlDefinition("metric_code", 1, MetricValueShape.SCALAR, "TENANT", List.of(), Map.of(), sqlTemplate);
+    private static MetricDefinition definition(String sqlTemplate) {
+        return new MetricDefinition("metric_code", 1, MetricValueShape.SCALAR,
+                new MetricSubjectDsl("TENANT", null), List.of(), Map.of(),
+                new MetricSqlDefinition(sqlTemplate),
+                null, Map.of(), List.of());
     }
 
     private static MetricQuery query(String subjectId) {

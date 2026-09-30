@@ -1,7 +1,7 @@
 package com.wind.integration.metrics.jdbc;
 
 import com.wind.integration.metrics.query.MetricQuery;
-import com.wind.integration.metrics.spec.MetricDefinitionObject;
+import com.wind.integration.metrics.spec.MetricDefinition;
 import com.wind.integration.metrics.spec.MetricSqlDefinition;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
@@ -13,7 +13,10 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -33,8 +36,8 @@ import java.util.Objects;
  *   <li>{@code subjectType} —— 主体类型，优先 {@link MetricQuery#subjectType()}，缺省用定义值</li>
  *   <li>{@code dimensions} —— 具名维度值 Map，来自 {@link MetricQuery#dimensionValues()}</li>
  *   <li>{@code parameters} —— 具名参数值 Map（旧模板的 {@code queryVariables} 对应此处）</li>
- *   <li>{@code startTime} / {@code endTime} —— 半开窗端点，格式 {@code yyyy-MM-dd HH:mm:ss}，缺省为 null，
- *       配合 {@code <#if startTime??>} 表达可选时间窗</li>
+ *   <li>{@code startTime} / {@code endTime} —— 半开窗端点，整秒格式为 {@code yyyy-MM-dd HH:mm:ss}，
+ *       非整秒保留实际小数秒（最多9位），缺省为 null；配合 {@code <#if startTime??>} 表达可选时间窗</li>
  * </ul>
  *
  * <p>数字按 {@code computer} 格式渲染，避免按 Locale 分组（如 {@code 2,147,483,647}）破坏 SQL。
@@ -44,7 +47,10 @@ import java.util.Objects;
  */
 public final class FreemarkerMetricSqlRenderer implements MetricSqlGenerator {
 
-    private static final DateTimeFormatter SQL_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter SQL_TIMESTAMP = new DateTimeFormatterBuilder()
+            .appendPattern("yyyy-MM-dd HH:mm:ss")
+            .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+            .toFormatter();
 
     private final Configuration configuration;
 
@@ -58,18 +64,23 @@ public final class FreemarkerMetricSqlRenderer implements MetricSqlGenerator {
     /**
      * 实现 {@link MetricSqlGenerator}，按 SQL 模板模式生成查询。
      *
-     * @param definition 必须是 {@link MetricSqlDefinition}
+     * @param definition 共同定义，其取值声明必须为 {@link MetricSqlDefinition}
      * @param query 查询条件
-     * @return 插值后的 SQL，无绑定与投影
+     * @return 插值后的 SQL、声明字段的同名投影；无参数绑定
      * @throws IllegalArgumentException 定义不是 SQL 形态或模板渲染失败
      */
     @Override
-    public MetricSqlDescriptor generate(MetricDefinitionObject definition, MetricQuery query) {
-        if (!(definition instanceof MetricSqlDefinition sql)) {
-            throw new IllegalArgumentException("SQL renderer requires a MetricSqlDefinition, but was "
-                    + definition.getClass().getSimpleName());
+    public MetricSqlDescriptor generate(MetricDefinition definition, MetricQuery query) {
+        Map<String, String> projections = new LinkedHashMap<>();
+        if (definition.value() != null && definition.value().expression() == null) {
+            projections.put("value", "value");
         }
-        return new MetricSqlDescriptor(renderSql(sql, query), List.of(), Map.of());
+        definition.fields().forEach((field, value) -> {
+            if (value.expression() == null) {
+                projections.put(field, field);
+            }
+        });
+        return new MetricSqlDescriptor(renderSql(definition, query), List.of(), projections);
     }
 
     /**
@@ -80,7 +91,7 @@ public final class FreemarkerMetricSqlRenderer implements MetricSqlGenerator {
      * @return 插值后的 SQL 文本
      * @throws IllegalArgumentException 模板语法错误或渲染失败
      */
-    public String renderSql(MetricSqlDefinition definition, MetricQuery query) {
+    public String renderSql(MetricDefinition definition, MetricQuery query) {
         Objects.requireNonNull(definition, "definition must not be null");
         Objects.requireNonNull(query, "query must not be null");
         StringWriter out = new StringWriter();
@@ -92,15 +103,22 @@ public final class FreemarkerMetricSqlRenderer implements MetricSqlGenerator {
         return out.toString();
     }
 
-    private Template template(MetricSqlDefinition definition) {
+    private Template template(MetricDefinition definition) {
         try {
-            return new Template(definition.code(), new StringReader(definition.sqlTemplate()), configuration);
+            return new Template(definition.code(), new StringReader(sql(definition).sqlTemplate()), configuration);
         } catch (IOException exception) {
             throw new IllegalArgumentException("Invalid SQL template for metric " + definition.code(), exception);
         }
     }
 
-    private static Map<String, Object> dataModel(MetricSqlDefinition definition, MetricQuery query) {
+    private static MetricSqlDefinition sql(MetricDefinition definition) {
+        if (definition.valueQuery() instanceof MetricSqlDefinition sql) {
+            return sql;
+        }
+        throw new IllegalArgumentException("SQL renderer requires a SQL value query");
+    }
+
+    private static Map<String, Object> dataModel(MetricDefinition definition, MetricQuery query) {
         Map<String, Object> model = new HashMap<>();
         model.put("subjectId", query.subjectId());
         model.put("subjectType", query.subjectType() == null ? definition.subjectType() : query.subjectType());

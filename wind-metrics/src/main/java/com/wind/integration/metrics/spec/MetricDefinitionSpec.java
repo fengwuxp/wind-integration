@@ -1,91 +1,63 @@
 package com.wind.integration.metrics.spec;
 
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.wind.integration.metrics.MetricValidationException;
-import com.wind.integration.metrics.enums.MetricDefinitionType;
 import com.wind.integration.metrics.enums.MetricErrorCode;
-import io.swagger.v3.oas.annotations.media.Schema;
-import org.jspecify.annotations.NullMarked;
+import com.wind.integration.metrics.enums.MetricValueShape;
+import com.wind.integration.metrics.json.MetricDefinitionSpecDeserializer;
+import com.wind.integration.metrics.json.MetricDefinitionSpecSerializer;
+import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.annotation.JsonSerialize;
 
 import java.util.Objects;
 
 /**
- * 指标定义规范
+ * 指标定义的版本化协议容器，不再按 SQL/DSL 拆分共同口径。
  *
- * <p>{@link #definitionType()} 标识定义的声明方式，Jackson 使用该字段进行多态反序列化。</p>
+ * <p>schema6 保存共同定义及嵌套的取值声明。读取旧 DSL schema1—4 与旧 SQL 时显式转换，
+ * 不猜测旧 SQL 缺失的值类型；旧 DSL schema5 已撤回，仍拒绝读取。
+ * 旧 SQL 曾允许任意正数版本，因此保留其原 definitionType 布局（包括数字6）；
+ * 它缺少值声明时不会因版本号而获得累计能力。新值声明与 SQL 累计能力必须使用共同 schema6。</p>
  *
+ * @param schemaVersion 协议版本，不是定义修订
+ * @param definition 精确修订的共同定义
  * @author wuxp
- * @date 2026-09-18 04:59
- **/
-@NullMarked
-@JsonTypeInfo(
-        use = JsonTypeInfo.Id.NAME,
-        property = "definitionType",
-        include = JsonTypeInfo.As.EXISTING_PROPERTY,
-        visible = true
-)
-@JsonSubTypes({
-        @JsonSubTypes.Type(value = MetricDefinitionSpec.MetricDSLDefinitionSpec.class, name = "DSL"),
-        @JsonSubTypes.Type(value = MetricDefinitionSpec.MetricSqlDefinitionSpec.class, name = "SQL")
-})
-public sealed interface MetricDefinitionSpec<O extends MetricDefinitionObject>
-        permits MetricDefinitionSpec.MetricDSLDefinitionSpec, MetricDefinitionSpec.MetricSqlDefinitionSpec {
+ */
+@JsonDeserialize(using = MetricDefinitionSpecDeserializer.class)
+@JsonSerialize(using = MetricDefinitionSpecSerializer.class)
+public record MetricDefinitionSpec(Integer schemaVersion, MetricDefinition definition) {
 
     /**
-     * 携带精确依赖的计算定义版本；读取模式和分段规则不进入计算正文。
+     * 共同定义与取值声明分离后的协议版本。
      */
-    int DSL_SCHEMA_VERSION = 4;
+    public static final int SCHEMA_VERSION = 6;
 
-    /**
-     * @return 规范版本
-     */
-    @Schema(description = "规范版本")
-    Integer schemaVersion();
-
-    /**
-     * @return 指标定义
-     */
-    @Schema(description = "指标定义")
-    O definition();
-
-    /**
-     * @return 指标定义类型
-     */
-    @Schema(description = "指标定义类型")
-    @JsonProperty("definitionType")
-    MetricDefinitionType definitionType();
-
-    @Schema(description = "指标定义 DSL 的根对象")
-    record MetricDSLDefinitionSpec(
-            @Schema(description = "规范版本") Integer schemaVersion,
-            @Schema(description = "指标定义") MetricDSLDefinition definition) implements MetricDefinitionSpec<MetricDSLDefinition> {
-
-        public MetricDSLDefinitionSpec {
-            Objects.requireNonNull(definition, "definition must not be null");
-            if (schemaVersion == null || schemaVersion < 1 || schemaVersion > DSL_SCHEMA_VERSION || definition.derivationType().isDerived() && schemaVersion < 4) {
+    public MetricDefinitionSpec {
+        Objects.requireNonNull(definition, "definition must not be null");
+        if (schemaVersion == null || schemaVersion < 1) {
+            throw new MetricValidationException(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED,
+                    "/schemaVersion", "Schema version must be positive");
+        }
+        boolean sql = definition.valueQuery() instanceof MetricSqlDefinition;
+        if (!sql && schemaVersion != SCHEMA_VERSION) {
+            boolean unsupportedLegacySchema = schemaVersion > 4;
+            boolean missingExactReferenceSchema = definition.derivationType().isDerived() && schemaVersion < 4;
+            if (unsupportedLegacySchema || missingExactReferenceSchema) {
                 throw new MetricValidationException(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED,
-                        "/schemaVersion", "Definition DSL supports RAW schemas 1 to 4 and DERIVED schema 4");
+                        "/schemaVersion", "Legacy DSL supports RAW schemas 1 to 4 and DERIVED schema 4");
             }
-
         }
-
-        @Override
-        public MetricDefinitionType definitionType() {
-            return MetricDefinitionType.DSL;
-        }
-    }
-
-    @Schema(description = "SQL 模板指标定义的根对象")
-    record MetricSqlDefinitionSpec(
-            @Schema(description = "规范版本") Integer schemaVersion,
-            @Schema(description = "SQL 模板指标定义") MetricSqlDefinition definition) implements MetricDefinitionSpec<MetricSqlDefinition> {
-
-        @Override
-        public MetricDefinitionType definitionType() {
-            return MetricDefinitionType.SQL;
+        if (schemaVersion == SCHEMA_VERSION) {
+            boolean legacySql = sql && definition.value() == null && definition.fields().isEmpty();
+            boolean scalar = definition.valueShape() == MetricValueShape.SCALAR;
+            boolean invalidScalar = scalar && (definition.value() == null || !definition.fields().isEmpty());
+            boolean invalidFieldSet = !scalar && (definition.value() != null || definition.fields().isEmpty());
+            if (!legacySql && (invalidScalar || invalidFieldSet)) {
+                throw new MetricValidationException(MetricErrorCode.DSL_VALUE_BRANCH_INVALID,
+                        "/metric/value", "SCALAR requires value only; FIELD_SET requires non-empty fields only");
+            }
+        } else if (sql && (definition.value() != null || !definition.fields().isEmpty())) {
+            throw new MetricValidationException(MetricErrorCode.DSL_SCHEMA_VERSION_UNSUPPORTED,
+                    "/schemaVersion", "SQL shared value declarations require schema 6");
         }
     }
-
 }

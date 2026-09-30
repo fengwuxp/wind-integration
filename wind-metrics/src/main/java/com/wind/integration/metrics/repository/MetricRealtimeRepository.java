@@ -1,7 +1,7 @@
 package com.wind.integration.metrics.repository;
 
 import com.wind.integration.metrics.query.MetricQuery;
-import com.wind.integration.metrics.spec.MetricDefinitionObject;
+import com.wind.integration.metrics.spec.MetricDefinition;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -18,8 +18,8 @@ import org.jspecify.annotations.NonNull;
  * <ul>
  * <li>DSL 定义：返回本次事实查询的完整基础统计量，即 measure 结果；字段集合与编译投影一致，
  * 留给上层合并后计算表达式、最终精度和缺省值。</li>
- * <li>SQL 定义：返回 SQL 已计算的结果列，并保留其逻辑名称、类型及正常空值；不能把这些列
- * 自动解释为可累计的原始状态。</li>
+ * <li>SQL 定义：返回 SQL 已计算的结果列，并保留其逻辑名称、类型及正常空值；只有共同定义显式声明了
+ * measure 的列才是可合并候选状态，资格仍由上层校验。</li>
  * </ul>
  * <p>例如订单统计可以一次返回数量和金额，宿主将其表示为业务对象或具名字段 Map。
  * 返回对象本身非空；字段正常为空与缺失字段、读取失败应明确区分。</p>
@@ -28,11 +28,12 @@ import org.jspecify.annotations.NonNull;
  * <p>实现负责将定义与条件转换为受支持的数据访问，执行查询并校验结果结构和类型。
  * JDBC 实现可以组合现有 SQL 编译或模板渲染能力，承担参数绑定、超时、执行和结果映射；
  * SUM、COUNT 等统计可以在数据源查询中完成。指标选版、依赖展开、分段编排、跨段合并、
- * 指标累计以及 DSL 最终类型归一化、舍入、表达式和缺省值处理仍由上层承担。</p>
+ * 指标累计以及最终类型归一化、舍入、表达式和缺省值处理仍由上层承担。</p>
  * <p>数据源、冻结物理绑定及超时由实现装配，不作为查询参数传递。实现复用宿主当前事务，
  * 不另开依赖查询事务，不读取快照或执行物化；不支持的定义或条件应明确失败，不能丢弃条件、
  * 改选版本或改用其他来源继续执行。</p>
  * <p>SQL SCALAR 要求一行一列，逻辑字段为 value；FIELD_SET 要求一行、至少一列，
+ * 显式值声明时只返回非表达式字段，字段必须与声明相符；旧 SQL 无声明时沿原兼容规则，
  * 采用非空且唯一的列标签。列类型由 JDBC 元数据确定，NULL 也须保留明确类型；
  * 无法确定或不支持的类型、零行、多行、重复列均明确失败。事实集合为空时，聚合查询仍可能
  * 返回一行 COUNT=0 或其他正常 NULL；不能将这种正常结果与没有结果行混为一谈。</p>
@@ -66,5 +67,5 @@ public interface MetricRealtimeRepository<T> {
      * @return 完整实时结果对象；对象本身不得为 null，内部字段的空值语义由 T 的契约定义
      * @throws RuntimeException 定义或条件不支持、结果结构/类型不合法，或数据访问失败
      */
-    @NonNull T query(@NonNull MetricDefinitionObject definition, @NonNull MetricQuery query);
+    @NonNull T query(@NonNull MetricDefinition definition, @NonNull MetricQuery query);
 }

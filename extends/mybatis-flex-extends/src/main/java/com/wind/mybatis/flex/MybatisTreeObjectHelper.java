@@ -3,6 +3,7 @@ package com.wind.mybatis.flex;
 import com.mybatisflex.core.BaseMapper;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.wind.common.util.WindDeepCopyUtils;
 import com.wind.common.util.WindReflectUtils;
 import com.wind.core.resources.TreeResources;
 import com.wind.core.resources.WindResources;
@@ -10,8 +11,11 @@ import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 
 import java.io.Serializable;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -35,6 +39,33 @@ public final class MybatisTreeObjectHelper {
      * 树形对象父级 id
      */
     private static final QueryColumn PARENT_ID = new QueryColumn("parent_id");
+
+    /**
+     * 深拷贝树并按深度优先前序拉平，包含根节点并保持子节点顺序，副本的 children 置为 null。
+     * 原树保持不变；节点及其属性须支持 {@link WindDeepCopyUtils#copy(Object)}，children 须为同名可写字段。
+     *
+     * @param root 非空根节点，树中不得存在环；children 为 null 或空列表时视为叶节点
+     * @param <ID> 资源 ID 类型
+     * @return 包含独立节点副本的新列表，保留节点类型及 children 以外的属性
+     */
+    public static <ID extends Serializable> List<TreeResources<ID>> flattenTree(@NonNull TreeResources<ID> root) {
+        List<TreeResources<ID>> result = new ArrayList<>();
+        Deque<TreeResources<ID>> pending = new ArrayDeque<>();
+        // 整棵树只复制一次，避免逐节点深拷贝时反复复制后代。
+        pending.push(WindDeepCopyUtils.copy(root));
+        while (!pending.isEmpty()) {
+            TreeResources<ID> current = pending.pop();
+            result.add(current);
+            List<? extends TreeResources<ID>> children = current.getChildren();
+            if (children != null) {
+                for (TreeResources<ID> child : children.reversed()) {
+                    pending.push(child);
+                }
+                WindReflectUtils.setFieldValue("children", current, null);
+            }
+        }
+        return result;
+    }
 
     /**
      * 构建树形对象

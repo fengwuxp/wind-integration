@@ -7,11 +7,13 @@ import org.jspecify.annotations.Nullable;
 import java.util.concurrent.Callable;
 
 /**
- * 基于上下文的租户 ID 持有者
+ * 基于上下文的租户 ID 持有者。
+ * 已作废，请使用 {@link DataIsolationContextHolder}
  *
  * @author wuxp
  * @date 2023-12-28 16:23
  **/
+@Deprecated(forRemoval = true)
 public final class TenantContextHolder {
 
     private static final ThreadLocal<Long> TENANT_ID = new ThreadLocal<>();
@@ -25,23 +27,29 @@ public final class TenantContextHolder {
      *
      * @param tenantId 租户 ID
      */
+    @Deprecated(forRemoval = true)
     public static void setTenantId(@NonNull Long tenantId) {
         TENANT_ID.set(tenantId);
     }
 
     /**
-     * 运行时指定租户 ID
+     * 运行时指定租户 ID，退出时恢复原租户 ID
      *
      * @param tenantId 租户 ID
      * @param action   执行方法
      */
     public static void runWithTenantId(@NonNull Long tenantId, @NonNull Runnable action) {
-        setTenantId(tenantId);
-        action.run();
+        Long previous = getTenantId();
+        try {
+            setTenantId(tenantId);
+            action.run();
+        } finally {
+            restore(previous);
+        }
     }
 
     /**
-     * 运行时指定租户 ID
+     * 运行时指定租户 ID，退出时恢复原租户 ID
      *
      * @param tenantId 租户 ID
      * @param action   执行方法
@@ -49,8 +57,13 @@ public final class TenantContextHolder {
      * @return 返回值
      */
     public static <T> T callWithTenantId(@NonNull Long tenantId, @NonNull Callable<T> action) throws Exception {
-        setTenantId(tenantId);
-        return action.call();
+        Long previous = getTenantId();
+        try {
+            setTenantId(tenantId);
+            return action.call();
+        } finally {
+            restore(previous);
+        }
     }
 
     @Nullable
@@ -67,5 +80,13 @@ public final class TenantContextHolder {
 
     public static void clear() {
         TENANT_ID.remove();
+    }
+
+    private static void restore(@Nullable Long tenantId) {
+        if (tenantId == null) {
+            clear();
+        } else {
+            setTenantId(tenantId);
+        }
     }
 }

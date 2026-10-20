@@ -1,8 +1,7 @@
 package com.wind.mybatis.flex;
 
 import com.mybatisflex.annotation.AbstractInsertListener;
-import com.wind.common.WindConstants;
-import com.wind.common.util.ServiceInfoUtils;
+import com.wind.integration.core.context.DataIsolationContextHolder;
 import com.wind.integration.core.model.EnvIsolationObject;
 
 /**
@@ -15,8 +14,7 @@ public class EnvIsolationFieldInsertListener extends AbstractInsertListener<EnvI
 
     @Override
     public void doInsert(EnvIsolationObject entity) {
-        String env = ServiceInfoUtils.getSpringProfilesActive();
-        entity.setEnv(env == null ? WindConstants.UNKNOWN : env);
+        entity.setEnv(DataIsolationContextHolder.requireEnv());
     }
 
 }

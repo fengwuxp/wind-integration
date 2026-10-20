@@ -1,53 +1,85 @@
 package com.wind.mybatis.plugin;
 
-import com.mybatisflex.core.FlexConsts;
-import com.mybatisflex.core.query.CPI;
-import com.mybatisflex.core.query.QueryColumn;
-import com.mybatisflex.core.query.QueryTable;
-import com.mybatisflex.core.query.QueryWrapper;
-import com.mybatisflex.core.table.TableInfo;
-import com.mybatisflex.core.table.TableInfoFactory;
-import com.wind.common.WindConstants;
-import com.wind.common.util.ServiceInfoUtils;
-import com.wind.integration.core.model.EnvIsolationObject;
-import com.wind.integration.core.model.TestDataIsolationObject;
-import com.wind.trace.WindTraceContext;
-import com.wind.trace.WindTracer;
+import com.wind.integration.core.context.DataIsolationContextHolder;
+import com.wind.integration.core.enums.DataIsolationDimensions;
+import com.wind.mybatis.isolation.DataIsolationScope;
+import org.apache.ibatis.cache.CacheKey;
 import org.apache.ibatis.executor.Executor;
+import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.mapping.ResultMap;
+import org.apache.ibatis.mapping.ResultMapping;
 import org.apache.ibatis.mapping.SqlCommandType;
-import org.apache.ibatis.plugin.Intercepts;
 import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Intercepts;
 import org.apache.ibatis.plugin.Invocation;
 import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.ResultHandler;
 import org.apache.ibatis.session.RowBounds;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
-import static com.wind.common.WindConstants.TRACE_TEST_DATA_CLASSIFICATION_ATTRIBUTE_NAME;
+import static com.wind.integration.core.enums.DataIsolationDimensions.ENVIRONMENT;
+import static com.wind.integration.core.enums.DataIsolationDimensions.TENANT;
+import static com.wind.integration.core.enums.DataIsolationDimensions.TEST_DATA;
+import static com.wind.integration.core.enums.DataIsolationDimensions.WORKSPACE;
 
 /**
- * 环境和测试数据查询隔离拦截器。
+ * 在 MyBatis 执行层实现单表读隔离：在生成查询缓存键前绑定范围，不拦截 INSERT/UPDATE/DELETE。
+ * 从当前工厂的 BaseMapper 实体元数据自动发现表和隔离字段。
+ * 受管表的关联、子查询、union、CTE 以及嵌套查询映射尚不支持，遇到时拒绝执行。
  *
- * <p>当前实现基于 MyBatis-Flex QueryWrapper。环境条件始终追加，测试条件仅在测试上下文追加。
- * QueryWrapper 会先复制再追加条件，不改变调用方持有的查询对象。</p>
+ * @author wuxp
+ * @since 2026-10-16
  */
 @Intercepts({
         @Signature(type = Executor.class, method = "query", args = {
                 MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class
         }),
+        @Signature(type = Executor.class, method = "query", args = {
+                MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class, CacheKey.class, BoundSql.class
+        }),
         @Signature(type = Executor.class, method = "queryCursor", args = {
                 MappedStatement.class, Object.class, RowBounds.class
         })
 })
-public class DataIsolationQueryInterceptor implements Interceptor {
+public final class DataIsolationQueryInterceptor implements Interceptor {
 
-    private static final String ENV_PROPERTY = "env";
-    private static final String TEST_DATA_PROPERTY = "testData";
+    private final List<Rule> rules;
+
+    private final Map<Configuration, SelectIsolationRewriter> rewriters = new ConcurrentHashMap<>();
+
+    /**
+     * 自动发现当前工厂已注册 Mapper 的实体，启用租户、工作空间、环境和测试数据隔离；工作空间范围须由业务提供。
+     */
+    public DataIsolationQueryInterceptor() {
+        this(List.of());
+    }
+
+    /**
+     * 定制内置维度的规则；按维度覆盖默认配置，表名和物理列由实体元数据解析。
+     *
+     * @param rules 内置维度、实体属性及范围供应者，不需要逐表登记
+     */
+    public DataIsolationQueryInterceptor(List<Rule> rules) {
+        Map<DataIsolationDimensions, Rule> configured = new LinkedHashMap<>();
+        // TODO 字段名称应该支持标记或配置
+        configured.put(TENANT, new Rule(TENANT, "tenantId", () -> DataIsolationScope.of(DataIsolationContextHolder.getTenantId())));
+        configured.put(WORKSPACE, new Rule(WORKSPACE, "workspaceId", () -> DataIsolationScope.of(DataIsolationContextHolder.getWorkspaceId())));
+        configured.put(ENVIRONMENT, new Rule(ENVIRONMENT, "env", () -> DataIsolationScope.of(DataIsolationContextHolder.getEnv())));
+        configured.put(TEST_DATA, new Rule(TEST_DATA, "testData", () -> DataIsolationScope.of(DataIsolationContextHolder.isTestData())));
+        rules.forEach(rule -> configured.put(rule.dimension(), rule));
+        this.rules = List.copyOf(configured.values());
+    }
 
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
@@ -56,144 +88,109 @@ public class DataIsolationQueryInterceptor implements Interceptor {
         if (statement.getSqlCommandType() != SqlCommandType.SELECT) {
             return invocation.proceed();
         }
-
-        args[1] = isolateParameter(statement, args[1], isTestContext());
+        rejectNestedQueries(statement, statement.getResultMaps(), new HashSet<>());
+        Object parameter = args[1];
+        BoundSql original = args.length == 6 ? (BoundSql) args[5] : statement.getBoundSql(parameter);
+        BoundSql isolated = rewriterFor(statement.getConfiguration()).rewrite(statement, original);
+        if (isolated == original) {
+            return invocation.proceed();
+        }
+        MappedStatement copy = copyStatement(statement, isolated);
+        Object isolatedParameter = isolated.getParameterObject();
+        args[0] = copy;
+        args[1] = isolatedParameter;
+        if (args.length == 6) {
+            Executor executor = (Executor) invocation.getTarget();
+            RowBounds rowBounds = (RowBounds) args[2];
+            args[4] = executor.createCacheKey(copy, isolatedParameter, rowBounds, isolated);
+            args[5] = isolated;
+        }
         return invocation.proceed();
     }
 
-    private Object isolateParameter(MappedStatement statement, Object parameter, boolean testContext) {
-        TableInfo tableInfo = resolveTableInfo(statement);
-        if (tableInfo == null) {
-            return parameter;
+    private SelectIsolationRewriter rewriterFor(Configuration configuration) {
+        int mapperCount = configuration.getMapperRegistry().getMappers().size();
+        SelectIsolationRewriter current = rewriters.get(configuration);
+        if (current != null && current.mapperCount() == mapperCount) {
+            return current;
         }
-        boolean testDataEntity = isTestDataEntity(tableInfo);
-        boolean envEntity = isEnvEntity(tableInfo);
-        if (!testDataEntity && !envEntity) {
-            return parameter;
-        }
-        String env = envEntity ? currentEnv() : null;
-
-        if (parameter instanceof QueryWrapper queryWrapper) {
-            return copyWithIsolationConditions(tableInfo, queryWrapper, testContext, env, testDataEntity, envEntity);
-        }
-        if (parameter instanceof Map<?, ?> parameterMap) {
-            Object wrapper = parameterMap.get(FlexConsts.QUERY);
-            if (wrapper instanceof QueryWrapper queryWrapper) {
-                Map<Object, Object> copy = new LinkedHashMap<>();
-                parameterMap.forEach(copy::put);
-                copy.put(FlexConsts.QUERY,
-                        copyWithIsolationConditions(tableInfo, queryWrapper, testContext, env, testDataEntity, envEntity));
-                return copy;
+        return rewriters.compute(configuration, (key, previous) -> {
+            if (previous != null && previous.mapperCount() == mapperCount) {
+                return previous;
             }
-        }
-
-        throw new IllegalStateException("Isolation query must use MyBatis-Flex QueryWrapper: " + statement.getId());
+            return new SelectIsolationRewriter(key, rules);
+        });
     }
 
-    private QueryWrapper copyWithIsolationConditions(TableInfo tableInfo, QueryWrapper queryWrapper,
-                                                     boolean testContext, String env,
-                                                     boolean testDataEntity, boolean envEntity) {
-        List<?> joins = CPI.getJoins(queryWrapper);
-        if (joins != null && !joins.isEmpty()) {
-            throw new IllegalStateException("Isolation query with joins is not supported: " + tableInfo.getTableName());
-        }
-        List<QueryWrapper> childSelects = CPI.getChildSelect(queryWrapper);
-        if (childSelects != null && !childSelects.isEmpty()) {
-            throw new IllegalStateException("Isolation query with subqueries is not supported: " + tableInfo.getTableName());
-        }
-
-        String envColumn = envEntity ? requiredColumn(tableInfo, ENV_PROPERTY) : null;
-        String testDataColumn = testDataEntity ? requiredColumn(tableInfo, TEST_DATA_PROPERTY) : null;
-
-        QueryWrapper copy = queryWrapper.clone();
-        if (envEntity) {
-            copy.and(isolationColumn(tableInfo, copy, envColumn).eq(env));
-        }
-        if (testContext && testDataEntity) {
-            copy.and(isolationColumn(tableInfo, copy, testDataColumn).eq(Boolean.TRUE));
-        }
-        return copy;
-    }
-
-    private String requiredColumn(TableInfo tableInfo, String property) {
-        String column = tableInfo.getPropertyColumnMapping().get(property);
-        if (column == null) {
-            for (Map.Entry<String, String> entry : tableInfo.getPropertyColumnMapping().entrySet()) {
-                if (property.equalsIgnoreCase(entry.getKey())) {
-                    column = entry.getValue();
-                    break;
+    private void rejectNestedQueries(MappedStatement statement, List<ResultMap> resultMaps, Set<String> visited) {
+        for (ResultMap resultMap : resultMaps) {
+            if (!visited.add(resultMap.getId())) {
+                continue;
+            }
+            if (resultMap.getDiscriminator() != null) {
+                for (String target : resultMap.getDiscriminator().getDiscriminatorMap().values()) {
+                    rejectNestedQueries(statement, List.of(statement.getConfiguration().getResultMap(target)), visited);
+                }
+            }
+            for (ResultMapping mapping : resultMap.getResultMappings()) {
+                if (mapping.getNestedQueryId() != null) {
+                    throw new IllegalStateException("Nested selects/lazy loading are not supported by read isolation: " + statement.getId());
+                }
+                if (mapping.getNestedResultMapId() != null) {
+                    ResultMap nested = statement.getConfiguration().getResultMap(mapping.getNestedResultMapId());
+                    rejectNestedQueries(statement, List.of(nested), visited);
                 }
             }
         }
-        if (column == null || column.isBlank()) {
-            throw new IllegalStateException("Isolation object requires a " + property + " column: " + tableInfo.getTableName());
-        }
-        return column;
     }
 
-    private QueryColumn isolationColumn(TableInfo tableInfo, QueryWrapper queryWrapper, String column) {
-        List<QueryTable> tables = CPI.getQueryTables(queryWrapper);
-        if (tables != null && !tables.isEmpty()) {
-            if (tables.size() != 1 || !Objects.equals(tableInfo.getTableName(), tables.getFirst().getName())) {
-                throw new IllegalStateException("Isolation query must target the mapper table: " + tableInfo.getTableName());
+    private MappedStatement copyStatement(MappedStatement source, BoundSql sql) {
+        MappedStatement.Builder builder = new MappedStatement.Builder(source.getConfiguration(), source.getId(),
+                ignored -> sql, source.getSqlCommandType())
+                .resource(source.getResource())
+                .fetchSize(source.getFetchSize())
+                .timeout(source.getTimeout())
+                .statementType(source.getStatementType())
+                .resultSetType(source.getResultSetType())
+                .parameterMap(source.getParameterMap())
+                .resultMaps(source.getResultMaps())
+                .cache(source.getCache())
+                .flushCacheRequired(source.isFlushCacheRequired())
+                .useCache(source.isUseCache())
+                .resultOrdered(source.isResultOrdered())
+                .keyGenerator(source.getKeyGenerator())
+                .databaseId(source.getDatabaseId())
+                .lang(source.getLang())
+                .dirtySelect(source.isDirtySelect());
+        if (source.getKeyProperties() != null) {
+            builder.keyProperty(String.join(",", source.getKeyProperties()));
+        }
+        if (source.getKeyColumns() != null) {
+            builder.keyColumn(String.join(",", source.getKeyColumns()));
+        }
+        if (source.getResultSets() != null) {
+            builder.resultSets(String.join(",", source.getResultSets()));
+        }
+        return builder.build();
+    }
+
+    /**
+     * 隔离维度与实体属性的绑定；每次查询从范围供应者读取当前允许访问的值。
+     *
+     * @param dimension     隔离维度，通过其接口匹配实体
+     * @param property      实体属性名，物理列从 MyBatis-Flex 元数据读取
+     * @param scopeSupplier 当前范围供应者，返回 null 表示缺少必要上下文
+     * @author wuxp
+     * @since 2026-10-16
+     */
+    @NullMarked
+    public record Rule(DataIsolationDimensions dimension, String property, Supplier<@Nullable DataIsolationScope> scopeSupplier) {
+
+        public Rule {
+            if (!property.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+                throw new IllegalArgumentException("Isolation property must be a simple identifier");
             }
-            QueryTable table = tables.getFirst();
-            String alias = table.getAlias();
-            if (alias != null && !alias.isBlank()) {
-                return new QueryColumn(alias, column);
-            }
-        }
-        return new QueryColumn(column);
-    }
-
-    private boolean isTestContext() {
-        WindTraceContext context = WindTracer.TRACER.currentContext().orElse(null);
-        return context != null
-                && Boolean.TRUE.equals(context.getContextVariable(TRACE_TEST_DATA_CLASSIFICATION_ATTRIBUTE_NAME, false));
-    }
-
-    private String currentEnv() {
-        String env = ServiceInfoUtils.getSpringProfilesActive();
-        return env == null ? WindConstants.UNKNOWN : env;
-    }
-
-    private boolean isTestDataEntity(TableInfo tableInfo) {
-        Class<?> entityClass = tableInfo.getEntityClass();
-        return entityClass != null && TestDataIsolationObject.class.isAssignableFrom(entityClass);
-    }
-
-    private boolean isEnvEntity(TableInfo tableInfo) {
-        Class<?> entityClass = tableInfo.getEntityClass();
-        return entityClass != null && EnvIsolationObject.class.isAssignableFrom(entityClass);
-    }
-
-    private TableInfo resolveTableInfo(MappedStatement statement) {
-        String statementId = statement.getId();
-        int separator = statementId.lastIndexOf('.');
-        if (separator <= 0) {
-            return null;
-        }
-        String mapperName = statementId.substring(0, separator);
-        try {
-            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-            if (classLoader == null) {
-                classLoader = DataIsolationQueryInterceptor.class.getClassLoader();
-            }
-            Class<?> mapperClass = Class.forName(mapperName, false, classLoader);
-            TableInfo tableInfo = TableInfoFactory.ofMapperClass(mapperClass);
-            if (tableInfo != null) {
-                return tableInfo;
-            }
-        } catch (ClassNotFoundException | RuntimeException ignored) {
-            // 自定义 XML namespace 可能不是可加载的 Mapper 类，继续使用 ResultMap 类型回退。
-        }
-        if (statement.getResultMaps().isEmpty()) {
-            return null;
-        }
-        try {
-            return TableInfoFactory.ofEntityClass(statement.getResultMaps().get(0).getType());
-        } catch (RuntimeException ignored) {
-            return null;
         }
     }
+
 }

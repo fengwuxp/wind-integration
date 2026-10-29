@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import static com.wind.integration.core.enums.DataIsolationDimensions.TENANT;
 import static com.wind.integration.core.enums.DataIsolationDimensions.WORKSPACE;
@@ -97,6 +98,17 @@ class DataIsolationMetadataIntegrationTests {
     }
 
     @Test
+    void testRegisteringConflictingMapperAfterPublicQueryDoesNotReuseFastPath() throws Exception {
+        SqlSessionFactory factory = factory(workspaceInterceptor(), PublicMapper.class);
+
+        assertEquals(List.of(1L, 2L, 3L), ids(factory));
+        assertEquals(List.of(1L, 2L, 3L), ids(factory));
+        factory.getConfiguration().addMapper(WorkspaceMapper.class);
+
+        assertThrows(PersistenceException.class, () -> ids(factory));
+    }
+
+    @Test
     void testConflictingMappingsForTheSameTableFailInsteadOfChoosingOne() {
         SqlSessionFactory factory = factory(workspaceInterceptor(), WorkspaceMapper.class, TenantMapper.class);
 
@@ -138,6 +150,16 @@ class DataIsolationMetadataIntegrationTests {
         assertEquals(List.of(2L), ids(factory(interceptor, WorkspaceMapper.class)));
     }
 
+    @Test
+    void testDuplicateCustomDimensionIsRejectedAtConstruction() {
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () ->
+                new DataIsolationQueryInterceptor(List.of(
+                        new Rule(TENANT, "tenantId", () -> DataIsolationScope.of(10L)),
+                        new Rule(TENANT, "tenantId", DataIsolationScope::unrestrictedScope))));
+
+        assertTrue(error.getMessage().contains("TENANT"));
+    }
+
     private DataIsolationQueryInterceptor workspaceInterceptor() {
         return new DataIsolationQueryInterceptor(List.of(new Rule(WORKSPACE, "workspaceId", () -> workspaceScope)));
     }
@@ -167,6 +189,10 @@ class DataIsolationMetadataIntegrationTests {
         private Long id;
     }
 
+    @Table("auto_orders")
+    static class PublicOrder extends Identity {
+    }
+
     @Getter
     @Setter
     @Table("auto_orders")
@@ -189,6 +215,9 @@ class DataIsolationMetadataIntegrationTests {
     }
 
     interface WorkspaceMapper extends GenericMapper<WorkspaceOrder> {
+    }
+
+    interface PublicMapper extends BaseMapper<PublicOrder> {
     }
 
     interface AnotherWorkspaceMapper extends GenericMapper<WorkspaceOrder> {

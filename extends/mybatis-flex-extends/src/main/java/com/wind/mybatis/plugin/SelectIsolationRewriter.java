@@ -39,6 +39,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -63,6 +64,19 @@ final class SelectIsolationRewriter {
     private final Map<String, List<ColumnRule>> tables;
 
     private final int mapperCount;
+
+    /**
+     * 已确认无需隔离的单表 SQL 缓存。
+     * key 为 MyBatis 语句 ID，value 为该语句最近一次确认的 SQL；仅 SQL 完全一致时跳过解析。
+     * 缓存由多线程共享，按最近访问顺序最多保留 256 条；Mapper 元数据刷新时随重写器重建。
+     */
+    private final Map<String, String> unisolatedStatements = Collections.synchronizedMap(
+            new LinkedHashMap<>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                    return size() > 256;
+                }
+            });
 
     SelectIsolationRewriter(Configuration configuration, List<Rule> rules) {
         List<Class<?>> mappers = List.copyOf(configuration.getMapperRegistry().getMappers());
@@ -106,6 +120,10 @@ final class SelectIsolationRewriter {
     }
 
     BoundSql rewrite(MappedStatement statement, BoundSql original) {
+        String sqlText = original.getSql();
+        if (sqlText.equals(unisolatedStatements.get(statement.getId()))) {
+            return original;
+        }
         CCJSqlParser parser = CCJSqlParserUtil.newParser(original.getSql()).withAllowComplexParsing(
                 CCJSqlParserUtil.getNestingDepth(original.getSql()) <= CCJSqlParserUtil.ALLOWED_NESTING_DEPTH);
         Select select;
@@ -123,6 +141,13 @@ final class SelectIsolationRewriter {
         boolean managed = shape.tableNames.stream().map(SelectIsolationRewriter::simpleName)
                 .map(tables::get).anyMatch(rules -> rules != null && !rules.isEmpty());
         if (!managed) {
+            if (!shape.nested && select.getSelectBody() instanceof PlainSelect query
+                    && query.getFromItem() instanceof Table table && (query.getJoins() == null || query.getJoins().isEmpty())) {
+                List<ColumnRule> bindings = tables.get(simpleName(table.getName()));
+                if (bindings != null && bindings.isEmpty()) {
+                    unisolatedStatements.put(statement.getId(), sqlText);
+                }
+            }
             return original;
         }
         if (shape.nested || !(select.getSelectBody() instanceof PlainSelect query)) {

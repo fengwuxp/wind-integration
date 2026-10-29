@@ -114,6 +114,25 @@ class DataIsolationReadWriteIntegrationTests {
         }
     }
 
+    @Test
+    void testInvalidTestDataTypeRejectsReadsAndInserts() {
+        DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, WORKSPACE, "ws-a", ENVIRONMENT, "sit", TEST_DATA, "true"), () -> {
+            try (SqlSession session = sessionFactory.openSession()) {
+                OrderMapper mapper = session.getMapper(OrderMapper.class);
+                Assertions.assertThrows(RuntimeException.class, mapper::ids);
+                Assertions.assertThrows(RuntimeException.class, () -> mapper.insert(order(10L)));
+                try (var statement = session.getConnection().createStatement();
+                     var result = statement.executeQuery("SELECT COUNT(*) FROM t_holder_order WHERE id=10")) {
+                    result.next();
+                    Assertions.assertEquals(0L, result.getLong(1));
+                } catch (SQLException exception) {
+                    throw new IllegalStateException(exception);
+                }
+                session.rollback();
+            }
+        });
+    }
+
     /** 同一工作线程顺序处理不同请求，缺失租户的请求不能读取上一请求的数据。 */
     @Test
     void testReusedWorkerDoesNotReadPreviousTenant() throws Exception {

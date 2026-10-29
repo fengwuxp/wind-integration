@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -190,6 +191,48 @@ class DataIsolationContextHolderTests {
         Assertions.assertThrows(NullPointerException.class, DataIsolationContextHolder::requireTenantId);
         Assertions.assertThrows(NullPointerException.class, DataIsolationContextHolder::requireWorkspaceId);
         Assertions.assertThrows(RuntimeException.class, DataIsolationContextHolder::requireEnv);
+    }
+
+    @Test
+    void testExplicitTestDataValuesAreBoolean() {
+        Assertions.assertFalse(DataIsolationContextHolder.isTestData());
+        DataIsolationContextHolder.runWith(Map.of(TEST_DATA, true),
+                () -> Assertions.assertTrue(DataIsolationContextHolder.isTestData()));
+        DataIsolationContextHolder.runWith(Map.of(TEST_DATA, false),
+                () -> Assertions.assertFalse(DataIsolationContextHolder.isTestData()));
+    }
+
+    @Test
+    void testInvalidTestDataDoesNotBecomeFormalData() {
+        for (Object invalid : List.of("true", 1)) {
+            Assertions.assertThrows(RuntimeException.class, () ->
+                    DataIsolationContextHolder.runWith(Map.of(TEST_DATA, invalid), DataIsolationContextHolder::isTestData));
+        }
+        Assertions.assertFalse(DataIsolationContextHolder.isTestData());
+    }
+
+    @Test
+    void testInvalidTestDataFromTraceDoesNotBecomeFormalData() {
+        for (Object invalid : List.of("true", 1)) {
+            WindTracer.TRACER.run(() -> {
+                WindTracer.TRACER.putVariable(TEST_DATA.getTraceAttributeName(), invalid);
+                Assertions.assertThrows(RuntimeException.class, DataIsolationContextHolder::isTestData);
+            });
+        }
+        Assertions.assertFalse(DataIsolationContextHolder.isTestData());
+    }
+
+    @Test
+    void testInvalidNestedTestDataRestoresOuterContext() {
+        DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, TEST_DATA, true), () -> {
+            Assertions.assertThrows(RuntimeException.class, () -> DataIsolationContextHolder.runWith(
+                    Map.of(TENANT, 20L, TEST_DATA, "true"), DataIsolationContextHolder::isTestData));
+            Assertions.assertTrue(DataIsolationContextHolder.isTestData());
+            Assertions.assertEquals(10L, DataIsolationContextHolder.<Long>requireTenantId());
+            Assertions.assertEquals(10L, TenantContextHolder.requireTenantId());
+        });
+        Assertions.assertNull(TenantContextHolder.getTenantId());
+        Assertions.assertFalse(DataIsolationContextHolder.isTestData());
     }
 
     @ParameterizedTest

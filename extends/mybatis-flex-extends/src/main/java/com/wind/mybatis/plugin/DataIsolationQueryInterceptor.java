@@ -20,6 +20,7 @@ import org.apache.ibatis.session.RowBounds;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -77,7 +78,13 @@ public final class DataIsolationQueryInterceptor implements Interceptor {
         configured.put(WORKSPACE, new Rule(WORKSPACE, "workspaceId", () -> DataIsolationScope.of(DataIsolationContextHolder.getWorkspaceId())));
         configured.put(ENVIRONMENT, new Rule(ENVIRONMENT, "env", () -> DataIsolationScope.of(DataIsolationContextHolder.getEnv())));
         configured.put(TEST_DATA, new Rule(TEST_DATA, "testData", () -> DataIsolationScope.of(DataIsolationContextHolder.isTestData())));
-        rules.forEach(rule -> configured.put(rule.dimension(), rule));
+        Set<DataIsolationDimensions> overridden = EnumSet.noneOf(DataIsolationDimensions.class);
+        for (Rule rule : rules) {
+            if (!overridden.add(rule.dimension())) {
+                throw new IllegalArgumentException("Duplicate isolation rule: " + rule.dimension());
+            }
+            configured.put(rule.dimension(), rule);
+        }
         this.rules = List.copyOf(configured.values());
     }
 
@@ -93,6 +100,10 @@ public final class DataIsolationQueryInterceptor implements Interceptor {
         BoundSql original = args.length == 6 ? (BoundSql) args[5] : statement.getBoundSql(parameter);
         BoundSql isolated = rewriterFor(statement.getConfiguration()).rewrite(statement, original);
         if (isolated == original) {
+            if (args.length != 6) {
+                // 固定已检查的 SQL，避免动态 SqlSource 在执行时生成不同的查询。
+                args[0] = copyStatement(statement, original);
+            }
             return invocation.proceed();
         }
         MappedStatement copy = copyStatement(statement, isolated);

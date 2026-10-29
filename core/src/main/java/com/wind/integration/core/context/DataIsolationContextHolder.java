@@ -154,7 +154,14 @@ public final class DataIsolationContextHolder {
     }
 
     public static boolean isTestData() {
-        return Boolean.TRUE.equals(getDataIsolationDimensioId(DataIsolationDimensions.TEST_DATA));
+        Object value = getDataIsolationDimensioId(DataIsolationDimensions.TEST_DATA);
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof Boolean testData) {
+            return testData;
+        }
+        throw new IllegalStateException("context testData must be Boolean");
     }
 
     @Nullable

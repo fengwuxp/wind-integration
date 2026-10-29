@@ -365,7 +365,7 @@ public final class IsolationRequestExample {
 | getTenantId / getWorkspaceId / getEnv | 返回 null；getTenantId 另有旧租户兼容回退 |
 | requireTenantId / requireWorkspaceId | 抛出异常 |
 | requireEnv | 缺失、空字符串或仅空白时抛出异常 |
-| isTestData | 返回 false |
+| isTestData | 返回 false；读取到非 Boolean 值时抛异常 |
 
 租户绑定虽接收 Serializable，为兼容 TenantContextHolder 要求 Long；工作空间可使用 String 等 Serializable 类型。getTenantId 优先读取 trace，缺失时回退旧 TenantContextHolder。直接调用旧 setTenantId 的代码仍须管理自己的清理；新回调负责恢复进入前的旧值。
 
@@ -431,6 +431,8 @@ public class WorkspaceIsolationConfiguration {
 ```
 
 应用提供 workspaceIsolationScopeSupplier Bean，每次查询返回本次已计算好的授权范围。Rule 使用 Java 持久化属性名：workspaceId 可映射到 organization_id；若 Java 字段本身叫 organizationId，则 Rule 配 organizationId。单独添加 getter 别名不会建立 Flex 字段映射。
+
+每个维度只能配置一条自定义 Rule；重复配置同一维度会报错。自定义规则会覆盖该维度的默认规则。
 
 | Supplier 结果 | 查询行为 |
 | --- | --- |
@@ -517,7 +519,7 @@ JSQLParser 4.3 对部分 TABLE 查询简写与数据库的理解不同，因此�
 
 未知表会放行，因此“缺失范围拒绝”不能理解为“所有漏配都拒绝”。应在 Mapper 注册完成后开放流量；元数据错误常在首次查询暴露，仅检查 Bean 创建成功不够。已有游标和已返回数据不会因范围后续变化重新过滤，应在原授权上下文内消费并关闭游标。
 
-每次 SELECT 都会解析 SQL，包括 MyBatis 缓存命中的查询；语法树不缓存。Supplier 宜读取请求内结果，不应每条 SQL 都调用权限服务或递归执行受管查询。IN 集合没有自动分批与大小上限，应结合数据库参数限制和索引评估。
+SELECT 在 MyBatis 缓存命中前进行隔离检查。已登记且无需隔离的单表查询，首次解析确认后，重复执行相同 SQL 可以跳过解析；SQL 或 Mapper 元数据变化时重新检查。其他查询每次解析，语法树不缓存。Supplier 宜读取请求内结果，不应每条 SQL 都调用权限服务或递归执行受管查询。IN 集合没有自动分批与大小上限，应结合数据库参数限制和索引评估。
 
 <a id="verification"></a>
 ## 8. 生产接入与维护
@@ -555,7 +557,7 @@ JSQLParser 4.3 对部分 TABLE 查询简写与数据库的理解不同，因此�
 在仓库根目录使用 JDK 21 执行：
 
 ```bash
-WIND_MYBATIS_TESTS='MybatisQueryMethodHelperTests,MybatisTreeObjectHelperTests,TenantContextHolderTests,DataIsolationContextHolderTests,DataIsolationQueryIgnoreHolderTests,DataIsolationQueryInterceptorIntegrationTests,DataIsolationDefaultsIntegrationTests,DataIsolationMetadataIntegrationTests,WorkspaceIsolationIntegrationTests,DataIsolationReadWriteIntegrationTests'
+WIND_MYBATIS_TESTS='MybatisQueryMethodHelperTests,MybatisTreeObjectHelperTests,TenantContextHolderTests,DataIsolationContextHolderTests,DataIsolationQueryIgnoreHolderTests,SelectIsolationRewriterTests,DataIsolationQueryInterceptorIntegrationTests,DataIsolationDefaultsIntegrationTests,DataIsolationMetadataIntegrationTests,WorkspaceIsolationIntegrationTests,DataIsolationReadWriteIntegrationTests,DynamicSqlIsolationIntegrationTests'
 
 mvn -o -pl tests -am clean verify \
   -Dmaven.test.skip=false -DskipTests=false -Dtest.ignore.failure=false \

@@ -1,8 +1,7 @@
 package com.wind.mybatis.plugin;
 
-import com.wind.integration.core.context.DataIsolationContextHolder;
-import com.wind.integration.core.enums.DataIsolationDimensions;
-import com.wind.mybatis.isolation.DataIsolationScope;
+import com.wind.mybatis.isolation.DataIsolationStrategy;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
 import org.apache.ibatis.cache.CacheKey;
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.mapping.BoundSql;
@@ -17,27 +16,19 @@ import org.apache.ibatis.plugin.Signature;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.ResultHandler;
 import org.apache.ibatis.session.RowBounds;
-import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
-import java.util.EnumSet;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
-
-import static com.wind.integration.core.enums.DataIsolationDimensions.ENVIRONMENT;
-import static com.wind.integration.core.enums.DataIsolationDimensions.TENANT;
-import static com.wind.integration.core.enums.DataIsolationDimensions.TEST_DATA;
-import static com.wind.integration.core.enums.DataIsolationDimensions.WORKSPACE;
 
 /**
  * 在 MyBatis 执行层实现单表读隔离：在生成查询缓存键前绑定范围，不拦截 INSERT/UPDATE/DELETE。
  * 从当前工厂的 BaseMapper 实体元数据自动发现表和隔离字段。
- * 受管表的关联、子查询、union、CTE 以及嵌套查询映射尚不支持，遇到时拒绝执行。
+ * 受管单表支持限定形式的 WHERE EXISTS；其他关联、子查询、union、CTE 及嵌套查询映射遇到时拒绝执行。
  *
  * @author wuxp
  * @since 2026-10-16
@@ -55,37 +46,29 @@ import static com.wind.integration.core.enums.DataIsolationDimensions.WORKSPACE;
 })
 public final class DataIsolationQueryInterceptor implements Interceptor {
 
-    private final List<Rule> rules;
+    private final List<DataIsolationStrategy> strategies;
 
     private final Map<Configuration, SelectIsolationRewriter> rewriters = new ConcurrentHashMap<>();
 
     /**
-     * 自动发现当前工厂已注册 Mapper 的实体，启用租户、工作空间、环境和测试数据隔离；工作空间范围须由业务提供。
+     * 使用默认字段策略，按实体接口和当前上下文启用租户、工作空间、环境和测试数据隔离。
      */
     public DataIsolationQueryInterceptor() {
-        this(List.of());
+        this(List.of(new FieldDataIsolationStrategy()));
     }
 
     /**
-     * 定制内置维度的规则；按维度覆盖默认配置，表名和物理列由实体元数据解析。
+     * 使用完整策略集合，不隐式追加默认策略。按优先级升序执行，同值保持输入顺序，各策略条件取 AND。
      *
-     * @param rules 内置维度、实体属性及范围供应者，不需要逐表登记
+     * @param strategies 非空的隔离策略集合
      */
-    public DataIsolationQueryInterceptor(List<Rule> rules) {
-        Map<DataIsolationDimensions, Rule> configured = new LinkedHashMap<>();
-        // TODO 字段名称应该支持标记或配置
-        configured.put(TENANT, new Rule(TENANT, "tenantId", () -> DataIsolationScope.of(DataIsolationContextHolder.getTenantId())));
-        configured.put(WORKSPACE, new Rule(WORKSPACE, "workspaceId", () -> DataIsolationScope.of(DataIsolationContextHolder.getWorkspaceId())));
-        configured.put(ENVIRONMENT, new Rule(ENVIRONMENT, "env", () -> DataIsolationScope.of(DataIsolationContextHolder.getEnv())));
-        configured.put(TEST_DATA, new Rule(TEST_DATA, "testData", () -> DataIsolationScope.of(DataIsolationContextHolder.isTestData())));
-        Set<DataIsolationDimensions> overridden = EnumSet.noneOf(DataIsolationDimensions.class);
-        for (Rule rule : rules) {
-            if (!overridden.add(rule.dimension())) {
-                throw new IllegalArgumentException("Duplicate isolation rule: " + rule.dimension());
-            }
-            configured.put(rule.dimension(), rule);
+    public DataIsolationQueryInterceptor(List<? extends DataIsolationStrategy> strategies) {
+        if (strategies.isEmpty()) {
+            throw new IllegalArgumentException("Isolation strategies must not be empty");
         }
-        this.rules = List.copyOf(configured.values());
+        List<DataIsolationStrategy> ordered = new ArrayList<>(List.copyOf(strategies));
+        ordered.sort(Comparator.comparingInt(DataIsolationStrategy::getOrder));
+        this.strategies = List.copyOf(ordered);
     }
 
     @Override
@@ -129,7 +112,7 @@ public final class DataIsolationQueryInterceptor implements Interceptor {
             if (previous != null && previous.mapperCount() == mapperCount) {
                 return previous;
             }
-            return new SelectIsolationRewriter(key, rules);
+            return new SelectIsolationRewriter(key, strategies.toArray(DataIsolationStrategy[]::new));
         });
     }
 
@@ -183,25 +166,6 @@ public final class DataIsolationQueryInterceptor implements Interceptor {
             builder.resultSets(String.join(",", source.getResultSets()));
         }
         return builder.build();
-    }
-
-    /**
-     * 隔离维度与实体属性的绑定；每次查询从范围供应者读取当前允许访问的值。
-     *
-     * @param dimension     隔离维度，通过其接口匹配实体
-     * @param property      实体属性名，物理列从 MyBatis-Flex 元数据读取
-     * @param scopeSupplier 当前范围供应者，返回 null 表示缺少必要上下文
-     * @author wuxp
-     * @since 2026-10-16
-     */
-    @NullMarked
-    public record Rule(DataIsolationDimensions dimension, String property, Supplier<@Nullable DataIsolationScope> scopeSupplier) {
-
-        public Rule {
-            if (!property.matches("[A-Za-z_][A-Za-z0-9_]*")) {
-                throw new IllegalArgumentException("Isolation property must be a simple identifier");
-            }
-        }
     }
 
 }

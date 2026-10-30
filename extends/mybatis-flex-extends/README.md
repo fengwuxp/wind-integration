@@ -37,7 +37,7 @@
 </dependency>
 ```
 
-版本由宿主 Wind BOM/依赖管理确定。构建基线为 Java 21、MyBatis 3.5.19、MyBatis-Flex 1.11.5 和 JSQLParser 4.3。MyBatis-Flex Starter 按应用的 Spring Boot 版本选择；仓内集成测试使用 Spring Boot 4.1.0、Flex Boot 4 Starter 和 H2 2.4.240。
+版本由宿主 Wind BOM/依赖管理确定，JDK 随父 POM 版本选择，见第 8 节。当前依赖基线为 MyBatis 3.5.19、MyBatis-Flex 1.11.5 和 JSQLParser 4.3。MyBatis-Flex Starter 按应用的 Spring Boot 版本选择；仓内集成测试使用 Spring Boot 4.1.0、Flex Boot 4 Starter 和 H2 2.4.240。
 
 各能力按需接入：静态 helper 直接调用；TypeHandler 配在需要转换的字段上；插入监听器挂到实体或 Flex 全局配置；读隔离插件单独注册。仅添加依赖不会自动启用这些行为。
 
@@ -285,7 +285,7 @@ public class FieldEncryptionConfiguration {
 
 ### 7.1 一次注册，普通查询默认过滤
 
-需要保护的实体应在同一 SqlSessionFactory 中有已注册的 BaseMapper，并实现相应归属接口。插件按实际 SQL 表匹配，不依赖查询返回类型，因此列表、详情、COUNT、DTO 查询都可受保护。
+需要保护的实体应在同一 SqlSessionFactory 中有已注册的 BaseMapper。默认字段规则通过相应归属接口识别实体；普通字段可通过第 7.7 节的显式规则接入，无需实现内置接口。插件按实际 SQL 表匹配，不依赖查询返回类型，因此受支持的列表、详情、COUNT、DTO 查询都可受保护。
 
 使用 Flex Spring Boot Starter 自动创建工厂时，在应用扫描范围内声明一次：
 
@@ -306,7 +306,7 @@ public class DataIsolationConfiguration {
 
 Flex Boot 4 Starter 1.11.5 会将 Interceptor Bean 安装到工厂，不应重复调用 addInterceptor。自建 SqlSessionFactory 时，将插件显式加入各工厂的插件列表，并保留其他插件。
 
-无参构造直接读取 DataIsolationContextHolder：
+无参构造安装默认 FieldDataIsolationStrategy，由它读取 DataIsolationContextHolder：
 
 | 维度 | 实体接口 | 默认 Java 属性 | 默认读取条件 |
 | --- | --- | --- | --- |
@@ -325,7 +325,9 @@ Flex Boot 4 Starter 1.11.5 会将 Interceptor Bean 安装到工厂，不应重�
 | DataIsolationQueryIgnoreHolder | core；控制当前线程哪些查询维度暂时不生效，不修改归属值 |
 | DataIsolationDimensions | core.enums；四个枚举值、归属接口和 trace 属性名的映射 |
 | DataIsolationScope | mybatis-flex-extends；表达一个维度允许读取的值集合或无限制 |
-| DataIsolationQueryInterceptor.Rule | 读插件内部类型；绑定维度、Java 属性和 scopeSupplier |
+| DataIsolationStrategy.FieldRule | 共享字段规则；声明实体类型、Java 属性、范围供应者和可选内置维度 |
+| DataIsolationStrategy | mybatis-flex-extends；按静态实体匹配并产生本次查询条件，继承 Ordered |
+| FieldDataIsolationStrategy | mybatis-flex-extends；内置维度及普通字段的等值、集合范围隔离 |
 
 上下文值表达当前归属，Scope 表达读取范围。跨工作空间读取可以扩大范围，同时让插入继续使用当前工作空间；各归属接口按需组合。
 
@@ -407,8 +409,9 @@ public class OrderEntity implements TenantIsolationObject<Long>,
 
 ```java
 import com.wind.mybatis.isolation.DataIsolationScope;
+import com.wind.mybatis.isolation.DataIsolationStrategy.FieldRule;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
 import com.wind.mybatis.plugin.DataIsolationQueryInterceptor;
-import com.wind.mybatis.plugin.DataIsolationQueryInterceptor.Rule;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -424,15 +427,35 @@ public class WorkspaceIsolationConfiguration {
     @Bean
     public DataIsolationQueryInterceptor dataIsolationQueryInterceptor(
             @Qualifier("workspaceIsolationScopeSupplier") Supplier<DataIsolationScope> workspaceScopeSupplier) {
-        return new DataIsolationQueryInterceptor(List.of(
-                new Rule(WORKSPACE, "workspaceId", workspaceScopeSupplier)));
+        FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List.of(
+                FieldRule.forDimension(WORKSPACE, "workspaceId", workspaceScopeSupplier)));
+        return new DataIsolationQueryInterceptor(List.of(fields));
     }
 }
 ```
 
-应用提供 workspaceIsolationScopeSupplier Bean，每次查询返回本次已计算好的授权范围。Rule 使用 Java 持久化属性名：workspaceId 可映射到 organization_id；若 Java 字段本身叫 organizationId，则 Rule 配 organizationId。单独添加 getter 别名不会建立 Flex 字段映射。
+应用提供 workspaceIsolationScopeSupplier Bean，每次查询返回本次已计算好的可信范围。FieldRule.property 指定 Java 持久化属性名，不能填写数据库列名：workspaceId 可通过 @Column 映射到 organization_id；单独添加 getter 别名不会建立持久字段映射。
 
-每个维度只能配置一条自定义 Rule；重复配置同一维度会报错。自定义规则会覆盖该维度的默认规则。
+同一工厂中，不同实体可以使用不同属性。假设 InvoiceEntity 同样实现 WorkspaceIsolationObject，但实际持久字段为 organizationId，且 getWorkspaceId/setWorkspaceId 委托给该字段，可以在同一字段策略中配置：
+
+```java
+FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List.of(
+        FieldRule.forDimension(WORKSPACE, "workspaceId", workspaceScopeSupplier),
+        new FieldRule(InvoiceEntity.class, "organizationId", workspaceScopeSupplier, WORKSPACE)
+));
+```
+
+InvoiceEntity 使用 organizationId，其他工作空间实体使用 workspaceId；二者复用相同的范围供应者，每次查询只执行一条 WORKSPACE 规则。没有自定义配置的其他维度继续使用默认约定。普通字段规则的 dimension 为 null，不要求实体实现内置隔离接口。
+
+规则选择遵循以下顺序：
+
+1. 对当前实体和维度查找适用的自定义规则，优先选择唯一最具体的实体、父类或接口类型。
+2. 完全没有适用的自定义规则，才使用内置约定。实体必须实现对应隔离接口，不能仅凭属性名称自动启用维度。
+3. 两个互不包含的接口规则同时匹配时拒绝；更具体的实体配置可以消除歧义。规则的书写顺序和策略 Ordered 不决定覆盖关系。
+
+相同实体类型、相同维度的重复配置会在构造时拒绝；同一实体类型、相同属性的重复配置也会拒绝。属性缺失或继承规则歧义会在实体元数据解析时暴露，通常是该工厂首次 SELECT。选中的属性无效或 Supplier 失败，不会回退默认规则。
+
+覆盖单位是完整 FieldRule，属性和 Supplier 一起选定。仅修改字段名时，显式复用相同 Supplier，避免丢失已定制的读取范围。维度之间仍取 AND；dimension 为 null 的普通字段约束作为额外 AND 条件，不参与内置维度覆盖。
 
 | Supplier 结果 | 查询行为 |
 | --- | --- |
@@ -485,7 +508,9 @@ callIgnoring 原样抛出 Callable 的受检异常。不要将查询忽略标记
 
 ### 7.6 执行过程与支持边界
 
-插件构造时组装规则，首次 SELECT 才读取当前 Configuration 的 Mapper 注册表，建立实体索引。各工厂独立缓存，Mapper 数量变化时刷新。同实体的多个 Mapper 去重；同名表规则冲突、属性缺失或列映射不受支持时报错。
+插件构造时固定有序策略集合，首次 SELECT 才读取当前 Configuration 的 Mapper 注册表，建立实体索引。各工厂独立缓存，Mapper 数量变化时刷新。同实体的多个 Mapper 去重；同名表规则冲突、属性缺失或列映射不受支持时报错。
+
+字段策略按实体类型和完整列映射缓存最终生效的规则，绑定校验与查询改写复用同一结果；不同列映射会分别解析。缓存只保存静态规则及物理列，Supplier 在每次查询时读取当前范围，配置解析阶段不调用它。
 
 ```mermaid
 flowchart LR
@@ -504,16 +529,19 @@ flowchart LR
 | 场景 | 行为 |
 | --- | --- |
 | 单表详情、列表、COUNT/SUM、别名、OR、GROUP BY/HAVING、排序、LIMIT/OFFSET、foreach、游标 | 追加隔离条件；保持原查询与参数语义 |
-| 受管 JOIN、子查询、UNION、CTE、SELECT INTO、部分非 LIMIT 分页 | 拒绝执行；忽略维度不会扩大语法支持范围 |
+| 受管单表 WHERE 中符合下述条件的 EXISTS | 追加主表隔离条件；关系表约束由业务查询提供 |
+| 其他受管 JOIN、子查询、UNION、CTE、SELECT INTO、部分非 LIMIT 分页 | 拒绝执行；忽略维度不会扩大语法支持范围 |
 | 嵌套 select/懒加载 ResultMap，包括 discriminator | 一律拒绝，查询入口为公共表也一样 |
 | JSQLParser 4.3 无法解析的 SELECT | 报错，未受管 SELECT 也会先解析 |
-| 没有已注册 BaseMapper 或实体未实现维度接口 | 不增加隔离条件，不报漏配错误 |
+| 没有已注册 BaseMapper，或所有策略都不匹配实体 | 不增加隔离条件，不报漏配错误 |
 | 动态表名/分表、视图/同义词、仅标量 SQL 无实体映射 | 不在保护契约内，实际物理名可能无法匹配而放行 |
 | 不同 schema 的同名表 | 按简单表名共用规则，配置冲突时报错，不支持按 schema 分权 |
 | INSERT、UPDATE、DELETE | 直通，不填字段、不校验写入归属 |
 | 直接 JDBC、其他 ORM、存储过程、StatementType.STATEMENT | 不在已验证保护范围内 |
 
-子查询无论出现在排序、分组、关联条件还是函数表达式中，都按上述边界检查。CTE 名称与受管物理表同名时保守拒绝，即使该 CTE 的定义只访问公共表；不涉及受管名称的公共 JOIN、UNION、CTE 和子查询仍然直通。
+受管主表的 WHERE 可以包含 `EXISTS (SELECT 1 FROM 关系表 WHERE ...)`，子查询内最多支持一个 `JOIN` 或 `INNER JOIN`，且必须有一个 ON 条件。涉及的每张关系表都必须有已注册的 BaseMapper 且未配置 Wind 隔离规则；关系表的实体元数据和 SQL 都不能指定 schema，同名的限定表元数据会使该关系表不再符合条件，别名也不能重复。子查询中的其他关联方式、嵌套查询、分组、排序和分页均不支持；外层 WHERE 中的 `NOT` 表达式、其他位置的子查询和其他形式的受管子查询仍然拒绝。
+
+关系表没有 Wind 隔离规则不代表其数据天然可公开；业务必须将关系表与当前主表行关联，并在子查询中显式限定可信的租户、团队和关系有效性，插件不会验证这些业务条件。由于表元数据按简单表名匹配，部署时需要固定 schema 和 search path，避免不同 schema 中存在同名表。CTE 名称与受管物理表同名时保守拒绝，即使该 CTE 的定义只访问公共表；不涉及受管名称的公共 JOIN、UNION、CTE 和子查询仍然直通。
 
 JSQLParser 4.3 对部分 TABLE 查询简写与数据库的理解不同，因此以 TABLE 关键字开头的括号表达式统一拒绝，包括只访问公共表的情况。字符串、注释和带引号的标识符中的同名文字不受这一检查影响。
 
@@ -521,12 +549,78 @@ JSQLParser 4.3 对部分 TABLE 查询简写与数据库的理解不同，因此�
 
 SELECT 在 MyBatis 缓存命中前进行隔离检查。已登记且无需隔离的单表查询，首次解析确认后，重复执行相同 SQL 可以跳过解析；SQL 或 Mapper 元数据变化时重新检查。其他查询每次解析，语法树不缓存。Supplier 宜读取请求内结果，不应每条 SQL 都调用权限服务或递归执行受管查询。IN 集合没有自动分批与大小上限，应结合数据库参数限制和索引评估。
 
+### 7.7 通用字段隔离与策略排序
+
+FieldDataIsolationStrategy 基于实体属性的允许值集合生成行级读取隔离条件，由 DataIsolationQueryInterceptor 调用并交给重写器应用到查询。Field 表示过滤依据，隔离对象是数据行；它不控制返回哪些列，也不进行字段脱敏。
+
+默认配置内置租户、工作空间、环境和测试标记规则；自定义普通字段无需新增隔离维度或修改两个 Holder。静态阶段选择有效规则并绑定物理列，查询阶段读取当前范围。角色授权、范围解析和写入归属校验由各自调用方承担。
+
+普通字段规则指定实体或接口、Java 属性和范围供应者。例如为 `OrderEntity.ownerId` 增加当前允许负责人的范围：
+
+```java
+FieldDataIsolationStrategy ownerIsolation = new FieldDataIsolationStrategy(List.of(
+        new FieldRule(OrderEntity.class, "ownerId", ownerScopeSupplier)), 100);
+
+DataIsolationQueryInterceptor interceptor = new DataIsolationQueryInterceptor(List.of(
+        new FieldDataIsolationStrategy(),
+        ownerIsolation
+));
+```
+
+`ownerScopeSupplier` 是应用提供的 `Supplier<DataIsolationScope>`，读取本次可信范围。实体仍须有同工厂已注册的 BaseMapper；属性通过 Flex 元数据映射到实际列，支持 `@Column`。单值生成 `=`，多值生成 `IN`，有效空范围生成 `1 = 0`，`unrestrictedScope()` 不增加本条条件；参与本次查询的供应者返回 null 或抛异常会拒绝查询。多个字段和多个策略的条件都取 AND，空范围不会跳过后续规则的检查。
+
+本策略适合独立字段约束，例如当前租户、工作空间及已计算好的负责人允许集合。跨字段 OR、部门树、关联关系和数值区间不属于它的能力；这些需求须由其他策略或业务查询处理，并遵守第 7.6 节的 SQL 支持边界。
+
+字段策略提供三个配置入口：
+
+| 入口 | 行为 |
+| --- | --- |
+| new FieldDataIsolationStrategy() | 四个默认维度，按实体接口和约定属性匹配 |
+| FieldDataIsolationStrategy.withDefaults(customRules) | 自定义维度规则优先，无配置才按约定；普通字段规则额外追加 |
+| new FieldDataIsolationStrategy(explicitRules) | 仅使用传入规则，不补默认维度；可通过带 order 的构造指定优先级 |
+
+DataIsolationQueryInterceptor 的显式构造接收非空的完整策略集合，不自动追加默认策略；无参构造则安装一个默认字段策略。定制默认维度时，把 withDefaults 的结果放进策略集合，不要同时再安装另一份默认字段策略。拦截器不会按字段名或维度合并不同策略的条件。
+
+Spring 中可由配置类收集 List<DataIsolationStrategy> 并传入拦截器，默认字段策略作为其中一个 Bean 明确提供。规则归字段策略配置。
+
+升级已有配置时，按以下方式迁移：
+
+| 原调用 | 当前调用 |
+| --- | --- |
+| DataIsolationQueryInterceptor.Rule | DataIsolationStrategy.FieldRule；维度规则使用 FieldRule.forDimension(...) |
+| FieldDataIsolationStrategy.Rule | DataIsolationStrategy.FieldRule |
+| new DataIsolationQueryInterceptor(List<Rule>) | 先用 FieldDataIsolationStrategy.withDefaults(...) 创建字段策略，再传入 List<DataIsolationStrategy> |
+| withStrategies(additional...) | 显式传入默认字段策略及额外策略 |
+| withStrategies(overrides, additional...) | 显式传入 withDefaults(overrides) 的字段策略及额外策略 |
+
+旧嵌套 Rule 类型和 withStrategies 工厂已移除。这不是二进制兼容替换：消费应用中创建规则或插件的模块必须更新源码、重新编译并一起部署，不能只替换 JAR。回退时成套恢复对应版本的应用、依赖制品和配置，不通过关闭隔离插件恢复查询。
+
+FieldRule 只承载字段范围和可选维度标签，不规定条件如何组合。其他策略可以复用它，也可以直接返回参数化 Condition，但仍须遵守重写器的支持边界。复用 FieldRule 不代表复用本字段策略的覆盖和忽略语义，也不会使本字段策略支持跨字段 OR 或关系查询。本模块当前不提供 Capte 的数据权限策略。
+
+`DataIsolationStrategy` 继承 Spring `Ordered`。拦截器创建时按 `getOrder()` 从小到大排序并固定；同值保持输入顺序。排序只决定执行先后，各策略读取相同的只读查询信息，不能移除其他策略的条件。空范围仍会执行后续策略；任何策略抛异常都会拒绝本次查询。字段策略只会忽略带对应 dimension 标签的规则及其 Supplier，普通字段规则不受影响；静态字段绑定和列校验仍会执行，忽略不能掩盖错误配置。
+
+策略的 `supports(EntityMetadata)` 只根据实体元数据判断适用性，不能读取当前请求；其结果用于工厂的元数据缓存。`resolve(QueryContext)` 才读取当前范围，返回参数化条件；空列表表示本次不追加条件。查询上下文和结果为只读对象，策略不修改 SQL、BoundSql 或 MyBatis 参数容器。首版仍限于现有重写器支持的根表查询，新增策略条件不接受子查询、命名占位符或尾随 SQL；业务关系隔离尚未作为策略实现。
+
+两个 Holder 的职责保持独立：`DataIsolationContextHolder` 提供当前归属值，供读取和插入监听共用；`DataIsolationQueryIgnoreHolder` 只在当前线程临时忽略指定内置维度的读取规则，不改变归属、不跳过普通字段或其他策略，也不随 trace 自动传播。范围供应者可以返回比当前归属更广的已授权范围，但上下文值本身不是授权证明。
+
+### 7.8 与业务数据范围配合
+
+隔离插件只负责已登记实体的基础读隔离，不解析角色或业务数据权限。应用层从可信身份和授权事实解析当前资源的数据范围，资源所属 DAL 使用 MyBatis-Flex 将该范围应用于查询；查询条件与基础隔离共同生效。例如员工范围可由指定员工条件和部门关系 EXISTS 组成，两者用 OR 组合，租户、工作空间等基础隔离与整个范围用 AND 组合。[关系范围集成测试](../../tests/src/test/java/com/wind/mybatis/plugin/RelationshipPermissionIntegrationTests.java)展示了节点、子树及分页查询的组合；测试中的表和数据仅为示例。
+
+范围中的 OR 条件必须先整体分组，再追加详情 ID 或其他业务条件，即 `(员工范围 OR 部门范围) AND 业务条件`。直接在未分组的 OR 后追加 AND，可能让详情查询返回不符合目标 ID 的记录。不同查询应根据同一授权结果分别构造 QueryWrapper，避免复用时残留条件。
+
+业务必须分别处理未配置范围、显式全部范围、有效空范围和授权解析失败。未配置或全部范围是否省略业务范围条件由业务契约决定，不能因此忽略基础隔离；有效空范围应返回空结果或追加 `1 = 0`，不能使用会省略过滤的空 QueryCondition；授权解析失败应拒绝，不应伪装成空结果。列表、总数、详情和导出必须应用相同范围，写入还需校验目标归属。
+
+默认测试数据规则按上下文的 `testData` 值做等值过滤，缺省为 `false`。如果业务允许某类主体同时访问正式和测试数据，或要求在明确请求越界数据时拒绝，须按业务规则定制测试维度范围并在入口校验，不能直接把默认等值规则视为该业务的完整测试守卫。
+
+只为查询追加条件不会自动保护同一资源的其他 Mapper、手写 SQL、直接 JDBC 或未登记表。消费方需要明确资源的所有查询入口和事实映射，确保这些路径全部应用授权，并验证详情和写入。范围引用与关系事实可能在 SQL 和参数不变时发生变化；使用关系条件时应关闭相关 Mapper 的二级缓存，必要时将 MyBatis 一级缓存设为 `STATEMENT`，或提供经过验证的失效机制。隔离参数参与缓存键并不意味着关系变更会自动使缓存失效。
+
 <a id="verification"></a>
 ## 8. 生产接入与维护
 
 ### 接入检查
 
-1. **工厂与实体**：确认每个 SqlSessionFactory 已安装插件，受保护实体有已注册的 BaseMapper 并实现对应归属接口。动态表名、视图和未登记实体需单独处理，不能依赖此插件自动识别。
+1. **工厂与实体**：确认每个 SqlSessionFactory 已安装插件，受保护实体有已注册的 BaseMapper，且匹配内置接口或普通字段规则。动态表名、视图和未登记实体需单独处理，不能依赖此插件自动识别。
 2. **身份与写入**：请求、消息和任务入口绑定必要维度。环境来自 Spring profile；工作空间必填要求由入口校验和数据库约束落实。更新、删除及手写插入另行校验归属。
 3. **真实 SQL 与负载**：在目标数据库验证实际详情、列表、统计、分页和游标查询，覆盖两租户、两工作空间、缺失维度、忽略恢复及历史 null 字段。使用实际插件顺序、数据量和范围集合评估延迟与资源开销。
 4. **发布与回退**：固定制品和依赖版本，重新编译消费应用并执行冒烟。观察空结果、权限失败和 SQL 异常比例；保留上一套已验证的制品及配置作为回退目标。
@@ -554,10 +648,19 @@ SELECT 在 MyBatis 缓存命中前进行隔离检查。已登记且无需隔离�
 
 ### 构建与测试
 
-在仓库根目录使用 JDK 21 执行：
+构建 JDK 必须与根 POM 使用的 Wind 父版本一致：
+
+| 父 POM / 依赖基线 | 构建 JDK |
+| --- | --- |
+| 4.0.0-SNAPSHOT | JDK 21 |
+| 4.1.0-SNAPSHOT | JDK 25 |
+
+执行前用 mvn -version 核对当前进程的 JDK。4.1 依赖包含 JDK 25 字节码，不能仅设置编译参数让 JDK 21 使用这些依赖。使用本地 4.0/JDK 21 配置取得的结果，不代替 4.1/JDK 25 提交制品的验证。
+
+在仓库根目录执行：
 
 ```bash
-WIND_MYBATIS_TESTS='MybatisQueryMethodHelperTests,MybatisTreeObjectHelperTests,TenantContextHolderTests,DataIsolationContextHolderTests,DataIsolationQueryIgnoreHolderTests,SelectIsolationRewriterTests,DataIsolationQueryInterceptorIntegrationTests,DataIsolationDefaultsIntegrationTests,DataIsolationMetadataIntegrationTests,WorkspaceIsolationIntegrationTests,DataIsolationReadWriteIntegrationTests,DynamicSqlIsolationIntegrationTests'
+WIND_MYBATIS_TESTS='MybatisQueryMethodHelperTests,MybatisTreeObjectHelperTests,TenantContextHolderTests,DataIsolationContextHolderTests,DataIsolationQueryIgnoreHolderTests,SelectIsolationRewriterTests,DataIsolationQueryInterceptorIntegrationTests,DataIsolationDefaultsIntegrationTests,DataIsolationMetadataIntegrationTests,WorkspaceIsolationIntegrationTests,DataIsolationReadWriteIntegrationTests,DynamicSqlIsolationIntegrationTests,RelationshipPermissionIntegrationTests,FieldDataIsolationStrategyIntegrationTests,FieldDataIsolationStrategyConfigurationTests,DataIsolationSpringIntegrationTests'
 
 mvn -o -pl tests -am clean verify \
   -Dmaven.test.skip=false -DskipTests=false -Dtest.ignore.failure=false \
@@ -574,9 +677,14 @@ mvn -o -pl tests -am clean verify \
 | [查询隔离集成测试](../../tests/src/test/java/com/wind/mybatis/isolation/DataIsolationQueryInterceptorIntegrationTests.java) | SQL 支持边界、参数绑定、插件顺序、缓存和游标 |
 | [默认规则、元数据与工作空间测试](../../tests/src/test/java/com/wind/mybatis/plugin) | 四个维度的默认值、Mapper 自动发现、多工厂与字段映射 |
 | [读写集成测试](../../tests/src/test/java/com/wind/mybatis/plugin/DataIsolationReadWriteIntegrationTests.java) | 插入与查询归属一致、线程复用、忽略不改变写入和手写 SQL 边界 |
+| [字段策略集成测试](../../tests/src/test/java/com/wind/mybatis/plugin/FieldDataIsolationStrategyIntegrationTests.java) | 普通字段、属性映射、策略排序、默认隔离交集和忽略边界 |
+| [字段配置集成测试](../../tests/src/test/java/com/wind/mybatis/plugin/FieldDataIsolationStrategyConfigurationTests.java) | 异名实体、默认/全局/实体配置、继承优先级、歧义拒绝、错误不回退及读写一致性 |
+| [Spring 装配集成测试](../../tests/src/test/java/com/wind/mybatis/spring/DataIsolationSpringIntegrationTests.java) | Flex Boot 自动装配、策略集合注入、Mapper 扫描、分页及上下文切换、并发和拒绝路径 |
 | [查询与树工具测试](src/test/java/com/wind/mybatis/flex) | MySQL 条件参数化、树拉平顺序和副本独立性 |
 
 数据库用例使用 H2 验证组件契约。真实 MySQL 全文检索、生产方言、完整业务流程和吞吐需在消费应用中验证；加密字段还需覆盖所选 TextEncryptor、历史密文及密钥变更。
+
+库制品验收覆盖这里声明的读取能力、失败边界和最小 Spring 装配，不等于消费应用获准上线。消费方仍须核对实际数据库版本、全部受保护 Mapper、插件组合、关系缓存失效，以及真实数据量和范围集合下的延迟与资源开销；上线负责人需确定灰度退出条件和成套回滚版本。缺少这些证据时，只能确认库组件验证通过。
 
 <a id="source"></a>
 ## 9. 源码索引
@@ -585,6 +693,7 @@ mvn -o -pl tests -am clean verify \
 - 插入监听：[EnvIsolationFieldInsertListener](src/main/java/com/wind/mybatis/flex/EnvIsolationFieldInsertListener.java)、[TestDataIsolationFieldInsertListener](src/main/java/com/wind/mybatis/flex/TestDataIsolationFieldInsertListener.java)、[WorkspaceIsolationFieldInsertListener](src/main/java/com/wind/mybatis/flex/WorkspaceIsolationFieldInsertListener.java)。
 - 类型处理：[LocaleTypeHandler](src/main/java/com/wind/mybatis/convert/LocaleTypeHandler.java)、[AbstractEncryptBaseTypeHandler](src/main/java/com/wind/mybatis/encrypt/AbstractEncryptBaseTypeHandler.java)、[StringEncryptTypeHandler](src/main/java/com/wind/mybatis/encrypt/StringEncryptTypeHandler.java)、[LocalDateEncryptTypeHandler](src/main/java/com/wind/mybatis/encrypt/LocalDateEncryptTypeHandler.java)。
 - 读隔离：[DataIsolationQueryInterceptor](src/main/java/com/wind/mybatis/plugin/DataIsolationQueryInterceptor.java)、[SelectIsolationRewriter](src/main/java/com/wind/mybatis/plugin/SelectIsolationRewriter.java)、[MybatisFlexReadParameters](src/main/java/com/wind/mybatis/flex/MybatisFlexReadParameters.java)。
+- 隔离策略：[DataIsolationStrategy](src/main/java/com/wind/mybatis/isolation/DataIsolationStrategy.java)、[FieldDataIsolationStrategy](src/main/java/com/wind/mybatis/isolation/FieldDataIsolationStrategy.java)。
 - 隔离范围：[DataIsolationScope](src/main/java/com/wind/mybatis/isolation/DataIsolationScope.java)。
 - 公共维度与上下文：[DataIsolationDimensions](../../core/src/main/java/com/wind/integration/core/enums/DataIsolationDimensions.java)、[DataIsolationContextHolder](../../core/src/main/java/com/wind/integration/core/context/DataIsolationContextHolder.java)、[DataIsolationQueryIgnoreHolder](../../core/src/main/java/com/wind/integration/core/context/DataIsolationQueryIgnoreHolder.java)。
 - 测试：[模块测试](src/test/java/com/wind/mybatis)、[隔离集成测试](../../tests/src/test/java/com/wind/mybatis)。

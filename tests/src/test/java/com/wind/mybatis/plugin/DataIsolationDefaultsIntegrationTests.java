@@ -17,7 +17,8 @@ import com.wind.integration.core.model.EnvIsolationObject;
 import com.wind.integration.core.model.TestDataIsolationObject;
 import com.wind.integration.core.context.DataIsolationQueryIgnoreHolder;
 import com.wind.mybatis.isolation.DataIsolationScope;
-import com.wind.mybatis.plugin.DataIsolationQueryInterceptor.Rule;
+import com.wind.mybatis.isolation.DataIsolationStrategy.FieldRule;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
 import org.apache.ibatis.datasource.pooled.PooledDataSource;
 import org.apache.ibatis.cursor.Cursor;
 import org.apache.ibatis.exceptions.PersistenceException;
@@ -120,7 +121,7 @@ class DataIsolationDefaultsIntegrationTests {
         assertEquals(List.of(1L, 2L), envIds);
 
         sqlSessionFactory = factory(TestOnlyMapper.class, List.of(
-                new Rule(ENVIRONMENT, "env", () -> {
+                FieldRule.forDimension(ENVIRONMENT, "env", () -> {
                     throw new AssertionError("测试数据维度不应读取环境范围");
                 })));
         List<Long> testIds = inContext(true, () -> {
@@ -135,15 +136,15 @@ class DataIsolationDefaultsIntegrationTests {
     @Test
     void testMissingPropertyMappingFailsInsteadOfReturningUnscopedRows() {
         sqlSessionFactory = factory(DataMapper.class, List.of(
-                new Rule(TEST_DATA, "missingProperty", () -> DataIsolationScope.of(true))));
+                FieldRule.forDimension(TEST_DATA, "missingProperty", () -> DataIsolationScope.of(true))));
 
         assertThrows(PersistenceException.class, () -> selectList(QueryWrapper.create()));
     }
 
-    private SqlSessionFactory factory(Class<?> mapperType, List<Rule> rules) {
+    private SqlSessionFactory factory(Class<?> mapperType, List<FieldRule> rules) {
         FlexConfiguration configuration = new FlexConfiguration(new Environment(
                 "test", new JdbcTransactionFactory(), dataSource));
-        configuration.addInterceptor(new DataIsolationQueryInterceptor(rules));
+        configuration.addInterceptor(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(rules))));
         configuration.addMapper(mapperType);
         return new FlexSqlSessionFactoryBuilder().build(configuration);
     }

@@ -16,7 +16,8 @@ import com.wind.integration.core.model.WorkspaceIsolationObject;
 import com.wind.integration.core.context.DataIsolationQueryIgnoreHolder;
 import com.wind.integration.core.context.DataIsolationContextHolder;
 import com.wind.mybatis.isolation.DataIsolationScope;
-import com.wind.mybatis.plugin.DataIsolationQueryInterceptor.Rule;
+import com.wind.mybatis.isolation.DataIsolationStrategy.FieldRule;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.ibatis.datasource.unpooled.UnpooledDataSource;
@@ -155,10 +156,11 @@ class WorkspaceIsolationIntegrationTests {
     }
 
     private DataIsolationQueryInterceptor interceptor() {
-        return new DataIsolationQueryInterceptor(List.of(
-                new Rule(WORKSPACE, "workspaceId", () -> workspaceScope),
-                new Rule(ENVIRONMENT, "env", () -> DataIsolationScope.of("sit")),
-                new Rule(TEST_DATA, "testData", () -> DataIsolationScope.of(true))));
+        FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List.of(
+                FieldRule.forDimension(WORKSPACE, "workspaceId", () -> workspaceScope),
+                FieldRule.forDimension(ENVIRONMENT, "env", () -> DataIsolationScope.of("sit")),
+                FieldRule.forDimension(TEST_DATA, "testData", () -> DataIsolationScope.of(true))));
+        return new DataIsolationQueryInterceptor(List.of(fields));
     }
 
     private SqlSessionFactory factory(DataIsolationQueryInterceptor interceptor, Class<?> mapperType) {

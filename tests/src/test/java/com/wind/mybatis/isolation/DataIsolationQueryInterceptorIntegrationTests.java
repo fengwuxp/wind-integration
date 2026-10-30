@@ -19,8 +19,9 @@ import com.wind.integration.core.model.EnvIsolationObject;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.integration.core.model.TestDataIsolationObject;
 import com.wind.mybatis.convert.LocaleTypeHandler;
+import com.wind.mybatis.isolation.DataIsolationStrategy.FieldRule;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
 import com.wind.mybatis.plugin.DataIsolationQueryInterceptor;
-import com.wind.mybatis.plugin.DataIsolationQueryInterceptor.Rule;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.ibatis.annotations.CacheNamespace;
@@ -403,11 +404,12 @@ class DataIsolationQueryInterceptorIntegrationTests {
     }
 
     private DataIsolationQueryInterceptor interceptor() {
-        return new DataIsolationQueryInterceptor(List.of(
-                new Rule(TENANT, "tenantId", () -> tenantScope == null
+        FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List.of(
+                FieldRule.forDimension(TENANT, "tenantId", () -> tenantScope == null
                         ? DataIsolationScope.of(TenantContextHolder.requireTenantId()) : tenantScope),
-                new Rule(ENVIRONMENT, "env", () -> environmentScope),
-                new Rule(TEST_DATA, "testData", () -> testDataScope)));
+                FieldRule.forDimension(ENVIRONMENT, "env", () -> environmentScope),
+                FieldRule.forDimension(TEST_DATA, "testData", () -> testDataScope)));
+        return new DataIsolationQueryInterceptor(List.of(fields));
     }
 
     @Intercepts(@Signature(type = Executor.class, method = "query", args = {

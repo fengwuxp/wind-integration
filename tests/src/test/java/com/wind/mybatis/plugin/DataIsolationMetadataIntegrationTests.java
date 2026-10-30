@@ -9,7 +9,8 @@ import com.wind.integration.core.model.WorkspaceIsolationObject;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.integration.core.context.DataIsolationQueryIgnoreHolder;
 import com.wind.mybatis.isolation.DataIsolationScope;
-import com.wind.mybatis.plugin.DataIsolationQueryInterceptor.Rule;
+import com.wind.mybatis.isolation.DataIsolationStrategy.FieldRule;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.ibatis.annotations.Select;
@@ -129,10 +130,11 @@ class DataIsolationMetadataIntegrationTests {
 
     @Test
     void testIgnoredDimensionDoesNotReadItsScopeSupplier() throws Exception {
-        DataIsolationQueryInterceptor interceptor = new DataIsolationQueryInterceptor(List.of(
-                new Rule(WORKSPACE, "workspaceId", () -> {
+        FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List.of(
+                FieldRule.forDimension(WORKSPACE, "workspaceId", () -> {
                     throw new IllegalStateException("当前操作未绑定归属范围");
                 })));
+        DataIsolationQueryInterceptor interceptor = new DataIsolationQueryInterceptor(List.of(fields));
         SqlSessionFactory factory = factory(interceptor, WorkspaceMapper.class);
 
         assertThrows(PersistenceException.class, () -> ids(factory));
@@ -143,9 +145,10 @@ class DataIsolationMetadataIntegrationTests {
 
     @Test
     void testCustomRuleOverridesOneBuiltinDimension() throws Exception {
-        DataIsolationQueryInterceptor interceptor = new DataIsolationQueryInterceptor(List.of(
-                new Rule(WORKSPACE, "workspaceId", () -> workspaceScope),
-                new Rule(TENANT, "tenantId", () -> DataIsolationScope.of(20L))));
+        FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List.of(
+                FieldRule.forDimension(WORKSPACE, "workspaceId", () -> workspaceScope),
+                FieldRule.forDimension(TENANT, "tenantId", () -> DataIsolationScope.of(20L))));
+        DataIsolationQueryInterceptor interceptor = new DataIsolationQueryInterceptor(List.of(fields));
 
         assertEquals(List.of(2L), ids(factory(interceptor, WorkspaceMapper.class)));
     }
@@ -153,15 +156,17 @@ class DataIsolationMetadataIntegrationTests {
     @Test
     void testDuplicateCustomDimensionIsRejectedAtConstruction() {
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () ->
-                new DataIsolationQueryInterceptor(List.of(
-                        new Rule(TENANT, "tenantId", () -> DataIsolationScope.of(10L)),
-                        new Rule(TENANT, "tenantId", DataIsolationScope::unrestrictedScope))));
+                FieldDataIsolationStrategy.withDefaults(List.of(
+                        FieldRule.forDimension(TENANT, "tenantId", () -> DataIsolationScope.of(10L)),
+                        FieldRule.forDimension(TENANT, "tenantId", DataIsolationScope::unrestrictedScope))));
 
         assertTrue(error.getMessage().contains("TENANT"));
     }
 
     private DataIsolationQueryInterceptor workspaceInterceptor() {
-        return new DataIsolationQueryInterceptor(List.of(new Rule(WORKSPACE, "workspaceId", () -> workspaceScope)));
+        FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List.of(
+                FieldRule.forDimension(WORKSPACE, "workspaceId", () -> workspaceScope)));
+        return new DataIsolationQueryInterceptor(List.of(fields));
     }
 
     private SqlSessionFactory factory(DataIsolationQueryInterceptor interceptor, Class<?>... mapperTypes) {

@@ -195,7 +195,7 @@ final class SelectIsolationRewriter {
         for (DataIsolationStrategy strategy : bindingsForTable.strategies()) {
             List<Condition> conditions = Objects.requireNonNull(strategy.resolve(context), "isolation conditions");
             for (Condition resolved : conditions) {
-                Expression predicate = predicate(statement, original, resolved, bindings, additional);
+                Expression predicate = predicate(statement, original, resolved, bindings, additional, context);
                 Expression grouped = new Parenthesis(predicate);
                 condition = condition == null ? grouped : new AndExpression(condition, grouped);
             }
@@ -249,7 +249,8 @@ final class SelectIsolationRewriter {
     }
 
     private Expression predicate(MappedStatement statement, BoundSql original, Condition condition,
-                                 List<ParameterMapping> bindings, Map<String, Object> additional) {
+                                 List<ParameterMapping> bindings, Map<String, Object> additional,
+                                 @Nullable QueryContext relationRoot) {
         Expression expression;
         CCJSqlParser[] parsed = new CCJSqlParser[1];
         try {
@@ -259,14 +260,20 @@ final class SelectIsolationRewriter {
         }
         rejectTableQueryShorthand(statement, parsed[0].getASTRoot());
         QueryShape shape = new QueryShape(parsed[0].getASTRoot());
+        List<RelationIsolationPredicate.Relation> relations = List.of();
         if (shape.nested || !shape.tableNames.isEmpty()) {
-            throw new IllegalArgumentException("Isolation strategy conditions do not support subqueries");
+            if (relationRoot == null || shape.hasWith) {
+                throw new IllegalArgumentException("Isolation relation constraints must not contain subqueries");
+            }
+            relations = new RelationIsolationPredicate(relationRoot, table -> relationContext(statement, table))
+                    .validate(expression, shape.subselectNodes);
         }
         List<JdbcParameter> parameters = new ArrayList<>();
         /*
          * 使用与最终 SQL 输出一致的遍历器，避免普通 Visitor 漏掉 ESCAPE、FROM/FOR 等位置的参数。
          */
-        expression.accept(new ExpressionDeParser(null, new StringBuilder()) {
+        StringBuilder buffer = new StringBuilder();
+        ExpressionDeParser parameterCollector = new ExpressionDeParser(null, buffer) {
             @Override
             public void visit(JdbcNamedParameter parameter) {
                 throw new IllegalArgumentException("Isolation condition must use positional placeholders");
@@ -280,7 +287,9 @@ final class SelectIsolationRewriter {
                 parameters.add(parameter);
                 super.visit(parameter);
             }
-        });
+        };
+        parameterCollector.setSelectVisitor(new SelectDeParser(parameterCollector, buffer));
+        expression.accept(parameterCollector);
         if (parameters.size() != condition.values().size()) {
             throw new IllegalArgumentException("Isolation condition parameter count does not match values");
         }
@@ -295,7 +304,33 @@ final class SelectIsolationRewriter {
             bindings.add(new ParameterMapping.Builder(statement.getConfiguration(), name, javaType).build());
             parameters.get(i).setIndex(bindings.size());
         }
+        /*
+         * 原策略参数先取得身份，再追加各内表约束；最终输出统一按 SQL 位置重排。
+         * 只调用显式关系入口，不递归套用内表的独立资源权限。
+         */
+        for (RelationIsolationPredicate.Relation relation : relations) {
+            for (QueryContext table : relation.tables()) {
+                TableBinding binding = tables.get(simpleName(table.tableName()));
+                for (DataIsolationStrategy strategy : binding.strategies()) {
+                    List<Condition> constraints = Objects.requireNonNull(strategy.resolveRelation(table), "isolation relation conditions");
+                    for (Condition constraint : constraints) {
+                        Expression inner = predicate(statement, original, constraint, bindings, additional, null);
+                        relation.query().setWhere(new AndExpression(new Parenthesis(relation.query().getWhere()), new Parenthesis(inner)));
+                    }
+                }
+            }
+        }
         return expression;
+    }
+
+    private QueryContext relationContext(MappedStatement statement, Table table) {
+        TableBinding binding = tables.get(simpleName(table.getName()));
+        if (binding == null || !unqualifiedTables.contains(simpleName(table.getName()))
+                || table.getName().contains(".") || !table.getFullyQualifiedName().equals(table.getName())
+                || table.getPivot() != null || table.getUnPivot() != null) {
+            throw new IllegalArgumentException("Isolation relation requires an unqualified registered table: " + statement.getId());
+        }
+        return new QueryContext(statement.getId(), table.getFullyQualifiedName(), table.getAlias().getName(), binding.entity());
     }
 
     private boolean usesProperty(List<ParameterMapping> mappings, String name) {

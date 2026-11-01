@@ -34,6 +34,21 @@ public interface DataIsolationStrategy extends Ordered {
      */
     List<Condition> resolve(QueryContext context);
 
+    /**
+     * 为策略生成的 EXISTS 内表提供关系事实约束；不会用于原始业务 SQL 的子查询。
+     * 所有适用策略都须明确声明关系语义，返回的标量条件取 AND，不能再次包含子查询。
+     * 空列表表示本策略在关系场景不追加条件；不支持时拒绝，不能默认绕过根查询约束。
+     *
+     * @param context 关系内表及其独立别名
+     * @return 当前关系事实所需的标量条件
+     * @throws IllegalStateException 策略未声明关系场景的处理方式
+     */
+    default List<Condition> resolveRelation(QueryContext context) {
+        throw new IllegalStateException("Isolation strategy does not support relation queries: "
+                + getClass().getName() + ", entity=" + context.entity().type().getName()
+                + ", statement=" + context.statementId());
+    }
+
     @Override
     default int getOrder() {
         return 0;

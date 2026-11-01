@@ -530,6 +530,7 @@ flowchart LR
 | --- | --- |
 | 单表详情、列表、COUNT/SUM、别名、OR、GROUP BY/HAVING、排序、LIMIT/OFFSET、foreach、游标 | 追加隔离条件；保持原查询与参数语义 |
 | 受管单表 WHERE 中符合下述条件的 EXISTS | 追加主表隔离条件；关系表约束由业务查询提供 |
+| 可信策略生成的受控相关 EXISTS | 校验关系结构，逐个执行内表策略的 resolveRelation，参数按最终 SQL 绑定 |
 | 其他受管 JOIN、子查询、UNION、CTE、SELECT INTO、部分非 LIMIT 分页 | 拒绝执行；忽略维度不会扩大语法支持范围 |
 | 嵌套 select/懒加载 ResultMap，包括 discriminator | 一律拒绝，查询入口为公共表也一样 |
 | JSQLParser 4.3 无法解析的 SELECT | 报错，未受管 SELECT 也会先解析 |
@@ -599,13 +600,19 @@ FieldRule 只承载字段范围和可选维度标签，不规定条件如何组�
 
 `DataIsolationStrategy` 继承 Spring `Ordered`。拦截器创建时按 `getOrder()` 从小到大排序并固定；同值保持输入顺序。排序只决定执行先后，各策略读取相同的只读查询信息，不能移除其他策略的条件。空范围仍会执行后续策略；任何策略抛异常都会拒绝本次查询。字段策略只会忽略带对应 dimension 标签的规则及其 Supplier，普通字段规则不受影响；静态字段绑定和列校验仍会执行，忽略不能掩盖错误配置。
 
-策略的 `supports(EntityMetadata)` 只根据实体元数据判断适用性，不能读取当前请求；其结果用于工厂的元数据缓存。`resolve(QueryContext)` 才读取当前范围，返回参数化条件；空列表表示本次不追加条件。查询上下文和结果为只读对象，策略不修改 SQL、BoundSql 或 MyBatis 参数容器。首版仍限于现有重写器支持的根表查询，新增策略条件不接受子查询、命名占位符或尾随 SQL；业务关系隔离尚未作为策略实现。
+策略的 `supports(EntityMetadata)` 只根据实体元数据判断适用性，不能读取当前请求；其结果用于工厂的元数据缓存。`resolve(QueryContext)` 才读取当前范围，返回参数化条件；空列表表示本次不追加条件。查询上下文和结果为只读对象，策略不修改 SQL、BoundSql 或 MyBatis 参数容器。策略条件可以包含下述受控关系谓词，仍不接受命名占位符或尾随 SQL。
+
+可信策略可以返回 `字段条件 OR EXISTS (SELECT 1 FROM 已登记关系表 r WHERE r.关联列 = 主表.主键 AND ...)`。EXISTS 只能位于 AND、OR、括号组成的正向布尔表达式中，必须包含独立成立的外内列等式；等式只出现在 OR 分支中不算有效关联。内表必须有明确且不遮蔽外层的别名，列须能由登记元数据识别；最多一个 INNER JOIN。NOT、反向比较、CASE 包裹、嵌套或标量子查询、CTE、UNION、跨 schema、排序、分页和锁均不支持。
+
+每张关系内表的所有适用策略都会调用 `resolveRelation(QueryContext)`，返回条件以 AND 加入该子查询。该方法默认抛异常，已有自定义策略不会自动放行关联读取；FieldDataIsolationStrategy 复用其字段边界。业务权限策略可明确返回空列表，表示关系事实不作为独立资源再次套用 RBAC，但其他基础策略仍执行。关系入口返回的条件不能再包含子查询。关联键、业务归属及有效期由关系适配提供者负责，登记内表本身不证明这些约束已齐备。
+
+该入口只作用于策略生成的关系条件，原始业务 SQL 中的 EXISTS 仍遵守第 7.6 节的限制。策略值与内表追加值统一按最终 SQL 顺序绑定，并参与查询缓存键；新增默认方法保留原根表策略的调用方式，消费方启用关系能力前仍须重新编译、验证制品与配置。
 
 两个 Holder 的职责保持独立：`DataIsolationContextHolder` 提供当前归属值，供读取和插入监听共用；`DataIsolationQueryIgnoreHolder` 只在当前线程临时忽略指定内置维度的读取规则，不改变归属、不跳过普通字段或其他策略，也不随 trace 自动传播。范围供应者可以返回比当前归属更广的已授权范围，但上下文值本身不是授权证明。
 
 ### 7.8 与业务数据范围配合
 
-隔离插件只负责已登记实体的基础读隔离，不解析角色或业务数据权限。应用层从可信身份和授权事实解析当前资源的数据范围，资源所属 DAL 使用 MyBatis-Flex 将该范围应用于查询；查询条件与基础隔离共同生效。例如员工范围可由指定员工条件和部门关系 EXISTS 组成，两者用 OR 组合，租户、工作空间等基础隔离与整个范围用 AND 组合。[关系范围集成测试](../../tests/src/test/java/com/wind/mybatis/plugin/RelationshipPermissionIntegrationTests.java)展示了节点、子树及分页查询的组合；测试中的表和数据仅为示例。
+隔离插件执行已登记策略提供的读取约束，不解析角色或业务数据权限。应用层从可信身份和授权事实解析当前资源的数据范围，资源所属 DAL 可以通过策略统一应用参数化字段与关系条件；查询条件与基础隔离共同生效。例如指定对象与关系 EXISTS 在同一策略内用 OR 组合，租户、工作空间等基础隔离与整个范围用 AND 组合。[策略关系集成测试](../../tests/src/test/java/com/wind/mybatis/isolation/DataIsolationRelationIntegrationTests.java)验证了真实 Mapper 的条件组合、内表边界与参数顺序；测试中的表和范围仅为示例。
 
 范围中的 OR 条件必须先整体分组，再追加详情 ID 或其他业务条件，即 `(员工范围 OR 部门范围) AND 业务条件`。直接在未分组的 OR 后追加 AND，可能让详情查询返回不符合目标 ID 的记录。不同查询应根据同一授权结果分别构造 QueryWrapper，避免复用时残留条件。
 

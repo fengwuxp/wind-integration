@@ -304,7 +304,7 @@ class FieldDataIsolationStrategyIntegrationTests {
         Map<DataIsolationStrategy.Condition, String> unsupported = Map.of(
                 DataIsolationStrategy.Condition.of("field_plain_item.owner_key = ?"), "parameter count does not match",
                 DataIsolationStrategy.Condition.of("1 = 0", "unused"), "parameter count does not match",
-                DataIsolationStrategy.Condition.of("field_plain_item.id IN (SELECT id FROM field_plain_item)"), "do not support subqueries",
+                DataIsolationStrategy.Condition.of("field_plain_item.id IN (SELECT id FROM field_plain_item)"), "Unsupported isolation relation predicate",
                 DataIsolationStrategy.Condition.of("1 = (TABLE field_plain_item)"), "single-table SELECT only",
                 DataIsolationStrategy.Condition.of("field_plain_item.owner_key = :owner", "alice"), "positional placeholders",
                 DataIsolationStrategy.Condition.of("field_plain_item.owner_key LIKE ? ESCAPE :escape", "alice%"), "Cannot parse isolation condition",

@@ -163,6 +163,14 @@ public final class FieldDataIsolationStrategy implements DataIsolationStrategy {
         return List.copyOf(result);
     }
 
+    /**
+     * 关系事实沿用同一字段边界与显式忽略语义，不丢弃租户、工作空间等约束。
+     */
+    @Override
+    public List<Condition> resolveRelation(QueryContext context) {
+        return resolve(context);
+    }
+
     @Override
     public int getOrder() {
         return order;

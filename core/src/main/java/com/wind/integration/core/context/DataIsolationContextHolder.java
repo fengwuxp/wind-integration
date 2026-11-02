@@ -1,7 +1,7 @@
 package com.wind.integration.core.context;
 
-import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
+import com.wind.common.util.ServiceInfoUtils;
 import com.wind.integration.core.enums.DataIsolationDimensions;
 import com.wind.trace.WindTraceContext;
 import com.wind.trace.WindTracer;
@@ -150,8 +150,7 @@ public final class DataIsolationContextHolder {
         if (StringUtils.hasText(env)) {
             return env;
         }
-        // TODO 临时方案，待优化
-        return System.getProperty(WindConstants.SPRING_PROFILES_ACTIVE, System.getenv(WindConstants.SPRING_PROFILES_ACTIVE));
+        return ServiceInfoUtils.getSpringProfilesActive();
     }
 
     public static String requireEnv() {

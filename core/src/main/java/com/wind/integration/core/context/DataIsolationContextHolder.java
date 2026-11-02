@@ -1,11 +1,13 @@
 package com.wind.integration.core.context;
 
+import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.core.enums.DataIsolationDimensions;
 import com.wind.trace.WindTraceContext;
 import com.wind.trace.WindTracer;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.io.Serializable;
 import java.util.Map;
@@ -44,7 +46,7 @@ public final class DataIsolationContextHolder {
      * @param <T>      返回值类型
      * @return 返回值
      */
-    public static <T> T callWithTenantId(Serializable tenantId, Callable<T> action) throws Exception {
+    public static <T> T callWithTenantId(Serializable tenantId, Callable<T> action) {
         return callWith(Map.of(DataIsolationDimensions.TENANT, tenantId), action);
     }
 
@@ -65,7 +67,7 @@ public final class DataIsolationContextHolder {
      * @param action      执行方法
      * @return 返回值
      */
-    public static <T> T callWithWorkspace(Serializable workspaceId, Callable<T> action) throws Exception {
+    public static <T> T callWithWorkspace(Serializable workspaceId, Callable<T> action) {
         return callWith(Map.of(DataIsolationDimensions.WORKSPACE, workspaceId), action);
     }
 
@@ -144,7 +146,12 @@ public final class DataIsolationContextHolder {
 
     @Nullable
     public static String getEnv() {
-        return getDataIsolationDimensioId(DataIsolationDimensions.ENVIRONMENT);
+        String env = getDataIsolationDimensioId(DataIsolationDimensions.ENVIRONMENT);
+        if (StringUtils.hasText(env)) {
+            return env;
+        }
+        // TODO 临时方案，待优化
+        return System.getProperty(WindConstants.SPRING_PROFILES_ACTIVE, System.getenv(WindConstants.SPRING_PROFILES_ACTIVE));
     }
 
     public static String requireEnv() {

@@ -132,7 +132,7 @@ public final class DataIsolationContextHolder {
     }
 
     public static <T> T requireTenantId() {
-        return Objects.requireNonNull(getTenantId(), "context workspaceId is must not null");
+        return Objects.requireNonNull(getTenantId(), "context tenantId is must not null");
     }
 
     @Nullable
@@ -146,10 +146,6 @@ public final class DataIsolationContextHolder {
 
     @Nullable
     public static String getEnv() {
-        String env = getDataIsolationDimensioId(DataIsolationDimensions.ENVIRONMENT);
-        if (StringUtils.hasText(env)) {
-            return env;
-        }
         return ServiceInfoUtils.getSpringProfilesActive();
     }
 

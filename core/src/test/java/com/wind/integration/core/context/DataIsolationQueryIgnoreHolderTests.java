@@ -5,8 +5,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.FutureTask;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.wind.integration.core.enums.DataIsolationDimensions.ENVIRONMENT;
 import static com.wind.integration.core.enums.DataIsolationDimensions.TENANT;
@@ -104,12 +106,12 @@ class DataIsolationQueryIgnoreHolderTests {
     @Test
     void testIgnoredDimensionsAreNotInheritedByAnotherThread() throws Exception {
         boolean ignoredByChild = DataIsolationQueryIgnoreHolder.callIgnoring(() -> {
-            FutureTask<Boolean> task = new FutureTask<>(() -> DataIsolationQueryIgnoreHolder.isIgnored(ENVIRONMENT));
-            Thread thread = new Thread(task);
-            thread.start();
-            thread.join();
-            Assertions.assertTrue(DataIsolationQueryIgnoreHolder.isIgnored(ENVIRONMENT));
-            return task.get();
+            try (var executor = Executors.newSingleThreadExecutor()) {
+                boolean ignored = executor.submit(() -> DataIsolationQueryIgnoreHolder.isIgnored(ENVIRONMENT))
+                        .get(5, TimeUnit.SECONDS);
+                Assertions.assertTrue(DataIsolationQueryIgnoreHolder.isIgnored(ENVIRONMENT));
+                return ignored;
+            }
         }, ENVIRONMENT);
 
         Assertions.assertFalse(ignoredByChild);
@@ -133,15 +135,16 @@ class DataIsolationQueryIgnoreHolderTests {
     void testTracePropagationDoesNotCopyIgnoredDimensions() throws Exception {
         boolean childIgnored = DataIsolationContextHolder.callWithTenantId(10L, () ->
                 DataIsolationQueryIgnoreHolder.callIgnoring(() -> {
-                    FutureTask<Boolean> task = new FutureTask<>(() -> {
+                    AtomicBoolean ignored = new AtomicBoolean();
+                    Runnable task = ContextPropagationTaskDecorator.of().decorate(() -> {
                         Assertions.assertEquals(10L, DataIsolationContextHolder.<Long>requireTenantId());
-                        return DataIsolationQueryIgnoreHolder.isIgnored(TENANT);
+                        ignored.set(DataIsolationQueryIgnoreHolder.isIgnored(TENANT));
                     });
-                    Thread thread = new Thread(ContextPropagationTaskDecorator.of().decorate(task));
-                    thread.start();
-                    thread.join();
+                    try (var executor = Executors.newSingleThreadExecutor()) {
+                        executor.submit(task).get(5, TimeUnit.SECONDS);
+                    }
                     Assertions.assertTrue(DataIsolationQueryIgnoreHolder.isIgnored(TENANT));
-                    return task.get();
+                    return ignored.get();
                 }, TENANT));
 
         Assertions.assertFalse(childIgnored);

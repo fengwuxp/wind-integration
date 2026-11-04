@@ -7,7 +7,6 @@ import com.wind.trace.WindTraceContext;
 import com.wind.trace.WindTracer;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 import java.io.Serializable;
 import java.util.Map;

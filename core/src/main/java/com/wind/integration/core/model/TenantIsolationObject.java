@@ -1,7 +1,5 @@
 package com.wind.integration.core.model;
 
-import org.jspecify.annotations.NonNull;
-
 import java.io.Serializable;
 
 /**
@@ -16,7 +14,13 @@ public interface TenantIsolationObject<I extends Serializable> extends IdObject<
     /**
      * @return 获取租户 ID
      */
-    @NonNull
     I getTenantId();
+
+    /**
+     * 设置对象所属的租户。
+     *
+     * @param tenantId 租户 ID
+     */
+    void setTenantId(I tenantId);
 
 }

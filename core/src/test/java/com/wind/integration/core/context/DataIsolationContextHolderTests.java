@@ -1,10 +1,14 @@
 package com.wind.integration.core.context;
 
+import com.wind.common.util.ServiceInfoUtils;
 import com.wind.trace.WindTraceContext;
 import com.wind.trace.WindTracer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -13,21 +17,37 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import static com.wind.common.WindConstants.SPRING_PROFILES_ACTIVE;
 import static com.wind.integration.core.enums.DataIsolationDimensions.ENVIRONMENT;
 import static com.wind.integration.core.enums.DataIsolationDimensions.TENANT;
 import static com.wind.integration.core.enums.DataIsolationDimensions.TEST_DATA;
 import static com.wind.integration.core.enums.DataIsolationDimensions.WORKSPACE;
+import static org.mockito.Mockito.mockStatic;
 
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class DataIsolationContextHolderTests {
+
+    private String previousProfile;
+
+    @BeforeEach
+    void setUp() {
+        previousProfile = System.getProperty(SPRING_PROFILES_ACTIVE);
+        System.setProperty(SPRING_PROFILES_ACTIVE, "sit");
+    }
 
     @AfterEach
     void tearDown() {
         TenantContextHolder.clear();
+        if (previousProfile == null) {
+            System.clearProperty(SPRING_PROFILES_ACTIVE);
+        } else {
+            System.setProperty(SPRING_PROFILES_ACTIVE, previousProfile);
+        }
     }
 
     @Test
     void testRunCreatesRootAndClearsContext() {
-        DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, WORKSPACE, "ws-a", ENVIRONMENT, "sit", TEST_DATA, true), () -> {
+        DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, WORKSPACE, "ws-a", TEST_DATA, true), () -> {
             Assertions.assertNull(WindTracer.TRACER.requireContext().parentSpanId());
             Assertions.assertEquals(10L, DataIsolationContextHolder.<Long>requireTenantId());
             Assertions.assertEquals("ws-a", DataIsolationContextHolder.<String>requireWorkspaceId());
@@ -61,7 +81,7 @@ class DataIsolationContextHolderTests {
         WindTracer.TRACER.run(() -> {
             WindTraceContext request = WindTracer.TRACER.requireContext();
             WindTracer.TRACER.putVariable("requestMarker", "outer");
-            DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, WORKSPACE, "ws-a", ENVIRONMENT, "sit", TEST_DATA, true), () -> {
+            DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, WORKSPACE, "ws-a", TEST_DATA, true), () -> {
                 assertChildTrace(request);
                 WindTraceContext outer = WindTracer.TRACER.requireContext();
                 DataIsolationContextHolder.runWithWorkspace("ws-b", () -> {
@@ -86,7 +106,7 @@ class DataIsolationContextHolderTests {
     @Test
     void testNestedCallInheritsDimensionsAndRestoresOuterContext() {
         String result = DataIsolationContextHolder.callWith(
-                Map.of(TENANT, 10L, WORKSPACE, "ws-a", ENVIRONMENT, "sit", TEST_DATA, true), () -> {
+                Map.of(TENANT, 10L, WORKSPACE, "ws-a", TEST_DATA, true), () -> {
                     WindTraceContext outer = WindTracer.TRACER.requireContext();
                     String workspace = DataIsolationContextHolder.callWithWorkspace("ws-b", () -> {
                         assertChildTrace(outer);
@@ -159,7 +179,7 @@ class DataIsolationContextHolderTests {
             worker.submit(() -> {
                 Assertions.assertNull(TenantContextHolder.getTenantId());
                 Assertions.assertFalse(WindTracer.TRACER.currentContext().isPresent());
-                DataIsolationContextHolder.callWith(Map.of(ENVIRONMENT, "sit"), () -> {
+                DataIsolationContextHolder.callWith(Map.of(TEST_DATA, false), () -> {
                     Assertions.assertNull(DataIsolationContextHolder.getTenantId());
                     Assertions.assertNull(DataIsolationContextHolder.getWorkspaceId());
                     return null;
@@ -186,11 +206,29 @@ class DataIsolationContextHolderTests {
     void testRequiredValuesRejectMissingContext() {
         Assertions.assertNull(DataIsolationContextHolder.getTenantId());
         Assertions.assertNull(DataIsolationContextHolder.getWorkspaceId());
-        Assertions.assertNull(DataIsolationContextHolder.getEnv());
+        Assertions.assertEquals("sit", DataIsolationContextHolder.getEnv());
         Assertions.assertFalse(DataIsolationContextHolder.isTestData());
         Assertions.assertThrows(NullPointerException.class, DataIsolationContextHolder::requireTenantId);
         Assertions.assertThrows(NullPointerException.class, DataIsolationContextHolder::requireWorkspaceId);
-        Assertions.assertThrows(RuntimeException.class, DataIsolationContextHolder::requireEnv);
+    }
+
+    @Test
+    void testEnvironmentUsesApplicationProfileInsteadOfTraceValue() {
+        DataIsolationContextHolder.runWith(Map.of(ENVIRONMENT, "prod"), () -> {
+            Assertions.assertEquals("sit", DataIsolationContextHolder.requireEnv());
+            DataIsolationContextHolder.runWith(Map.of(ENVIRONMENT, "test"),
+                    () -> Assertions.assertEquals("sit", DataIsolationContextHolder.requireEnv()));
+        });
+        Assertions.assertEquals("sit", DataIsolationContextHolder.requireEnv());
+    }
+
+    @Test
+    void testMissingEnvironmentRejectsRequiredValue() {
+        try (var environmentSource = mockStatic(ServiceInfoUtils.class)) {
+            environmentSource.when(ServiceInfoUtils::getSpringProfilesActive).thenReturn(null);
+            Assertions.assertNull(DataIsolationContextHolder.getEnv());
+            Assertions.assertThrows(RuntimeException.class, DataIsolationContextHolder::requireEnv);
+        }
     }
 
     @Test
@@ -238,10 +276,11 @@ class DataIsolationContextHolderTests {
     @ParameterizedTest
     @ValueSource(strings = {"", " ", "\t"})
     void testRequireEnvRejectsBlankValue(String environment) {
-        DataIsolationContextHolder.runWith(Map.of(ENVIRONMENT, environment), () -> {
+        try (var environmentSource = mockStatic(ServiceInfoUtils.class)) {
+            environmentSource.when(ServiceInfoUtils::getSpringProfilesActive).thenReturn(environment);
             Assertions.assertEquals(environment, DataIsolationContextHolder.getEnv());
             Assertions.assertThrows(RuntimeException.class, DataIsolationContextHolder::requireEnv);
-        });
+        }
     }
 
     @Test

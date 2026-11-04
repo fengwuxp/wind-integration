@@ -1,8 +1,5 @@
 package com.wind.integration.core.model;
 
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
-
 import java.io.Serializable;
 
 /**
@@ -19,7 +16,6 @@ public interface WorkspaceIsolationObject<W extends Serializable> {
      *
      * @return 工作空间 ID
      */
-    @NonNull
     W getWorkspaceId();
 
     /**
@@ -27,5 +23,5 @@ public interface WorkspaceIsolationObject<W extends Serializable> {
      *
      * @param workspaceId 工作空间 ID
      */
-    void setWorkspaceId(@Nullable W workspaceId);
+    void setWorkspaceId(W workspaceId);
 }

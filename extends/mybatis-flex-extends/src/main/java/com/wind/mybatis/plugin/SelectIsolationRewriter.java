@@ -16,23 +16,25 @@ import net.sf.jsqlparser.expression.JdbcNamedParameter;
 import net.sf.jsqlparser.expression.JdbcParameter;
 import net.sf.jsqlparser.expression.LongValue;
 import net.sf.jsqlparser.expression.NotExpression;
-import net.sf.jsqlparser.expression.Parenthesis;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
 import net.sf.jsqlparser.expression.operators.relational.ExistsExpression;
+import net.sf.jsqlparser.expression.operators.relational.ParenthesedExpressionList;
 import net.sf.jsqlparser.parser.CCJSqlParser;
+import net.sf.jsqlparser.parser.CCJSqlParserConstants;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.parser.CCJSqlParserTreeConstants;
 import net.sf.jsqlparser.parser.Node;
-import net.sf.jsqlparser.parser.SimpleNode;
 import net.sf.jsqlparser.parser.Token;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.select.FromItem;
 import net.sf.jsqlparser.statement.select.Join;
-import net.sf.jsqlparser.statement.select.ParenthesisFromItem;
+import net.sf.jsqlparser.statement.select.ParenthesedFromItem;
+import net.sf.jsqlparser.statement.select.ParenthesedSelect;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
-import net.sf.jsqlparser.statement.select.SelectExpressionItem;
-import net.sf.jsqlparser.statement.select.SubJoin;
-import net.sf.jsqlparser.statement.select.SubSelect;
+import net.sf.jsqlparser.statement.select.SetOperationList;
+import net.sf.jsqlparser.statement.select.TableStatement;
+import net.sf.jsqlparser.statement.select.UnionOp;
 import net.sf.jsqlparser.util.deparser.ExpressionDeParser;
 import net.sf.jsqlparser.util.deparser.SelectDeParser;
 import org.apache.ibatis.mapping.BoundSql;
@@ -53,20 +55,37 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import static net.sf.jsqlparser.parser.CCJSqlParserConstants.K_TABLE;
-import static net.sf.jsqlparser.parser.CCJSqlParserTreeConstants.JJTSUBSELECT;
-import static net.sf.jsqlparser.parser.CCJSqlParserTreeConstants.JJTWITHITEM;
 
 /**
- * 单表 SELECT 的内部改写器，保留原参数身份并按改写后的占位符顺序重新绑定。
+ * 对受支持查询的物理表叶节点追加隔离，保留原参数身份并按最终 SQL 顺序重新绑定。
  *
  * @author wuxp
  * @since 2026-10-16
  */
 final class SelectIsolationRewriter {
 
+    private static final Set<String> UNION_MODIFIERS = Set.of("", "ALL", "DISTINCT");
+
+    /**
+     * 解析是 CPU 工作，按可用处理器限制并发；256 项队列吸收短时突发，满载时明确拒绝。
+     * 池随模块共享，不随 Mapper 刷新重建；守护线程不继承请求上下文，闲置一分钟后回收。
+     */
+    private static final ExecutorService PARSER_EXECUTOR = createParserExecutor();
+
+    private final ExecutorService parserExecutor;
+
+    private final boolean strict;
+
     private final Map<String, TableBinding> tables;
+
+    private final Set<Class<?>> protectedEntities;
 
     private final Set<String> unqualifiedTables;
 
@@ -86,12 +105,32 @@ final class SelectIsolationRewriter {
             });
 
     SelectIsolationRewriter(Configuration configuration, DataIsolationStrategy... strategies) {
+        this(configuration, false, Set.of(), strategies);
+    }
+
+    SelectIsolationRewriter(Configuration configuration, boolean strict, Set<Class<?>> publicEntities,
+                            DataIsolationStrategy... strategies) {
+        this(configuration, PARSER_EXECUTOR, strict, publicEntities, strategies);
+    }
+
+    /**
+     * 借用指定解析执行器，由提供者管理关闭；用于独立验证排队、拒绝和取消边界。
+     */
+    SelectIsolationRewriter(Configuration configuration, ExecutorService parserExecutor, DataIsolationStrategy... strategies) {
+        this(configuration, parserExecutor, false, Set.of(), strategies);
+    }
+
+    private SelectIsolationRewriter(Configuration configuration, ExecutorService parserExecutor, boolean strict,
+                                    Set<Class<?>> publicEntities, DataIsolationStrategy... strategies) {
+        this.parserExecutor = Objects.requireNonNull(parserExecutor, "parser executor");
+        this.strict = strict;
         List<Class<?>> mappers = List.copyOf(configuration.getMapperRegistry().getMappers());
         mapperCount = mappers.size();
         Map<String, TableBinding> registered = new HashMap<>();
         Set<String> unqualified = new HashSet<>();
         Set<String> qualified = new HashSet<>();
         Set<Class<?>> entities = new HashSet<>();
+        Set<Class<?>> protectedTypes = new HashSet<>();
         for (Class<?> mapper : mappers) {
             if (!BaseMapper.class.isAssignableFrom(mapper)) {
                 continue;
@@ -114,8 +153,23 @@ final class SelectIsolationRewriter {
                 Object signature = strategy instanceof FieldDataIsolationStrategy fields ? fields.bindings(entity) : entity;
                 signatures.add(List.of(strategy, signature));
             }
+            if (strict) {
+                boolean declaredPublic = publicEntities.contains(entity.type());
+                if (applicable.isEmpty() && !declaredPublic) {
+                    throw new IllegalStateException("Entity has no isolation strategy or public declaration: " + entity.type().getName());
+                }
+                if (!applicable.isEmpty() && declaredPublic) {
+                    throw new IllegalStateException("Public entity also matches an isolation strategy: " + entity.type().getName());
+                }
+            }
             String name = simpleName(table.getTableName());
+            if (!applicable.isEmpty()) {
+                protectedTypes.add(entity.type());
+            }
             if (table.getTableName().contains(".") || table.getSchema() != null && !table.getSchema().isBlank()) {
+                if (strict) {
+                    throw new IllegalStateException("Strict isolation does not support schema-qualified mappings: " + entity.type().getName());
+                }
                 qualified.add(name);
             } else {
                 unqualified.add(name);
@@ -127,6 +181,12 @@ final class SelectIsolationRewriter {
             }
         }
         tables = Map.copyOf(registered);
+        protectedEntities = Set.copyOf(protectedTypes);
+        for (Class<?> publicEntity : publicEntities) {
+            if (!entities.contains(publicEntity)) {
+                throw new IllegalStateException("Public entity has no mapper in this SqlSessionFactory: " + publicEntity.getName());
+            }
+        }
         unqualified.removeAll(qualified);
         unqualifiedTables = Set.copyOf(unqualified);
     }
@@ -135,29 +195,49 @@ final class SelectIsolationRewriter {
         return mapperCount;
     }
 
+    void validateRequiredEntities(Class<?>... requiredEntities) {
+        for (Class<?> required : requiredEntities) {
+            if (!protectedEntities.contains(required)) {
+                throw new IllegalStateException("Required entity has no protected mapper in this SqlSessionFactory: " + required.getName());
+            }
+        }
+    }
+
     BoundSql rewrite(MappedStatement statement, BoundSql original) {
         String sqlText = original.getSql();
         if (sqlText.equals(unisolatedStatements.get(statement.getId()))) {
             return original;
         }
-        CCJSqlParser parser = CCJSqlParserUtil.newParser(original.getSql()).withAllowComplexParsing(
-                CCJSqlParserUtil.getNestingDepth(original.getSql()) <= CCJSqlParserUtil.ALLOWED_NESTING_DEPTH);
+        CCJSqlParser[] parser = new CCJSqlParser[1];
         Select select;
         try {
-            if (!(CCJSqlParserUtil.parseStatement(parser) instanceof Select parsed)) {
+            if (!(CCJSqlParserUtil.parse(sqlText, parserExecutor, configured -> parser[0] = configured) instanceof Select parsed)) {
                 throw new IllegalStateException("Read isolation requires a SELECT statement: " + statement.getId());
             }
             select = parsed;
-        } catch (JSQLParserException exception) {
+        } catch (JSQLParserException | RejectedExecutionException exception) {
             throw new IllegalStateException("Cannot parse query for read isolation: " + statement.getId(), exception);
         }
-        Node root = parser.getASTRoot();
-        rejectTableQueryShorthand(statement, root);
+        Node root = parser[0].getASTRoot();
+        validateSqlTokens(statement, parser[0]);
         QueryShape shape = new QueryShape(root);
+        if (shape.hasUnsupportedQuery || select instanceof TableStatement) {
+            throw unsupported(statement);
+        }
+        if (strict) {
+            if (shape.hasWith) {
+                throw unsupported(statement);
+            }
+            for (String name : shape.tableNames) {
+                if (name.contains(".") || !tables.containsKey(simpleName(name))) {
+                    throw new IllegalStateException("Query table has no isolation mapping: " + name + ", statement=" + statement.getId());
+                }
+            }
+        }
         boolean managed = shape.tableNames.stream().map(SelectIsolationRewriter::simpleName)
                 .map(tables::get).anyMatch(binding -> binding != null && !binding.strategies().isEmpty());
         if (!managed) {
-            if (!shape.nested && select.getSelectBody() instanceof PlainSelect query
+            if (!shape.nested && select instanceof PlainSelect query
                     && query.getFromItem() instanceof Table table && (query.getJoins() == null || query.getJoins().isEmpty())) {
                 TableBinding binding = tables.get(simpleName(table.getName()));
                 if (binding != null && binding.strategies().isEmpty()) {
@@ -166,80 +246,45 @@ final class SelectIsolationRewriter {
             }
             return original;
         }
-        if (!(select.getSelectBody() instanceof PlainSelect query)) {
+        if (shape.hasWith) {
             throw unsupported(statement);
         }
-        if (!(query.getFromItem() instanceof Table table) || query.getJoins() != null && !query.getJoins().isEmpty()) {
-            throw unsupported(statement);
+        List<PlainSelect> leaves = new ArrayList<>();
+        Set<ParenthesedSelect> allowed = new HashSet<>();
+        collectQueryLeaves(statement, select, false, leaves, allowed);
+        for (PlainSelect leaf : leaves) {
+            allowed.addAll(validateExistsSubqueries(statement, leaf));
         }
-        if (query.getIntoTables() != null || query.getTop() != null || query.getSkip() != null || query.getFirst() != null
-                || query.getFetch() != null || query.getOracleHierarchical() != null || query.getKsqlWindow() != null) {
+        // 原始解析树中的每个子查询都必须属于结构包装或已验证的 EXISTS。
+        if (!allowed.equals(shape.subqueries)) {
             throw unsupported(statement);
-        }
-        if (query.getDistinct() != null && query.getDistinct().getOnSelectItems() != null) {
-            throw unsupported(statement);
-        }
-        TableBinding bindingsForTable = tables.get(simpleName(table.getName()));
-        if (bindingsForTable == null) {
-            throw unsupported(statement);
-        }
-        if (shape.nested) {
-            validateExistsSubqueries(statement, query, shape);
         }
         original = MybatisFlexReadParameters.adapt(statement, original);
         List<ParameterMapping> bindings = new ArrayList<>(original.getParameterMappings());
         Map<String, Object> additional = new LinkedHashMap<>(original.getAdditionalParameters());
-        Expression condition = null;
-        String qualifier = table.getAlias() == null ? table.getFullyQualifiedName() : table.getAlias().getName();
-        QueryContext context = new QueryContext(statement.getId(), table.getFullyQualifiedName(), qualifier, bindingsForTable.entity());
-        for (DataIsolationStrategy strategy : bindingsForTable.strategies()) {
-            List<Condition> conditions = Objects.requireNonNull(strategy.resolve(context), "isolation conditions");
-            for (Condition resolved : conditions) {
-                Expression predicate = predicate(statement, original, resolved, bindings, additional, context);
-                Expression grouped = new Parenthesis(predicate);
-                condition = condition == null ? grouped : new AndExpression(condition, grouped);
-            }
+        Set<String> reservedProperties = parameterRoots(original.getParameterMappings());
+        boolean changed = false;
+        for (PlainSelect leaf : leaves) {
+            changed |= isolateLeaf(statement, leaf, reservedProperties, bindings, additional);
         }
-        if (condition == null) {
+        if (!changed) {
             return original;
         }
-        if (query.getWhere() != null) {
-            condition = new AndExpression(new Parenthesis(query.getWhere()), new Parenthesis(condition));
-        }
-        query.setWhere(condition);
 
         StringBuilder sql = new StringBuilder();
         List<ParameterMapping> ordered = new ArrayList<>();
         Set<Integer> visited = new HashSet<>();
         ExpressionDeParser expressions = new ExpressionDeParser() {
             @Override
-            public void visit(JdbcParameter parameter) {
+            public <S> StringBuilder visit(JdbcParameter parameter, S context) {
                 appendBinding(parameter, bindings, ordered, visited);
-                getBuffer().append('?');
+                return getBuilder().append('?');
             }
         };
         SelectDeParser selections = new SelectDeParser(expressions, sql);
-        expressions.setBuffer(sql);
+        expressions.setBuilder(sql);
         expressions.setSelectVisitor(selections);
-        query.accept(selections);
-        // 4.3 的 LIMIT/OFFSET 通过 toString 输出，不经过 ExpressionDeParser。
-        ExpressionVisitorAdapter trailing = new ExpressionVisitorAdapter() {
-            @Override
-            public void visit(JdbcParameter parameter) {
-                appendBinding(parameter, bindings, ordered, visited);
-            }
-        };
-        if (query.getLimit() != null) {
-            if (query.getLimit().getOffset() != null) {
-                query.getLimit().getOffset().accept(trailing);
-            }
-            if (query.getLimit().getRowCount() != null) {
-                query.getLimit().getRowCount().accept(trailing);
-            }
-        }
-        if (query.getOffset() != null) {
-            query.getOffset().getOffset().accept(trailing);
-        }
+        select.accept(selections);
         if (ordered.size() != bindings.size()) {
             throw new IllegalStateException("Unsupported parameter placement in isolation query: " + statement.getId());
         }
@@ -248,7 +293,87 @@ final class SelectIsolationRewriter {
         return result;
     }
 
-    private Expression predicate(MappedStatement statement, BoundSql original, Condition condition,
+    /**
+     * 派生表外层保留原有计数、过滤和分页，仅向实际读取物理表的叶查询追加隔离。
+     * UNION 的各分支独立处理，不把某个分支的实体或范围借给其他分支。
+     */
+    private void collectQueryLeaves(MappedStatement statement, Select select, boolean derived,
+                                    List<PlainSelect> leaves, Set<ParenthesedSelect> allowed) {
+        if (select instanceof ParenthesedSelect wrapper) {
+            if (wrapper.getClass() != ParenthesedSelect.class
+                    || wrapper.getOrderByElements() != null || wrapper.getLimit() != null || wrapper.getOffset() != null
+                    || wrapper.getFetch() != null || wrapper.getLimitBy() != null || wrapper.getForMode() != null
+                    || !derived && wrapper.getAlias() != null || wrapper.getPivot() != null || wrapper.getUnPivot() != null
+                    || wrapper.getSampleClause() != null || wrapper.getWithItemsList() != null && !wrapper.getWithItemsList().isEmpty()) {
+                throw unsupported(statement);
+            }
+            allowed.add(wrapper);
+            collectQueryLeaves(statement, wrapper.getSelect(), false, leaves, allowed);
+            return;
+        }
+        if (select instanceof SetOperationList union) {
+            if (union.getOperations().stream().anyMatch(operation -> !(operation instanceof UnionOp)
+                    || !UNION_MODIFIERS.contains(operation.getModifier().trim().toUpperCase(Locale.ROOT)))
+                    || union.getFetch() != null || union.getLimitBy() != null || union.getForMode() != null
+                    || union.getSampleClause() != null) {
+                throw unsupported(statement);
+            }
+            for (Select branch : union.getSelects()) {
+                collectQueryLeaves(statement, branch, false, leaves, allowed);
+            }
+            return;
+        }
+        if (!(select instanceof PlainSelect query)) {
+            throw unsupported(statement);
+        }
+        if (query.getJoins() != null && !query.getJoins().isEmpty()
+                || query.getIntoTables() != null || query.getTop() != null || query.getSkip() != null || query.getFirst() != null
+                || query.getFetch() != null || query.getOracleHierarchical() != null || query.getKsqlWindow() != null
+                || hasUnsupportedClauses(query)) {
+            throw unsupported(statement);
+        }
+        if (query.getDistinct() != null && query.getDistinct().getOnSelectItems() != null) {
+            throw unsupported(statement);
+        }
+        if (query.getFromItem() instanceof ParenthesedSelect source) {
+            if (source.getAlias() == null) {
+                throw unsupported(statement);
+            }
+            collectQueryLeaves(statement, source, true, leaves, allowed);
+            return;
+        }
+        if (!(query.getFromItem() instanceof Table table) || !tables.containsKey(simpleName(table.getName()))) {
+            throw unsupported(statement);
+        }
+        leaves.add(query);
+    }
+
+    private boolean isolateLeaf(MappedStatement statement, PlainSelect query, Set<String> reservedProperties,
+                                List<ParameterMapping> bindings, Map<String, Object> additional) {
+        Table table = (Table) query.getFromItem();
+        TableBinding binding = tables.get(simpleName(table.getName()));
+        String qualifier = table.getAlias() == null ? table.getFullyQualifiedName() : table.getAlias().getName();
+        QueryContext context = new QueryContext(statement.getId(), table.getFullyQualifiedName(), qualifier, binding.entity());
+        Expression condition = null;
+        for (DataIsolationStrategy strategy : binding.strategies()) {
+            List<Condition> conditions = Objects.requireNonNull(strategy.resolve(context), "isolation conditions");
+            for (Condition resolved : conditions) {
+                Expression predicate = predicate(statement, reservedProperties, resolved, bindings, additional, context);
+                Expression grouped = new ParenthesedExpressionList<>(predicate);
+                condition = condition == null ? grouped : new AndExpression(condition, grouped);
+            }
+        }
+        if (condition == null) {
+            return false;
+        }
+        if (query.getWhere() != null) {
+            condition = new AndExpression(new ParenthesedExpressionList<>(query.getWhere()), new ParenthesedExpressionList<>(condition));
+        }
+        query.setWhere(condition);
+        return true;
+    }
+
+    private Expression predicate(MappedStatement statement, Set<String> reservedProperties, Condition condition,
                                  List<ParameterMapping> bindings, Map<String, Object> additional,
                                  @Nullable QueryContext relationRoot) {
         Expression expression;
@@ -258,15 +383,15 @@ final class SelectIsolationRewriter {
         } catch (JSQLParserException exception) {
             throw new IllegalArgumentException("Cannot parse isolation condition", exception);
         }
-        rejectTableQueryShorthand(statement, parsed[0].getASTRoot());
+        validateSqlTokens(statement, parsed[0]);
         QueryShape shape = new QueryShape(parsed[0].getASTRoot());
         List<RelationIsolationPredicate.Relation> relations = List.of();
         if (shape.nested || !shape.tableNames.isEmpty()) {
-            if (relationRoot == null || shape.hasWith) {
+            if (relationRoot == null || shape.hasWith || shape.hasUnsupportedQuery) {
                 throw new IllegalArgumentException("Isolation relation constraints must not contain subqueries");
             }
             relations = new RelationIsolationPredicate(relationRoot, table -> relationContext(statement, table))
-                    .validate(expression, shape.subselectNodes);
+                    .validate(expression, shape.subqueries);
         }
         List<JdbcParameter> parameters = new ArrayList<>();
         /*
@@ -275,17 +400,17 @@ final class SelectIsolationRewriter {
         StringBuilder buffer = new StringBuilder();
         ExpressionDeParser parameterCollector = new ExpressionDeParser(null, buffer) {
             @Override
-            public void visit(JdbcNamedParameter parameter) {
+            public <S> StringBuilder visit(JdbcNamedParameter parameter, S context) {
                 throw new IllegalArgumentException("Isolation condition must use positional placeholders");
             }
 
             @Override
-            public void visit(JdbcParameter parameter) {
+            public <S> StringBuilder visit(JdbcParameter parameter, S context) {
                 if (parameter.isUseFixedIndex()) {
                     throw new IllegalArgumentException("Isolation condition must use positional placeholders");
                 }
                 parameters.add(parameter);
-                super.visit(parameter);
+                return super.visit(parameter, context);
             }
         };
         parameterCollector.setSelectVisitor(new SelectDeParser(parameterCollector, buffer));
@@ -296,7 +421,7 @@ final class SelectIsolationRewriter {
         for (int i = 0; i < parameters.size(); i++) {
             Object value = condition.values().get(i);
             String name = "windIsolation" + bindings.size();
-            while (additional.containsKey(name) || usesProperty(original.getParameterMappings(), name)) {
+            while (additional.containsKey(name) || reservedProperties.contains(name)) {
                 name += "Value";
             }
             additional.put(name, value);
@@ -314,8 +439,8 @@ final class SelectIsolationRewriter {
                 for (DataIsolationStrategy strategy : binding.strategies()) {
                     List<Condition> constraints = Objects.requireNonNull(strategy.resolveRelation(table), "isolation relation conditions");
                     for (Condition constraint : constraints) {
-                        Expression inner = predicate(statement, original, constraint, bindings, additional, null);
-                        relation.query().setWhere(new AndExpression(new Parenthesis(relation.query().getWhere()), new Parenthesis(inner)));
+                        Expression inner = predicate(statement, reservedProperties, constraint, bindings, additional, null);
+                        relation.query().setWhere(new AndExpression(new ParenthesedExpressionList<>(relation.query().getWhere()), new ParenthesedExpressionList<>(inner)));
                     }
                 }
             }
@@ -333,39 +458,63 @@ final class SelectIsolationRewriter {
         return new QueryContext(statement.getId(), table.getFullyQualifiedName(), table.getAlias().getName(), binding.entity());
     }
 
-    private boolean usesProperty(List<ParameterMapping> mappings, String name) {
-        return mappings.stream().map(ParameterMapping::getProperty)
-                .anyMatch(property -> property.equals(name) || property.startsWith(name + ".") || property.startsWith(name + "["));
+    private static Set<String> parameterRoots(List<ParameterMapping> mappings) {
+        Set<String> result = new HashSet<>();
+        for (ParameterMapping mapping : mappings) {
+            String property = mapping.getProperty();
+            int end = property.length();
+            int dot = property.indexOf('.');
+            int bracket = property.indexOf('[');
+            if (dot >= 0) {
+                end = dot;
+            }
+            if (bracket >= 0 && bracket < end) {
+                end = bracket;
+            }
+            result.add(property.substring(0, end));
+        }
+        return result;
     }
 
-    private void validateExistsSubqueries(MappedStatement statement, PlainSelect query, QueryShape shape) {
-        if (shape.hasWith || query.getWhere() == null) {
-            throw unsupported(statement);
+    private static ExecutorService createParserExecutor() {
+        int workers = Math.max(1, Runtime.getRuntime().availableProcessors());
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(workers, workers, 60, TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(256),
+                Thread.ofPlatform().daemon(true).inheritInheritableThreadLocals(false).name("wind-isolation-parser-", 0).factory(),
+                new ThreadPoolExecutor.AbortPolicy());
+        executor.allowCoreThreadTimeOut(true);
+        return executor;
+    }
+
+    private Set<ParenthesedSelect> validateExistsSubqueries(MappedStatement statement, PlainSelect query) {
+        if (query.getWhere() == null) {
+            return Set.of();
         }
         Table outer = (Table) query.getFromItem();
         String outerName = simpleName(outer.getAlias() == null ? outer.getName() : outer.getAlias().getName());
-        Set<Node> allowed = new HashSet<>();
-        query.getWhere().accept(new ExpressionVisitorAdapter() {
+        Set<ParenthesedSelect> allowed = new HashSet<>();
+        boolean[] hasNot = {false};
+        query.getWhere().accept(new ExpressionVisitorAdapter<Void>() {
             @Override
-            public void visit(NotExpression expression) {
-                throw unsupported(statement);
+            public <S> Void visit(NotExpression expression, S context) {
+                hasNot[0] = true;
+                return super.visit(expression, context);
             }
 
             @Override
-            public void visit(ExistsExpression expression) {
-                if (expression.isNot() || !(expression.getRightExpression() instanceof SubSelect subquery)
-                        || !(subquery.getSelectBody() instanceof PlainSelect inner)
+            public <S> Void visit(ExistsExpression expression, S context) {
+                if (expression.isNot() || !(expression.getRightExpression() instanceof ParenthesedSelect subquery)
+                        || !(subquery.getSelect() instanceof PlainSelect inner)
                         || !(inner.getFromItem() instanceof Table table)
                         || subquery.getWithItemsList() != null && !subquery.getWithItemsList().isEmpty()
                         || inner.getSelectItems().size() != 1
-                        || !(inner.getSelectItems().getFirst() instanceof SelectExpressionItem item)
-                        || !(item.getExpression() instanceof LongValue value) || value.getValue() != 1
+                        || !(inner.getSelectItems().getFirst().getExpression() instanceof LongValue value) || value.getValue() != 1
                         || inner.getLimit() != null || inner.getOffset() != null || inner.getFetch() != null
                         || inner.getTop() != null || inner.getSkip() != null || inner.getFirst() != null
                         || inner.getHaving() != null || inner.getGroupBy() != null || inner.getOrderByElements() != null
                         || inner.getIntoTables() != null || inner.getOracleHierarchical() != null
-                        || inner.getKsqlWindow() != null || inner.isForUpdate() || inner.getForUpdateTable() != null
-                        || inner.getWait() != null || inner.isNoWait()) {
+                        || inner.getKsqlWindow() != null || inner.getForMode() != null || inner.getForUpdateTable() != null
+                        || inner.getWait() != null || inner.isNoWait() || hasUnsupportedClauses(inner)) {
                     throw unsupported(statement);
                 }
                 if (subquery.getASTNode() == null) {
@@ -388,13 +537,14 @@ final class SelectIsolationRewriter {
                     }
                     validateUnisolatedTable(statement, joined, names);
                 }
-                allowed.add(subquery.getASTNode());
+                allowed.add(subquery);
+                return null;
             }
         });
-        // 逐个核对子查询节点，避免遗漏投影、排序及 EXISTS 内部的嵌套查询。
-        if (!allowed.equals(shape.subselectNodes)) {
+        if (hasNot[0] && !allowed.isEmpty()) {
             throw unsupported(statement);
         }
+        return allowed;
     }
 
     private void validateUnisolatedTable(MappedStatement statement, Table table, Set<String> names) {
@@ -407,13 +557,71 @@ final class SelectIsolationRewriter {
         }
     }
 
-    private void rejectTableQueryShorthand(MappedStatement statement, Node root) {
-        // 4.3 会把部分 TABLE 查询简写当作行构造表达式；按词法 token 拒绝，避免误伤注释和字符串。
-        for (Token token = ((SimpleNode) root).jjtGetFirstToken(); token != null; token = token.next) {
+    /**
+     * 检查解析器实际消费的完整 token 链，避免被当作注释的内容在数据库中执行。
+     * Statement 可在分号处结束，须先取得 EOF，才能覆盖分号后的注释；不接受第二条语句。
+     */
+    private void validateSqlTokens(MappedStatement statement, CCJSqlParser parser) {
+        if (parser.getToken(0).kind != CCJSqlParserConstants.EOF
+                && parser.getNextToken().kind != CCJSqlParserConstants.EOF) {
+            throw new IllegalStateException("Unsupported SQL statement tail: " + statement.getId());
+        }
+        for (Token token = parser.getASTRoot().jjtGetFirstToken(); token != null; token = token.next) {
+            for (Token comment = token.specialToken; comment != null; comment = comment.specialToken) {
+                validateSqlComment(statement, comment.image);
+            }
+            if (token.kind == CCJSqlParserConstants.S_CHAR_LITERAL || token.kind == CCJSqlParserConstants.S_QUOTED_IDENTIFIER) {
+                validateQuotedToken(statement, token.image);
+                continue;
+            }
+            // 默认词法配置把 # 当操作符或标识符，MySQL 却会从此处忽略行尾，可能吞掉追加条件。
+            if (token.kind != CCJSqlParserConstants.EOF && token.image.indexOf('#') >= 0) {
+                throw new IllegalStateException("Unsupported SQL comment syntax: " + statement.getId());
+            }
             if ("(".equals(token.image) && token.next != null && token.next.kind == K_TABLE) {
                 throw unsupported(statement);
             }
         }
+    }
+
+    /**
+     * 不按数据库 SQL mode 猜测反斜杠是否转义引号；标准双写引号不受影响。
+     */
+    private void validateQuotedToken(MappedStatement statement, String text) {
+        char delimiter = text.charAt(text.length() - 1);
+        if (delimiter != '\'' && delimiter != '"') {
+            return;
+        }
+        int backslashes = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char current = text.charAt(i);
+            if (current == '\\') {
+                backslashes++;
+                continue;
+            }
+            if (current == delimiter && backslashes % 2 != 0) {
+                throw new IllegalStateException("Unsupported SQL quoted literal: " + statement.getId());
+            }
+            backslashes = 0;
+        }
+    }
+
+    private void validateSqlComment(MappedStatement statement, String comment) {
+        if (comment.startsWith("/*")) {
+            if (comment.startsWith("/*!") || comment.startsWith("/*M!") || comment.startsWith("/*m!")
+                    || comment.indexOf("/*", 2) >= 0) {
+                throw new IllegalStateException("Unsupported SQL comment syntax: " + statement.getId());
+            }
+            return;
+        }
+        if (comment.startsWith("--")) {
+            // 长度为 2 的 token 也可能来自 -- 后直接换行；它没有可被隐藏的注释正文。
+            if (comment.length() > 2 && comment.charAt(2) > ' ' && comment.charAt(2) != 127) {
+                throw new IllegalStateException("Unsupported SQL comment syntax: " + statement.getId());
+            }
+            return;
+        }
+        throw new IllegalStateException("Unsupported SQL comment syntax: " + statement.getId());
     }
 
     private static void appendBinding(JdbcParameter parameter, List<ParameterMapping> bindings,
@@ -431,7 +639,17 @@ final class SelectIsolationRewriter {
     }
 
     private IllegalStateException unsupported(MappedStatement statement) {
-        return new IllegalStateException("Read isolation supports single-table SELECT only: " + statement.getId());
+        return new IllegalStateException("Read isolation supports single-table SELECT only, optionally wrapped or combined by UNION: " + statement.getId());
+    }
+
+    /**
+     * 升级解析器不扩大隔离查询契约；额外过滤、分页与 FROM 扩展需单独验证后才能支持。
+     */
+    static boolean hasUnsupportedClauses(PlainSelect query) {
+        return query.getPreWhere() != null || query.getQualify() != null || query.getLimitBy() != null
+                || query.getLateralViews() != null && !query.getLateralViews().isEmpty()
+                || query.getIntoTempTable() != null || query.getMySqlSelectIntoClause() != null
+                || query.getSampleClause() != null || query.getSettings() != null;
     }
 
     /**
@@ -460,20 +678,28 @@ final class SelectIsolationRewriter {
 
         private boolean hasWith;
 
-        private final Set<Node> subselectNodes = new HashSet<>();
+        private boolean hasUnsupportedQuery;
+
+        private final Set<ParenthesedSelect> subqueries = new HashSet<>();
 
         private QueryShape(Node root) {
             Deque<Node> pending = new ArrayDeque<>();
             pending.push(root);
             while (!pending.isEmpty()) {
-                SimpleNode node = (SimpleNode) pending.pop();
-                // 表名 finder 会跳过部分表达式，并将同名 CTE 的物理表一并排除。
-                if (node.getId() == JJTSUBSELECT || node.getId() == JJTWITHITEM) {
+                Node node = pending.pop();
+                if (node.getId() == CCJSqlParserTreeConstants.JJTFROMQUERY || node.getId() == CCJSqlParserTreeConstants.JJTPARENTHESEDINSERT
+                        || node.getId() == CCJSqlParserTreeConstants.JJTPARENTHESEDUPDATE || node.getId() == CCJSqlParserTreeConstants.JJTPARENTHESEDDELETE) {
+                    hasUnsupportedQuery = true;
                     nested = true;
                 }
-                if (node.getId() == JJTSUBSELECT) {
-                    subselectNodes.add(node);
-                } else if (node.getId() == JJTWITHITEM) {
+                // 表名 finder 会跳过部分表达式，并将同名 CTE 的物理表一并排除。
+                if (node.getId() == CCJSqlParserTreeConstants.JJTPARENTHESEDSELECT || node.getId() == CCJSqlParserTreeConstants.JJTWITHITEM) {
+                    nested = true;
+                }
+                if (node.getId() == CCJSqlParserTreeConstants.JJTPARENTHESEDSELECT) {
+                    // 5.4 的模型 AST 指针可能指向 PrimaryExpression，按同一子查询对象核对覆盖。
+                    subqueries.add((ParenthesedSelect) node.jjtGetValue());
+                } else if (node.getId() == CCJSqlParserTreeConstants.JJTWITHITEM) {
                     hasWith = true;
                 }
                 if (node.jjtGetValue() instanceof PlainSelect query) {
@@ -491,11 +717,11 @@ final class SelectIsolationRewriter {
         private void collectFromItem(@Nullable FromItem item) {
             if (item instanceof Table table) {
                 tableNames.add(table.getFullyQualifiedName());
-            } else if (item instanceof ParenthesisFromItem parenthesis) {
+            } else if (item instanceof ParenthesedFromItem parenthesis) {
                 collectFromItem(parenthesis.getFromItem());
-            } else if (item instanceof SubJoin join) {
-                collectFromItem(join.getLeft());
-                join.getJoinList().forEach(part -> collectFromItem(part.getRightItem()));
+                if (parenthesis.getJoins() != null) {
+                    parenthesis.getJoins().forEach(join -> collectFromItem(join.getRightItem()));
+                }
             }
         }
     }

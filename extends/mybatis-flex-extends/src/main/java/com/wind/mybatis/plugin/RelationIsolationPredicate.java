@@ -4,18 +4,16 @@ import com.wind.mybatis.isolation.DataIsolationStrategy.QueryContext;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.ExpressionVisitorAdapter;
 import net.sf.jsqlparser.expression.LongValue;
-import net.sf.jsqlparser.expression.Parenthesis;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
 import net.sf.jsqlparser.expression.operators.conditional.OrExpression;
 import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
 import net.sf.jsqlparser.expression.operators.relational.ExistsExpression;
-import net.sf.jsqlparser.parser.Node;
+import net.sf.jsqlparser.expression.operators.relational.ParenthesedExpressionList;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.select.Join;
+import net.sf.jsqlparser.statement.select.ParenthesedSelect;
 import net.sf.jsqlparser.statement.select.PlainSelect;
-import net.sf.jsqlparser.statement.select.SelectExpressionItem;
-import net.sf.jsqlparser.statement.select.SubSelect;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -44,14 +42,14 @@ final class RelationIsolationPredicate {
 
     private final List<Relation> relations = new ArrayList<>();
 
-    private final Set<Node> allowed = new HashSet<>();
+    private final Set<ParenthesedSelect> allowed = new HashSet<>();
 
     RelationIsolationPredicate(QueryContext outer, Function<Table, QueryContext> tableResolver) {
         this.outer = outer;
         this.tableResolver = tableResolver;
     }
 
-    List<Relation> validate(Expression expression, Set<Node> subqueries) {
+    List<Relation> validate(Expression expression, Set<ParenthesedSelect> subqueries) {
         collectPositiveExists(expression);
         /*
          * 未从正向 AND/OR 位置取得的子查询一律拒绝，包括 CASE、比较、函数及内部嵌套。
@@ -63,8 +61,8 @@ final class RelationIsolationPredicate {
     }
 
     private void collectPositiveExists(Expression expression) {
-        if (expression instanceof Parenthesis parenthesis) {
-            collectPositiveExists(parenthesis.getExpression());
+        if (expression instanceof ParenthesedExpressionList<?> parenthesis && parenthesis.size() == 1) {
+            collectPositiveExists(parenthesis.getFirst());
         } else if (expression instanceof AndExpression and) {
             collectPositiveExists(and.getLeftExpression());
             collectPositiveExists(and.getRightExpression());
@@ -77,8 +75,8 @@ final class RelationIsolationPredicate {
     }
 
     private void validateExists(ExistsExpression exists) {
-        if (exists.isNot() || !(exists.getRightExpression() instanceof SubSelect subquery)
-                || !(subquery.getSelectBody() instanceof PlainSelect query)
+        if (exists.isNot() || !(exists.getRightExpression() instanceof ParenthesedSelect subquery)
+                || !(subquery.getSelect() instanceof PlainSelect query)
                 || !(query.getFromItem() instanceof Table table)) {
             throw unsupported();
         }
@@ -106,22 +104,22 @@ final class RelationIsolationPredicate {
         if (!hasMandatoryCorrelation(query.getWhere(), names)) {
             throw unsupported();
         }
-        allowed.add(subquery.getASTNode());
+        allowed.add(subquery);
         relations.add(new Relation(query, List.copyOf(innerTables)));
     }
 
-    private void validateSelect(SubSelect subquery, PlainSelect query) {
+    private void validateSelect(ParenthesedSelect subquery, PlainSelect query) {
         if (subquery.getASTNode() == null || subquery.getWithItemsList() != null && !subquery.getWithItemsList().isEmpty()
                 || query.getWhere() == null || query.getSelectItems().size() != 1
-                || !(query.getSelectItems().getFirst() instanceof SelectExpressionItem item)
-                || !(item.getExpression() instanceof LongValue value) || value.getValue() != 1
+                || !(query.getSelectItems().getFirst().getExpression() instanceof LongValue value) || value.getValue() != 1
                 || query.getDistinct() != null || query.getLimit() != null || query.getOffset() != null
                 || query.getFetch() != null || query.getTop() != null || query.getSkip() != null
                 || query.getFirst() != null || query.getHaving() != null || query.getGroupBy() != null
                 || query.getOrderByElements() != null || query.getIntoTables() != null
                 || query.getOracleHierarchical() != null || query.getKsqlWindow() != null
-                || query.isForUpdate() || query.getForUpdateTable() != null
-                || query.getWait() != null || query.isNoWait()) {
+                || query.getForMode() != null || query.getForUpdateTable() != null
+                || query.getWait() != null || query.isNoWait()
+                || SelectIsolationRewriter.hasUnsupportedClauses(query)) {
             throw unsupported();
         }
     }
@@ -138,9 +136,9 @@ final class RelationIsolationPredicate {
     }
 
     private void validateColumns(Expression expression, Map<String, QueryContext> names) {
-        expression.accept(new ExpressionVisitorAdapter() {
+        expression.accept(new ExpressionVisitorAdapter<Void>() {
             @Override
-            public void visit(Column column) {
+            public <S> Void visit(Column column, S state) {
                 if (column.getTable() == null || column.getTable().getFullyQualifiedName() == null) {
                     throw unsupported();
                 }
@@ -149,18 +147,19 @@ final class RelationIsolationPredicate {
                         .noneMatch(name -> normalize(name).equals(normalize(column.getColumnName())))) {
                     throw unsupported();
                 }
+                return null;
             }
 
             @Override
-            public void visit(SubSelect subquery) {
+            public <S> Void visit(ParenthesedSelect subquery, S state) {
                 throw unsupported();
             }
         });
     }
 
     private boolean hasMandatoryCorrelation(Expression expression, Map<String, QueryContext> names) {
-        if (expression instanceof Parenthesis parenthesis) {
-            return hasMandatoryCorrelation(parenthesis.getExpression(), names);
+        if (expression instanceof ParenthesedExpressionList<?> parenthesis && parenthesis.size() == 1) {
+            return hasMandatoryCorrelation(parenthesis.getFirst(), names);
         }
         if (expression instanceof AndExpression and) {
             return hasMandatoryCorrelation(and.getLeftExpression(), names)

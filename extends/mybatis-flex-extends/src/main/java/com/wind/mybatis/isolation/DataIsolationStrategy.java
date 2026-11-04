@@ -29,7 +29,8 @@ public interface DataIsolationStrategy extends Ordered {
     boolean supports(EntityMetadata entity);
 
     /**
-     * 为本次受支持的单表查询提供条件，空列表表示本策略不追加条件，异常表示拒绝执行。
+     * 为当前物理表叶查询提供条件；UNION 的各分支分别求值，供应者应读取同一请求范围快照。
+     * 空列表表示本策略不追加条件，异常表示拒绝执行。
      * 仅返回可信代码构造的谓词；值使用占位符绑定，不能修改原 SQL 或参数。
      */
     List<Condition> resolve(QueryContext context);
@@ -104,7 +105,7 @@ public interface DataIsolationStrategy extends Ordered {
     }
 
     /**
-     * 本次查询目标；仅覆盖当前重写器支持的根表查询，不承诺任意关联或嵌套查询。
+     * 当前单表叶查询目标；派生包装及 UNION 各分支使用自己的实体和别名，不承诺任意关联查询。
      *
      * @param statementId MyBatis 语句标识
      * @param tableName   查询的物理表名

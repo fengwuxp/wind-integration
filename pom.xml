@@ -48,6 +48,7 @@
         <aliyun.credentials.version>1.0.3</aliyun.credentials.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <dom4j.version>2.1.5</dom4j.version>
+        <jsqlparser.version>5.4</jsqlparser.version>
         <embedded-redis.version>1.4.3</embedded-redis.version>
     </properties>
 
@@ -251,6 +252,11 @@
                 <groupId>org.dom4j</groupId>
                 <artifactId>dom4j</artifactId>
                 <version>${dom4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.jsqlparser</groupId>
+                <artifactId>jsqlparser</artifactId>
+                <version>${jsqlparser.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.github.codemonstur</groupId>

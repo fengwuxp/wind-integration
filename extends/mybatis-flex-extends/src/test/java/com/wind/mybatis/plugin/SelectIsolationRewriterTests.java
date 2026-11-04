@@ -17,10 +17,115 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.wind.integration.core.enums.DataIsolationDimensions.TENANT;
 
 class SelectIsolationRewriterTests {
+
+    @Test
+    void testParameterNamesAvoidNestedPropertiesAndAdditionalValues() {
+        Configuration configuration = configuration();
+        SelectIsolationRewriter rewriter = rewriter(configuration);
+        String sql = "SELECT id FROM protected_records WHERE id > ? AND id < ? AND id <> ? ORDER BY id LIMIT ?";
+        MappedStatement statement = statement(configuration, sql);
+        List<ParameterMapping> mappings = List.of(
+                new ParameterMapping.Builder(configuration, "windIsolation4.value", Long.class).build(),
+                new ParameterMapping.Builder(configuration, "windIsolation4Value[0]", Long.class).build(),
+                new ParameterMapping.Builder(configuration, "windIsolation4ValueValue.deep[0]", Long.class).build(),
+                new ParameterMapping.Builder(configuration, "limit", Integer.class).build());
+        Map<String, Object> input = Map.of("windIsolation4", Map.of("value", 0L),
+                "windIsolation4Value", List.of(100L), "windIsolation4ValueValue", Map.of("deep", List.of(5L)), "limit", 20);
+        BoundSql original = new BoundSql(configuration, sql, mappings, input);
+        original.setAdditionalParameter("windIsolation4ValueValueValue", 999L);
+
+        BoundSql rewritten = rewriter.rewrite(statement, original);
+
+        Assertions.assertEquals(List.of("windIsolation4.value", "windIsolation4Value[0]", "windIsolation4ValueValue.deep[0]",
+                        "windIsolation4ValueValueValueValue", "limit"),
+                rewritten.getParameterMappings().stream().map(ParameterMapping::getProperty).toList());
+        Assertions.assertSame(input, rewritten.getParameterObject());
+        Assertions.assertSame(mappings.getFirst(), rewritten.getParameterMappings().getFirst());
+        Assertions.assertSame(mappings.getLast(), rewritten.getParameterMappings().getLast());
+        Assertions.assertEquals(999L, rewritten.getAdditionalParameter("windIsolation4ValueValueValue"));
+        Assertions.assertEquals(10L, rewritten.getAdditionalParameter("windIsolation4ValueValueValueValue"));
+        Assertions.assertFalse(original.hasAdditionalParameter("windIsolation4ValueValueValueValue"));
+    }
+
+    @Test
+    void testSimilarPropertyPrefixDoesNotReserveAnUnrelatedName() {
+        Configuration configuration = configuration();
+        SelectIsolationRewriter rewriter = rewriter(configuration);
+        String sql = "SELECT id FROM protected_records WHERE id > ?";
+        MappedStatement statement = statement(configuration, sql);
+        List<ParameterMapping> mappings = List.of(
+                new ParameterMapping.Builder(configuration, "windIsolation1Other.value", Long.class).build());
+        BoundSql result = rewriter.rewrite(statement, new BoundSql(configuration, sql, mappings,
+                Map.of("windIsolation1Other", Map.of("value", 0L))));
+
+        Assertions.assertEquals(List.of("windIsolation1Other.value", "windIsolation1"),
+                result.getParameterMappings().stream().map(ParameterMapping::getProperty).toList());
+        Assertions.assertEquals(10L, result.getAdditionalParameter("windIsolation1"));
+    }
+
+    @Test
+    void testNewParserQueryFormsDoNotBypassIsolation() {
+        Configuration configuration = configuration();
+        SelectIsolationRewriter rewriter = rewriter(configuration);
+        for (String sql : List.of(
+                "FROM protected_records |> SELECT id",
+                "TABLE protected_records",
+                "(SELECT id FROM protected_records) ORDER BY id",
+                "(SELECT id FROM protected_records) LIMIT 1",
+                "SELECT id INTO OUTFILE 'dump.csv' FROM protected_records",
+                "WITH changed AS (DELETE FROM protected_records RETURNING id) SELECT id FROM public_records",
+                "WITH changed AS (UPDATE protected_records SET tenant_id = 20 RETURNING id) SELECT id FROM public_records",
+                "WITH changed AS (INSERT INTO protected_records (id) VALUES (1) RETURNING id) SELECT id FROM public_records",
+                "WITH x AS (FROM protected_records |> SELECT id) SELECT id FROM x",
+                "SELECT id FROM protected_records PREWHERE id = 1",
+                "SELECT id FROM protected_records QUALIFY id = 1",
+                "SELECT id FROM protected_records LIMIT 1 BY id")) {
+            MappedStatement statement = statement(configuration, sql);
+            Assertions.assertThrows(IllegalStateException.class,
+                    () -> rewriter.rewrite(statement, statement.getBoundSql(null)), sql);
+        }
+    }
+
+    @Test
+    void testLimitAndOffsetUseOneParameterTraversal() {
+        Configuration configuration = configuration();
+        SelectIsolationRewriter rewriter = rewriter(configuration);
+        for (String sql : List.of("SELECT id FROM protected_records WHERE id > ? LIMIT ? OFFSET ?",
+                "SELECT id FROM protected_records WHERE id > ? LIMIT ?, ?")) {
+            MappedStatement statement = statement(configuration, sql);
+            List<ParameterMapping> mappings = List.of(
+                    new ParameterMapping.Builder(configuration, "minimum", Long.class).build(),
+                    new ParameterMapping.Builder(configuration, "firstLimitArgument", Integer.class).build(),
+                    new ParameterMapping.Builder(configuration, "secondLimitArgument", Integer.class).build());
+            BoundSql result = rewriter.rewrite(statement, new BoundSql(configuration, sql, mappings, null));
+            Assertions.assertEquals(List.of("minimum", "windIsolation3", "firstLimitArgument", "secondLimitArgument"),
+                    result.getParameterMappings().stream().map(ParameterMapping::getProperty).toList());
+            Assertions.assertEquals(10L, result.getAdditionalParameter("windIsolation3"));
+        }
+    }
+
+    @Test
+    void testParenthesizedRootKeepsIsolationAndParameterOrder() {
+        Configuration configuration = configuration();
+        SelectIsolationRewriter rewriter = rewriter(configuration);
+        for (String sql : List.of("(SELECT id FROM protected_records WHERE id > ? ORDER BY id LIMIT ?)",
+                "((SELECT id FROM protected_records WHERE id > ? ORDER BY id LIMIT ?))")) {
+            MappedStatement statement = statement(configuration, sql);
+            List<ParameterMapping> mappings = List.of(
+                    new ParameterMapping.Builder(configuration, "minimum", Long.class).build(),
+                    new ParameterMapping.Builder(configuration, "limit", Integer.class).build());
+            BoundSql result = rewriter.rewrite(statement, new BoundSql(configuration, sql, mappings, null));
+            Assertions.assertTrue(result.getSql().startsWith("("));
+            Assertions.assertTrue(result.getSql().contains("tenant_id"));
+            Assertions.assertEquals(List.of("minimum", "windIsolation2", "limit"),
+                    result.getParameterMappings().stream().map(ParameterMapping::getProperty).toList());
+        }
+    }
 
     @Test
     void testRepeatedPublicEntityQuerySkipsSqlParsing() {

@@ -26,9 +26,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 在 MyBatis 执行层实现单表读隔离：在生成查询缓存键前绑定范围，不拦截 INSERT/UPDATE/DELETE。
+ * 在 MyBatis 执行层实现读隔离：在生成查询缓存键前绑定范围，不拦截 INSERT/UPDATE/DELETE。
  * 从当前工厂的 BaseMapper 实体元数据自动发现表和隔离字段。
- * 受管单表支持限定形式的 WHERE EXISTS；其他关联、子查询、union、CTE 及嵌套查询映射遇到时拒绝执行。
+ * 支持单表、派生包装、UNION 及限定的 WHERE EXISTS；其他关联、CTE 及嵌套查询映射拒绝执行。
  *
  * @author wuxp
  * @since 2026-10-16
@@ -48,6 +48,10 @@ public final class DataIsolationQueryInterceptor implements Interceptor {
 
     private final List<DataIsolationStrategy> strategies;
 
+    private final boolean strict;
+
+    private final Set<Class<?>> publicEntities;
+
     private final Map<Configuration, SelectIsolationRewriter> rewriters = new ConcurrentHashMap<>();
 
     /**
@@ -63,12 +67,46 @@ public final class DataIsolationQueryInterceptor implements Interceptor {
      * @param strategies 非空的隔离策略集合
      */
     public DataIsolationQueryInterceptor(List<? extends DataIsolationStrategy> strategies) {
+        this(strategies, false, Set.of());
+    }
+
+    private DataIsolationQueryInterceptor(List<? extends DataIsolationStrategy> strategies, boolean strict,
+                                          Set<Class<?>> publicEntities) {
         if (strategies.isEmpty()) {
             throw new IllegalArgumentException("Isolation strategies must not be empty");
         }
         List<DataIsolationStrategy> ordered = new ArrayList<>(List.copyOf(strategies));
         ordered.sort(Comparator.comparingInt(DataIsolationStrategy::getOrder));
         this.strategies = List.copyOf(ordered);
+        this.strict = strict;
+        this.publicEntities = Set.copyOf(publicEntities);
+    }
+
+    /**
+     * 严格覆盖模式：每个已登记实体须匹配策略或明确声明为公共实体，未知物理表拒绝查询。
+     * 公共声明不能覆盖适用策略，所有声明仍须在实际工厂登记 BaseMapper。
+     *
+     * @param strategies 完整策略集合
+     * @param publicEntities 明确无需隔离的实体；不接受表名或请求输入
+     * @return 严格覆盖的查询拦截器
+     */
+    public static DataIsolationQueryInterceptor strict(List<? extends DataIsolationStrategy> strategies,
+                                                       Set<Class<?>> publicEntities) {
+        return new DataIsolationQueryInterceptor(strategies, true, publicEntities);
+    }
+
+    /**
+     * 在工厂完成 Mapper 登记后预热元数据，校验安装状态及必须受保护的实体，不读取请求范围。
+     * requiredEntities 可从应用已有资源登记提取；此检查不替代策略自身的业务边界定义。
+     *
+     * @param configuration 实际业务工厂配置
+     * @param requiredEntities 必须有实体映射且匹配隔离策略的实体
+     */
+    public void validate(Configuration configuration, Class<?>... requiredEntities) {
+        if (configuration.getInterceptors().stream().noneMatch(interceptor -> interceptor == this)) {
+            throw new IllegalStateException("SqlSessionFactory has not installed this isolation interceptor");
+        }
+        rewriterFor(configuration).validateRequiredEntities(requiredEntities);
     }
 
     @Override
@@ -112,7 +150,7 @@ public final class DataIsolationQueryInterceptor implements Interceptor {
             if (previous != null && previous.mapperCount() == mapperCount) {
                 return previous;
             }
-            return new SelectIsolationRewriter(key, strategies.toArray(DataIsolationStrategy[]::new));
+            return new SelectIsolationRewriter(key, strict, publicEntities, strategies.toArray(DataIsolationStrategy[]::new));
         });
     }
 

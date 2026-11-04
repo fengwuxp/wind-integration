@@ -315,11 +315,28 @@ class DataIsolationQueryInterceptorIntegrationTests {
         try (SqlSession session = sessionFactory.openSession()) {
             ReadMapper mapper = session.getMapper(ReadMapper.class);
             Assertions.assertThrows(PersistenceException.class, mapper::joined);
-            Assertions.assertThrows(PersistenceException.class, mapper::union);
             Assertions.assertThrows(PersistenceException.class, mapper::subquery);
             Assertions.assertThrows(PersistenceException.class, mapper::nested);
             Assertions.assertThrows(PersistenceException.class, mapper::discriminatedNested);
         }
+    }
+
+    /** UNION ALL 的两个叶查询均应隔离，并保留重复记录。 */
+    @Test
+    void testUnionBranchesPreserveIsolationAndDuplicates() {
+        try (SqlSession session = sessionFactory.openSession()) {
+            List<Long> ids = session.getMapper(ReadMapper.class).union();
+            Assertions.assertEquals(List.of(1L, 1L, 5L, 5L), ids.stream().sorted().toList());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "(SELECT id FROM t_read_isolation ORDER BY id LIMIT 1 OFFSET 1)",
+            "((SELECT id FROM t_read_isolation ORDER BY id LIMIT 1 OFFSET 1))"
+    })
+    void testParenthesizedRootQueryKeepsVisibleRows(String sql) {
+        Assertions.assertEquals(List.of(5L), selectBoundarySql(sql));
     }
 
     /** 复杂查询不能通过 CTE 名称遮蔽或表达式位置读取其他租户的数据。 */
@@ -340,8 +357,6 @@ class DataIsolationQueryInterceptorIntegrationTests {
             "SELECT MAX(id) OVER (PARTITION BY (SELECT tenant_id FROM t_read_isolation WHERE id=3)) FROM t_public",
             "SELECT EXTRACT(YEAR FROM (SELECT CURRENT_DATE FROM t_read_isolation WHERE id=3)) FROM t_public",
             "SELECT id FROM t_public LIMIT (SELECT COUNT(*) FROM t_read_isolation)",
-            "SELECT id FROM t_public WHERE id=(TABLE t_read_isolation)",
-            "SELECT id FROM t_public WHERE id=(TABLE /* 查询简写 */ t_public)",
             "SELECT p.id FROM (t_public p JOIN t_read_isolation r ON p.id=r.id)",
             "SELECT id FROM (t_read_isolation)"
     })
@@ -349,6 +364,17 @@ class DataIsolationQueryInterceptorIntegrationTests {
         PersistenceException error = Assertions.assertThrows(PersistenceException.class, () -> selectBoundarySql(sql));
 
         Assertions.assertTrue(error.getMessage().contains("Read isolation supports single-table SELECT only"));
+    }
+
+    /** JSQLParser 5.4 在语法解析阶段拒绝括号内 TABLE 简写，仍不能执行未隔离查询。 */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "SELECT id FROM t_public WHERE id=(TABLE t_read_isolation)",
+            "SELECT id FROM t_public WHERE id=(TABLE /* 查询简写 */ t_public)"
+    })
+    void testTableShorthandIsRejectedDuringParsing(String sql) {
+        PersistenceException error = Assertions.assertThrows(PersistenceException.class, () -> selectBoundarySql(sql));
+        Assertions.assertTrue(error.getMessage().contains("Cannot parse query for read isolation"));
     }
 
     /** 无受管表的查询仍可使用复杂结构，投影别名和字符串内容不应触发隔离。 */
@@ -360,6 +386,8 @@ class DataIsolationQueryInterceptorIntegrationTests {
             "WITH t_public AS (SELECT id FROM t_public) SELECT id FROM t_public ORDER BY id",
             "SELECT t_read_isolation.* FROM t_public t_read_isolation ORDER BY t_read_isolation.id",
             "SELECT id FROM (t_public) ORDER BY id",
+            "(SELECT id FROM t_public) ORDER BY id",
+            "(SELECT id FROM t_public ORDER BY id) LIMIT 2",
             "SELECT p.id FROM (t_public p JOIN t_public q ON p.id=q.id) ORDER BY p.id",
             "SELECT id FROM t_public WHERE 'SELECT * FROM t_read_isolation' IS NOT NULL ORDER BY id",
             "SELECT id FROM t_public WHERE '(TABLE t_read_isolation)' IS NOT NULL ORDER BY id",

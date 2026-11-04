@@ -29,6 +29,8 @@ import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -37,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.wind.common.WindConstants.SPRING_PROFILES_ACTIVE;
 import static com.wind.integration.core.enums.DataIsolationDimensions.ENVIRONMENT;
 import static com.wind.integration.core.enums.DataIsolationDimensions.TEST_DATA;
 import static com.wind.integration.core.enums.DataIsolationDimensions.TENANT;
@@ -46,9 +49,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class WorkspaceIsolationIntegrationTests {
 
     private static final AtomicInteger DATABASE_SEQUENCE = new AtomicInteger();
+
+    private String previousProfile;
 
     private DataSource dataSource;
 
@@ -56,6 +62,8 @@ class WorkspaceIsolationIntegrationTests {
 
     @BeforeEach
     void setUp() throws Exception {
+        previousProfile = System.getProperty(SPRING_PROFILES_ACTIVE);
+        System.setProperty(SPRING_PROFILES_ACTIVE, "sit");
         String url = "jdbc:h2:mem:workspace_isolation_" + DATABASE_SEQUENCE.incrementAndGet() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         dataSource = new UnpooledDataSource("org.h2.Driver", url, "sa", "");
         try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
@@ -67,6 +75,11 @@ class WorkspaceIsolationIntegrationTests {
 
     @AfterEach
     void tearDown() {
+        if (previousProfile == null) {
+            System.clearProperty(SPRING_PROFILES_ACTIVE);
+        } else {
+            System.setProperty(SPRING_PROFILES_ACTIVE, previousProfile);
+        }
         DataIsolationQueryIgnoreHolder.clear();
         TenantContextHolder.clear();
     }
@@ -110,11 +123,11 @@ class WorkspaceIsolationIntegrationTests {
     void testMissingWorkspaceReturnsNoRowsAndNullCustomSupplierFails() {
         SqlSessionFactory defaults = factory(new DataIsolationQueryInterceptor(), OrderMapper.class);
         SqlSessionFactory configured = factory(interceptor(), OrderMapper.class);
-        DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, ENVIRONMENT, "sit", TEST_DATA, true), () -> {
+        DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, TEST_DATA, true), () -> {
             try (SqlSession session = defaults.openSession()) {
                 OrderMapper mapper = session.getMapper(OrderMapper.class);
                 assertEquals(List.of(), ids(mapper));
-                DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, WORKSPACE, "ws-a", ENVIRONMENT, "sit", TEST_DATA, true),
+                DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, WORKSPACE, "ws-a", TEST_DATA, true),
                         () -> assertEquals(List.of(1L), ids(mapper)));
                 assertEquals(List.of(), ids(mapper));
             }

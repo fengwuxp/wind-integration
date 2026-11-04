@@ -11,7 +11,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.query.CPI;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryTable;
-import com.wind.common.WindConstants;
+import com.wind.common.util.ServiceInfoUtils;
 import com.wind.integration.core.context.DataIsolationContextHolder;
 import com.wind.integration.core.model.EnvIsolationObject;
 import com.wind.integration.core.model.TestDataIsolationObject;
@@ -29,6 +29,8 @@ import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -38,13 +40,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
 
+import static com.wind.common.WindConstants.SPRING_PROFILES_ACTIVE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import static com.wind.integration.core.enums.DataIsolationDimensions.ENVIRONMENT;
 import static com.wind.integration.core.enums.DataIsolationDimensions.TEST_DATA;
+import static org.mockito.Mockito.mockStatic;
 
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class DataIsolationDefaultsIntegrationTests {
 
     private static final String JDBC_URL = "jdbc:h2:mem:data_isolation;MODE=MySQL;DB_CLOSE_DELAY=-1";
@@ -54,8 +59,12 @@ class DataIsolationDefaultsIntegrationTests {
 
     private SqlSessionFactory sqlSessionFactory;
 
+    private String previousProfile;
+
     @BeforeEach
     void setUp() throws SQLException {
+        previousProfile = System.getProperty(SPRING_PROFILES_ACTIVE);
+        System.setProperty(SPRING_PROFILES_ACTIVE, "sit");
         createSchema();
 
         sqlSessionFactory = factory(DataMapper.class, List.of());
@@ -63,6 +72,11 @@ class DataIsolationDefaultsIntegrationTests {
 
     @AfterEach
     void tearDown() {
+        if (previousProfile == null) {
+            System.clearProperty(SPRING_PROFILES_ACTIVE);
+        } else {
+            System.setProperty(SPRING_PROFILES_ACTIVE, previousProfile);
+        }
         DataIsolationQueryIgnoreHolder.clear();
     }
 
@@ -91,7 +105,7 @@ class DataIsolationDefaultsIntegrationTests {
             }
             return null;
         });
-        DataIsolationContextHolder.runWith(Map.of(ENVIRONMENT, WindConstants.SIT), () -> {
+        DataIsolationContextHolder.runWith(Map.of(TEST_DATA, false), () -> {
             try (SqlSession session = sqlSessionFactory.openSession()) {
                 assertEquals(1L, session.getMapper(DataMapper.class).selectCountByQuery(QueryWrapper.create()));
             }
@@ -176,7 +190,9 @@ class DataIsolationDefaultsIntegrationTests {
 
     @Test
     void testMissingEnvironmentReturnsNoRows() {
-        try (SqlSession session = sqlSessionFactory.openSession()) {
+        try (var environmentSource = mockStatic(ServiceInfoUtils.class);
+             SqlSession session = sqlSessionFactory.openSession()) {
+            environmentSource.when(ServiceInfoUtils::getSpringProfilesActive).thenReturn(null);
             assertEquals(List.of(), session.getMapper(DataMapper.class).selectListByQuery(QueryWrapper.create()));
             assertEquals(0L, session.getMapper(DataMapper.class).selectCountByQuery(QueryWrapper.create()));
         }
@@ -189,7 +205,7 @@ class DataIsolationDefaultsIntegrationTests {
     }
 
     private <T> T inContext(boolean testData, CheckedSupplier<T> supplier) throws Exception {
-        return DataIsolationContextHolder.callWith(Map.of(ENVIRONMENT, WindConstants.SIT, TEST_DATA, testData), supplier::get);
+        return DataIsolationContextHolder.callWith(Map.of(TEST_DATA, testData), supplier::get);
     }
 
     private void createSchema() throws SQLException {

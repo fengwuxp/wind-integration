@@ -9,6 +9,7 @@ import com.mybatisflex.core.mybatis.FlexConfiguration;
 import com.mybatisflex.core.mybatis.FlexSqlSessionFactoryBuilder;
 import com.mybatisflex.core.tenant.TenantFactory;
 import com.mybatisflex.core.tenant.TenantManager;
+import com.wind.common.util.ServiceInfoUtils;
 import com.wind.integration.core.context.DataIsolationContextHolder;
 import com.wind.integration.core.context.DataIsolationQueryIgnoreHolder;
 import com.wind.integration.core.context.TenantContextHolder;
@@ -18,6 +19,7 @@ import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.integration.core.model.TestDataIsolationObject;
 import com.wind.integration.core.model.WorkspaceIsolationObject;
 import com.wind.mybatis.flex.EnvIsolationFieldInsertListener;
+import com.wind.mybatis.flex.TenantIsolationFieldInsertListener;
 import com.wind.mybatis.flex.TestDataIsolationFieldInsertListener;
 import com.wind.mybatis.flex.WorkspaceIsolationFieldInsertListener;
 import lombok.Getter;
@@ -35,6 +37,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -43,14 +47,19 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.wind.common.WindConstants.SPRING_PROFILES_ACTIVE;
 import static com.wind.integration.core.enums.DataIsolationDimensions.ENVIRONMENT;
 import static com.wind.integration.core.enums.DataIsolationDimensions.TENANT;
 import static com.wind.integration.core.enums.DataIsolationDimensions.TEST_DATA;
 import static com.wind.integration.core.enums.DataIsolationDimensions.WORKSPACE;
+import static org.mockito.Mockito.mockStatic;
 
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class DataIsolationReadWriteIntegrationTests {
 
     private static final AtomicInteger DATABASE_SEQUENCE = new AtomicInteger();
+
+    private String previousProfile;
 
     private SqlSessionFactory sessionFactory;
 
@@ -58,36 +67,47 @@ class DataIsolationReadWriteIntegrationTests {
 
     @BeforeEach
     void setUp() throws SQLException {
+        previousProfile = System.getProperty(SPRING_PROFILES_ACTIVE);
+        System.setProperty(SPRING_PROFILES_ACTIVE, "sit");
         UnpooledDataSource source = new UnpooledDataSource("org.h2.Driver",
                 "jdbc:h2:mem:holder_write_" + DATABASE_SEQUENCE.incrementAndGet() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         try (var connection = source.getConnection(); var statement = connection.createStatement()) {
             statement.execute("CREATE TABLE t_holder_order (id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL, workspace_id VARCHAR(32), env VARCHAR(16) NOT NULL, is_test BOOLEAN NOT NULL, name VARCHAR(32))");
             statement.execute("INSERT INTO t_holder_order VALUES (1,10,'ws-a','sit',FALSE,'one'),(2,10,'ws-b','sit',FALSE,'two'),(3,20,'ws-a','sit',FALSE,'three'),(4,10,'ws-a','sit',TRUE,'four'),(5,10,'ws-a','prod',FALSE,'five')");
+            statement.execute("CREATE TABLE t_tenant_listener(id BIGINT PRIMARY KEY, account_key BIGINT)");
         }
         FlexConfiguration configuration = new FlexConfiguration(new Environment("holder", new JdbcTransactionFactory(),
                 new FlexDataSource("default", source, false)));
         configuration.addInterceptor(new DataIsolationQueryInterceptor());
         configuration.addMapper(OrderMapper.class);
+        configuration.addMapper(TenantMapper.class);
         sessionFactory = new FlexSqlSessionFactoryBuilder().build(configuration);
         previousTenantFactory = TenantManager.getTenantFactory();
-        TenantManager.setTenantFactory(() -> new Object[]{DataIsolationContextHolder.requireTenantId()});
+        TenantManager.setTenantFactory(null);
     }
 
     @AfterEach
     void tearDown() {
+        if (previousProfile == null) {
+            System.clearProperty(SPRING_PROFILES_ACTIVE);
+        } else {
+            System.setProperty(SPRING_PROFILES_ACTIVE, previousProfile);
+        }
         TenantManager.setTenantFactory(previousTenantFactory);
         TenantContextHolder.clear();
         DataIsolationQueryIgnoreHolder.clear();
     }
 
-    /** Flex 填充租户，三个监听器填充其余归属字段，插入后默认读取范围能看到该记录。 */
+    /** 插入与读取使用应用 profile，trace 中不同的环境值不改变字段填充。 */
     @Test
     void testInsertAndReadUseTheSameContext() throws Exception {
-        DataIsolationContextHolder.callWith(context(10L, "ws-a", "sit", false), () -> {
+        DataIsolationContextHolder.callWith(Map.of(TENANT, 10L, WORKSPACE, "ws-a", ENVIRONMENT, "client-env", TEST_DATA, false), () -> {
             try (SqlSession session = sessionFactory.openSession()) {
                 OrderMapper mapper = session.getMapper(OrderMapper.class);
                 OrderEntity entity = order(10L);
                 Assertions.assertEquals(1, mapper.insert(entity));
+                Assertions.assertEquals(10L, entity.getId());
+                Assertions.assertEquals(10L, entity.getTenantId());
                 assertStoredContext(session, 10L, "ws-a");
                 Assertions.assertEquals(List.of(1L, 10L), mapper.ids());
                 Assertions.assertEquals("ws-a", mapper.selectOneById(10L).getWorkspaceId());
@@ -97,26 +117,94 @@ class DataIsolationReadWriteIntegrationTests {
         });
     }
 
+    /** 缺少租户时清空实体预填值，租户必填约束由数据库拒绝，不能保留客户端值。 */
+    @Test
+    void testMissingTenantClearsPresetValueAndDatabaseRejectsNull() throws SQLException {
+        TenantContextHolder.clear();
+        try (SqlSession session = sessionFactory.openSession()) {
+            OrderEntity entity = order(10L);
+            RuntimeException error = Assertions.assertThrows(RuntimeException.class,
+                    () -> session.getMapper(OrderMapper.class).insert(entity));
+            Throwable cause = error;
+            while (cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            Assertions.assertInstanceOf(SQLException.class, cause);
+            Assertions.assertNull(entity.getTenantId());
+            try (var statement = session.getConnection().createStatement();
+                 var result = statement.executeQuery("SELECT COUNT(*) FROM t_holder_order WHERE id=10")) {
+                Assertions.assertTrue(result.next());
+                Assertions.assertEquals(0L, result.getLong(1));
+            }
+        }
+    }
+
+    /** 可空租户列允许落库，但缺少上下文的默认读取仍没有可见记录。 */
+    @Test
+    void testMissingTenantWritesNullWhenColumnAllowsIt() throws SQLException {
+        TenantContextHolder.clear();
+        try (SqlSession session = sessionFactory.openSession()) {
+            TenantRecord record = new TenantRecord(31L, 99L);
+            Assertions.assertEquals(1, session.getMapper(TenantMapper.class).insert(record));
+            Assertions.assertNull(record.getTenantId());
+            try (var statement = session.getConnection().createStatement();
+                 var result = statement.executeQuery("SELECT account_key FROM t_tenant_listener WHERE id=31")) {
+                Assertions.assertTrue(result.next());
+                Assertions.assertNull(result.getObject(1));
+            }
+            Assertions.assertNull(session.getMapper(TenantMapper.class).selectOneById(31L));
+            session.rollback();
+        }
+    }
+
+    /** 通过接口设置租户，物理列重命名不改变填充行为，也不覆盖实体主键。 */
+    @Test
+    void testTenantListenerSupportsMappedColumn() throws SQLException {
+        try (SqlSession session = sessionFactory.openSession()) {
+            TenantRecord record = new TenantRecord(30L, 99L);
+            DataIsolationContextHolder.runWithTenant(20L, () -> {
+                Assertions.assertEquals(1, session.getMapper(TenantMapper.class).insert(record));
+                Assertions.assertEquals(30L, record.getId());
+                Assertions.assertEquals(20L, record.getTenantId());
+            });
+            try (var statement = session.getConnection().createStatement();
+                 var result = statement.executeQuery("SELECT account_key FROM t_tenant_listener WHERE id=30")) {
+                Assertions.assertTrue(result.next());
+                Assertions.assertEquals(20L, result.getLong(1));
+            }
+            session.rollback();
+        }
+    }
+
+    /** 监听器只作用于租户接口实体，不能为普通对象要求租户上下文。 */
+    @Test
+    void testTenantListenerIgnoresObjectsWithoutTenantInterface() {
+        TenantContextHolder.clear();
+        Assertions.assertDoesNotThrow(() -> new TenantIsolationFieldInsertListener().onInsert(new Object()));
+    }
+
     @Test
     void testDefaultReadsAndCachesFollowAllFourDimensions() {
         try (SqlSession session = sessionFactory.openSession()) {
             OrderMapper mapper = session.getMapper(OrderMapper.class);
-            DataIsolationContextHolder.runWith(context(10L, "ws-a", "sit", false),
+            DataIsolationContextHolder.runWith(context(10L, "ws-a", false),
                     () -> Assertions.assertEquals(List.of(1L), mapper.ids()));
-            DataIsolationContextHolder.runWith(context(20L, "ws-a", "sit", false),
+            DataIsolationContextHolder.runWith(context(20L, "ws-a", false),
                     () -> Assertions.assertEquals(List.of(3L), mapper.ids()));
-            DataIsolationContextHolder.runWith(context(10L, "ws-b", "sit", false),
+            DataIsolationContextHolder.runWith(context(10L, "ws-b", false),
                     () -> Assertions.assertEquals(List.of(2L), mapper.ids()));
-            DataIsolationContextHolder.runWith(context(10L, "ws-a", "prod", false),
+            System.setProperty(SPRING_PROFILES_ACTIVE, "prod");
+            DataIsolationContextHolder.runWith(context(10L, "ws-a", false),
                     () -> Assertions.assertEquals(List.of(5L), mapper.ids()));
-            DataIsolationContextHolder.runWith(context(10L, "ws-a", "sit", true),
+            System.setProperty(SPRING_PROFILES_ACTIVE, "sit");
+            DataIsolationContextHolder.runWith(context(10L, "ws-a", true),
                     () -> Assertions.assertEquals(List.of(4L), mapper.ids()));
         }
     }
 
     @Test
     void testInvalidTestDataTypeRejectsReadsAndInserts() {
-        DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, WORKSPACE, "ws-a", ENVIRONMENT, "sit", TEST_DATA, "true"), () -> {
+        DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, WORKSPACE, "ws-a", TEST_DATA, "true"), () -> {
             try (SqlSession session = sessionFactory.openSession()) {
                 OrderMapper mapper = session.getMapper(OrderMapper.class);
                 Assertions.assertThrows(RuntimeException.class, mapper::ids);
@@ -138,13 +226,13 @@ class DataIsolationReadWriteIntegrationTests {
     void testReusedWorkerDoesNotReadPreviousTenant() throws Exception {
         try (var worker = Executors.newSingleThreadExecutor()) {
             List<Long> tenantRows = worker.submit(() -> DataIsolationContextHolder.callWith(
-                    context(10L, "ws-a", "sit", false), () -> {
+                    context(10L, "ws-a", false), () -> {
                         try (SqlSession session = sessionFactory.openSession()) {
                             return session.getMapper(OrderMapper.class).ids();
                         }
                     })).get(5, TimeUnit.SECONDS);
             List<Long> missingTenantRows = worker.submit(() -> DataIsolationContextHolder.callWith(
-                    Map.of(WORKSPACE, "ws-a", ENVIRONMENT, "sit"), () -> {
+                    Map.of(WORKSPACE, "ws-a"), () -> {
                         try (SqlSession session = sessionFactory.openSession()) {
                             return session.getMapper(OrderMapper.class).ids();
                         }
@@ -158,7 +246,7 @@ class DataIsolationReadWriteIntegrationTests {
     /** 忽略只控制查询条件；插入监听器继续使用原归属值，退出后查询恢复隔离。 */
     @Test
     void testIgnoringReadsDoesNotChangeInsertValues() throws Exception {
-        DataIsolationContextHolder.callWith(context(10L, "ws-a", "sit", false), () -> {
+        DataIsolationContextHolder.callWith(context(10L, "ws-a", false), () -> {
             try (SqlSession session = sessionFactory.openSession()) {
                 OrderMapper mapper = session.getMapper(OrderMapper.class);
                 DataIsolationQueryIgnoreHolder.runIgnoring(
@@ -175,26 +263,29 @@ class DataIsolationReadWriteIntegrationTests {
 
     @Test
     void testMissingEnvironmentRejectsInsert() throws Exception {
-        DataIsolationContextHolder.callWith(Map.of(TENANT, 10L, WORKSPACE, "ws-a"), () -> {
-            try (SqlSession session = sessionFactory.openSession()) {
-                RuntimeException error = Assertions.assertThrows(RuntimeException.class,
-                        () -> session.getMapper(OrderMapper.class).insert(order(10L)));
-                Assertions.assertTrue(error.getMessage().contains("context env"));
-                try (var statement = session.getConnection().createStatement();
-                     var result = statement.executeQuery("SELECT COUNT(*) FROM t_holder_order WHERE id=10")) {
-                    result.next();
-                    Assertions.assertEquals(0L, result.getLong(1));
+        try (var environmentSource = mockStatic(ServiceInfoUtils.class)) {
+            environmentSource.when(ServiceInfoUtils::getSpringProfilesActive).thenReturn(null);
+            DataIsolationContextHolder.callWith(Map.of(TENANT, 10L, WORKSPACE, "ws-a"), () -> {
+                try (SqlSession session = sessionFactory.openSession()) {
+                    RuntimeException error = Assertions.assertThrows(RuntimeException.class,
+                            () -> session.getMapper(OrderMapper.class).insert(order(10L)));
+                    Assertions.assertTrue(error.getMessage().contains("context env"));
+                    try (var statement = session.getConnection().createStatement();
+                         var result = statement.executeQuery("SELECT COUNT(*) FROM t_holder_order WHERE id=10")) {
+                        result.next();
+                        Assertions.assertEquals(0L, result.getLong(1));
+                    }
+                    session.rollback();
                 }
-                session.rollback();
-            }
-            return null;
-        });
+                return null;
+            });
+        }
     }
 
     /** 工作空间监听器按当前契约允许填 null，该记录随后不在缺失工作空间的默认读取范围内。 */
     @Test
     void testMissingWorkspaceWritesNullAndReadsNoRows() throws Exception {
-        DataIsolationContextHolder.callWith(Map.of(TENANT, 10L, ENVIRONMENT, "sit"), () -> {
+        DataIsolationContextHolder.callWith(Map.of(TENANT, 10L), () -> {
             try (SqlSession session = sessionFactory.openSession()) {
                 OrderMapper mapper = session.getMapper(OrderMapper.class);
                 Assertions.assertEquals(1, mapper.insert(order(10L)));
@@ -209,7 +300,7 @@ class DataIsolationReadWriteIntegrationTests {
     /** 手写写入语句不经过实体插入监听器，读隔离插件也不会为 UPDATE/DELETE 追加权限条件。 */
     @Test
     void testAnnotatedWritesRemainOutsideReadIsolation() {
-        DataIsolationContextHolder.runWith(context(10L, "ws-a", "sit", false), () -> {
+        DataIsolationContextHolder.runWith(context(10L, "ws-a", false), () -> {
             try (SqlSession session = sessionFactory.openSession()) {
                 OrderMapper mapper = session.getMapper(OrderMapper.class);
                 Assertions.assertEquals(1, mapper.insertOutsideContext());
@@ -221,13 +312,14 @@ class DataIsolationReadWriteIntegrationTests {
         });
     }
 
-    private Map<DataIsolationDimensions, Object> context(long tenantId, String workspaceId, String env, boolean testData) {
-        return Map.of(TENANT, tenantId, WORKSPACE, workspaceId, ENVIRONMENT, env, TEST_DATA, testData);
+    private Map<DataIsolationDimensions, Object> context(long tenantId, String workspaceId, boolean testData) {
+        return Map.of(TENANT, tenantId, WORKSPACE, workspaceId, TEST_DATA, testData);
     }
 
     private OrderEntity order(long id) {
         OrderEntity entity = new OrderEntity();
         entity.setId(id);
+        entity.setTenantId(99L);
         entity.setWorkspaceId("client-value");
         entity.setEnv("client-value");
         entity.setTestData(true);
@@ -251,18 +343,36 @@ class DataIsolationReadWriteIntegrationTests {
     @Getter
     @Setter
     @Table(value = "t_holder_order", onInsert = {
-            EnvIsolationFieldInsertListener.class, TestDataIsolationFieldInsertListener.class, WorkspaceIsolationFieldInsertListener.class
+            TenantIsolationFieldInsertListener.class, EnvIsolationFieldInsertListener.class,
+            TestDataIsolationFieldInsertListener.class, WorkspaceIsolationFieldInsertListener.class
     })
     static class OrderEntity implements TenantIsolationObject<Long>, WorkspaceIsolationObject<String>, EnvIsolationObject, TestDataIsolationObject {
         @Id
         private Long id;
-        @Column(tenantId = true)
         private Long tenantId;
         private String workspaceId;
         private String env;
         @Column("is_test")
         private boolean testData;
         private String name;
+    }
+
+    @Getter
+    @Setter
+    @Table(value = "t_tenant_listener", onInsert = TenantIsolationFieldInsertListener.class, mapperGenerateEnable = false)
+    static class TenantRecord implements TenantIsolationObject<Long> {
+        @Id
+        private Long id;
+        @Column("account_key")
+        private Long tenantId;
+
+        TenantRecord(Long id, Long tenantId) {
+            this.id = id;
+            this.tenantId = tenantId;
+        }
+    }
+
+    interface TenantMapper extends BaseMapper<TenantRecord> {
     }
 
     interface OrderMapper extends BaseMapper<OrderEntity> {

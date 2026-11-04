@@ -7,7 +7,7 @@
 | 把 Wind 查询请求转换为分页结果 | [查询与分页](#query) |
 | 构造 FIND_IN_SET 或全文搜索条件 | [MySQL 查询函数](#mysql-functions) |
 | 查询子树、补父名称、把树拉平 | [树对象处理](#tree) |
-| 插入时填充环境、工作空间和测试标记 | [插入监听器](#insert-listeners) |
+| 插入时填充租户、环境、工作空间和测试标记 | [插入监听器](#insert-listeners) |
 | 保存 Locale、字符串密文或日期密文 | [字段转换与加密](#type-handlers) |
 | 按租户、工作空间等维度过滤查询 | [数据读取隔离](#read-isolation) |
 | 部署检查、排障和运行测试 | [生产接入与维护](#verification) |
@@ -37,7 +37,7 @@
 </dependency>
 ```
 
-版本由宿主 Wind BOM/依赖管理确定，JDK 随父 POM 版本选择，见第 8 节。当前依赖基线为 MyBatis 3.5.19、MyBatis-Flex 1.11.5 和 JSQLParser 4.3。MyBatis-Flex Starter 按应用的 Spring Boot 版本选择；仓内集成测试使用 Spring Boot 4.1.0、Flex Boot 4 Starter 和 H2 2.4.240。
+版本由宿主 Wind BOM/依赖管理确定，JDK 随父 POM 版本选择，见第 8 节。当前依赖基线为 MyBatis 3.5.19、MyBatis-Flex 1.11.5 和 JSQLParser 5.4。MyBatis-Flex Starter 按应用的 Spring Boot 版本选择；仓内集成测试使用 Spring Boot 4.1.0、Flex Boot 4 Starter 和 H2 2.4.240。
 
 各能力按需接入：静态 helper 直接调用；TypeHandler 配在需要转换的字段上；插入监听器挂到实体或 Flex 全局配置；读隔离插件单独注册。仅添加依赖不会自动启用这些行为。
 
@@ -179,25 +179,30 @@ flattenTree 接受非空根节点，返回包含根节点的深度优先前序�
 <a id="insert-listeners"></a>
 ## 5. 插入监听器
 
-三个监听器通过 Flex 的 AbstractInsertListener 检查实体是否实现对应接口：
+四个监听器通过 Flex 的 AbstractInsertListener 检查实体是否实现对应接口：
 
 | 监听器 | 写入内容 |
 | --- | --- |
+| TenantIsolationFieldInsertListener | DataIsolationContextHolder.getTenantId()，未绑定时填 null |
 | EnvIsolationFieldInsertListener | DataIsolationContextHolder.requireEnv()，缺失、空字符串或仅空白时拒绝写入 |
 | TestDataIsolationFieldInsertListener | DataIsolationContextHolder.isTestData()，未绑定时为 false |
 | WorkspaceIsolationFieldInsertListener | DataIsolationContextHolder.getWorkspaceId()，未绑定时填 null |
 
-环境值的权威来源是 Spring profile。应用入口解析环境并绑定上下文，core 不读取 Spring 配置；读插件和插入监听器使用同一个上下文值。
+环境值的权威来源是应用的 Spring profile。`DataIsolationContextHolder.getEnv()` 通过 `ServiceInfoUtils.getSpringProfilesActive()` 读取它，读插件和插入监听器使用同一来源；在 trace 中绑定 ENVIRONMENT 不会覆盖应用 profile。
+
+租户监听器直接调用 `TenantIsolationObject.setTenantId`，实体须实现该方法；使用 Lombok `@Setter` 的 tenantId 字段可自动满足接口。物理列可用 `@Column` 重命名；采用其他 Java 属性存储租户时，由 getTenantId/setTenantId 委托到该属性，读取规则另按第 7.3 节配置。当前租户上下文仍采用 Long 兼容约定。
 
 可以挂到实体的 onInsert：
 
 ```java
 @Table(value = "t_order", onInsert = {
+        TenantIsolationFieldInsertListener.class,
         EnvIsolationFieldInsertListener.class,
         TestDataIsolationFieldInsertListener.class,
         WorkspaceIsolationFieldInsertListener.class
 })
-public class OrderEntity implements EnvIsolationObject, TestDataIsolationObject, WorkspaceIsolationObject<String> {
+public class OrderEntity implements TenantIsolationObject<Long>, EnvIsolationObject,
+        TestDataIsolationObject, WorkspaceIsolationObject<String> {
     // 保留业务字段，并实现各接口的 getter/setter。
 }
 ```
@@ -206,6 +211,7 @@ public class OrderEntity implements EnvIsolationObject, TestDataIsolationObject,
 
 ```java
 FlexGlobalConfig globalConfig = FlexGlobalConfig.getDefaultConfig();
+globalConfig.registerInsertListener(new TenantIsolationFieldInsertListener(), TenantIsolationObject.class);
 globalConfig.registerInsertListener(new EnvIsolationFieldInsertListener(), EnvIsolationObject.class);
 globalConfig.registerInsertListener(new TestDataIsolationFieldInsertListener(), TestDataIsolationObject.class);
 globalConfig.registerInsertListener(new WorkspaceIsolationFieldInsertListener(), WorkspaceIsolationObject.class);
@@ -215,7 +221,9 @@ globalConfig.registerInsertListener(new WorkspaceIsolationFieldInsertListener(),
 
 监听器会覆盖对应字段的已有值。查询忽略不会关闭这些监听器，也不会改变当前租户、工作空间或环境。它们只在 Flex 实体插入监听链上执行；手写 XML/注解 INSERT、直接 JDBC 和 UPDATE/DELETE 不经过该链路。
 
-租户填充可使用原有 Flex TenantFactory 与 @Column(tenantId = true)。写入归属校验仍由业务和 Flex 配置负责，读插件不会为更新、删除补写权限条件。工作空间监听器允许填 null；如果业务要求每条记录必须有工作空间，需要入口校验或数据库约束，否则可能写入一条默认查询不可见的记录。
+退役 Flex 原生租户能力时，可用 TenantIsolationFieldInsertListener 承接实体插入的租户填充，无需启用 TenantFactory 或 `@Column(tenantId = true)`。已有 tenantId 会被当前上下文覆盖，缺少租户时也会覆盖为 null，不保留预填值。更新、删除仍须校验并限定目标归属，插入监听器和读插件都不会补写这些权限条件。
+
+租户和工作空间监听器都允许填 null；如果业务要求每条记录必须有归属，需要入口校验或数据库约束，否则可能写入一条默认查询不可见的记录。
 
 <a id="type-handlers"></a>
 ## 6. 字段转换与加密
@@ -285,16 +293,21 @@ public class FieldEncryptionConfiguration {
 
 `DataIsolationQueryInterceptor` 在 MyBatis 查询执行前追加行级约束。配置后，业务仍正常调用 Mapper；受支持的列表、详情、计数、聚合和游标查询使用同一套隔离规则。
 
+本指南采用 **Wind 统一承担读取隔离** 的接入方式，不依赖 MyBatis-Flex 原生租户过滤，也不要求自定义 CommonsDialectImpl。MyBatis-Flex 继续提供 Mapper、实体映射和参数生成。已使用原生租户能力的应用，按第 7.1 节完成迁移。
+
 本模块消费已经确定的上下文与允许范围。身份认证、功能权限、引用有效性、必要的前后置校验和写控制由权限及业务层负责。查询没有命中记录，只表示本次条件下没有结果，不能直接解释为授权通过或拒绝。
 
 | 需求 | 使用方式 |
 | --- | --- |
 | 按当前租户、工作空间、环境或测试标记读取 | 实体实现对应接口，注册默认插件，绑定上下文 |
-| 改用其他持久化属性，或读取多个允许值 | 配置 `FieldRule` 与 `DataIsolationScope` |
+| 实体未实现隔离接口，或改用其他持久化属性 | 显式配置 `FieldRule`，由元数据解析物理列 |
+| 读取多个获准的租户、工作空间或其他字段值 | Supplier 提供本次 `DataIsolationScope`；不改变请求的当前归属 |
 | 临时忽略某些内置查询维度 | 在已授权操作中使用 `DataIsolationQueryIgnoreHolder` |
 | 多个字段取 OR，或按关系表确定范围 | 实现 `DataIsolationStrategy`，返回完整的参数化条件 |
 | 将业务数据权限统一应用到 Mapper 查询 | 由权限策略消费已校验范围，与基础隔离共同执行，见第 7.6 节 |
-| 插入时填充环境、工作空间、测试标记 | 单独注册[插入监听器](#insert-listeners) |
+| 插入时填充租户、环境、工作空间、测试标记 | 单独注册[插入监听器](#insert-listeners) |
+
+保护范围以实际工厂、已登记实体和适用策略为准。统一承担读取隔离时，应使用下文的严格模式及启动校验，让未知表、未分类实体明确报错。普通构造保留原有未受管查询直通行为；SQL 支持范围见第 7.8 节。
 
 ### 7.1 最小接入
 
@@ -369,29 +382,25 @@ public class DataIsolationConfiguration {
 
 **在可信入口绑定上下文**
 
-租户与工作空间来自服务端确认的业务上下文。环境值由应用根据 Spring profile 确定，core 不读取 Spring 配置。
+租户与工作空间来自服务端确认的业务上下文。环境由 ServiceInfoUtils 读取应用 profile，入口应确认其已配置。
 
 ```java
 import com.wind.integration.core.context.DataIsolationContextHolder;
 
 import java.util.Map;
 
-import static com.wind.integration.core.enums.DataIsolationDimensions.ENVIRONMENT;
 import static com.wind.integration.core.enums.DataIsolationDimensions.TENANT;
 import static com.wind.integration.core.enums.DataIsolationDimensions.TEST_DATA;
 import static com.wind.integration.core.enums.DataIsolationDimensions.WORKSPACE;
 
 public final class IsolationRequestExample {
 
-    public static void execute(Long tenantId, String workspaceId, String environment,
+    public static void execute(Long tenantId, String workspaceId,
                                boolean testData, Runnable query) {
-        if (environment == null || environment.isBlank()) {
-            throw new IllegalArgumentException("应用入口必须提供环境值");
-        }
+        DataIsolationContextHolder.requireEnv();
         DataIsolationContextHolder.runWith(Map.of(
                 TENANT, tenantId,
                 WORKSPACE, workspaceId,
-                ENVIRONMENT, environment,
                 TEST_DATA, testData), query);
     }
 }
@@ -407,7 +416,55 @@ AND env = ?
 AND is_test = ?
 ```
 
-注册、字段绑定和 SQL 结构问题可能在首次查询才暴露。启动接入检查应实际执行受保护 Mapper 的查询，不能只检查 Bean 是否创建成功。未登记的表不会自动报漏配错误，保护覆盖清单由应用维护。
+**严格覆盖与启动校验**
+
+完整接入时，用严格模式替换上面的普通插件 Bean。它复用当前工厂的 BaseMapper 元数据和策略匹配结果，不要求手工维护表名映射：
+
+```java
+@Bean
+public DataIsolationQueryInterceptor dataIsolationQueryInterceptor(
+        List<DataIsolationStrategy> strategies) {
+    return DataIsolationQueryInterceptor.strict(strategies, Set.of());
+}
+
+@Bean
+public SmartInitializingSingleton validateDataIsolation(
+        List<SqlSessionFactory> factories, DataIsolationQueryInterceptor interceptor) {
+    return () -> {
+        if (factories.isEmpty()) {
+            throw new IllegalStateException("缺少业务 SqlSessionFactory");
+        }
+        for (SqlSessionFactory factory : factories) {
+            interceptor.validate(factory.getConfiguration(), OrderEntity.class);
+        }
+    };
+}
+```
+
+示例使用 `org.springframework.beans.factory.SmartInitializingSingleton` 和 `org.apache.ibatis.session.SqlSessionFactory`；List、Set 来自 java.util。strategies 是完整策略集合，须单独声明 FieldDataIsolationStrategy 及所需业务策略 Bean。只使用默认维度时，可直接将 `List.of(new FieldDataIsolationStrategy())` 传给 strict。
+
+| 检查 | 严格模式行为 |
+| --- | --- |
+| 当前工厂已登记实体无适用策略 | 拒绝，除非实体在 publicEntities 中明确声明为公共对象 |
+| 公共实体同时匹配隔离策略，或没有登记 Mapper | 拒绝；公共声明不能覆盖保护规则 |
+| 实际 SQL 涉及未知表 | 查询拒绝，包括嵌套位置引用；不能因没有规则而直通 |
+| schema 限定映射/表名、CTE | 严格模式拒绝，避免同名表及 CTE 别名被误认为已登记物理表 |
+| `validate(configuration, requiredEntities...)` | 检查本实例已安装；预热静态绑定；要求指定实体已登记且匹配策略，不读取请求范围 |
+
+确实无需隔离的字典等实体可通过 `Set.of(PublicDictionaryEntity.class)` 声明；它们仍须有 BaseMapper。纯字面量 SELECT 不需要实体。公共声明按插件实例固定，多工厂若分类不同，应分别组装插件。requiredEntities 可直接从应用已有资源登记中提取，不必再维护一份平行清单。
+
+严格模式证明查询对象已分类、要求实体有策略，不能判断任意策略是否写对了租户或团队条件。普通实体只有 ownerId 规则时，不会自动补 tenantId；基础边界仍须由策略负责。实体、属性、安装问题可在启动时暴露；动态 SQL 支持形态还需通过真实查询验证。
+
+**从 Flex 原生租户隔离迁移**
+
+默认插件、显式字段规则和自定义策略均可在原生 TenantFactory 未启用时独立执行。迁移在应用装配处完成：
+
+1. 核对各 SqlSessionFactory 中的受保护实体和查询入口，包括生成 SQL、XML/注解 SQL、计数、详情及导出。启用严格模式和启动校验；仅有 `@Column(tenantId = true)` 的实体需要补 Wind 接口或显式字段规则。
+2. 为每类实体配置独立的租户、工作空间等边界，再追加业务权限策略；`noBinding` 只能省略 RBAC 条件。字段规则示例见第 7.3 节。
+3. 在应用启动配置中停用 TenantFactory Bean 及 `TenantManager.setTenantFactory(...)` 等原生注册入口，确认初始化结束后原生租户工厂未启用。不要在每次请求中切换全局工厂，也不要让 Wind 重写器识别、删除旧租户条件。原有租户填充及 UPDATE/DELETE 约束须同时有明确承接，见第 5 节。
+4. 在原生租户过滤关闭的配置下，验证生成 SQL 与手写 SQL 的可见范围一致，并覆盖缺上下文、无 DATA、空范围、多租户切换和临时忽略。检查方法见第 8 节。
+
+迁移期间若仍有原生过滤，两个条件会取交集：原 SQL 已限制租户 10，Wind 再允许租户 20，结果为空。Wind 的忽略 API 不会移除原条件；这不应作为长期接入方式。
 
 ### 7.2 上下文的生命周期
 
@@ -418,16 +475,17 @@ AND is_test = ?
 | `runWith(values, action)` / `callWith(values, action)` | 同时绑定多个维度，执行无返回值或有返回值的回调 |
 | `runWithTenant` / `callWithTenantId` | 只覆盖租户 |
 | `runWithWorkspace` / `callWithWorkspace` | 只覆盖工作空间 |
-| `getTenantId` / `getWorkspaceId` / `getEnv` | 读取归属，缺失时返回 null |
+| `getTenantId` / `getWorkspaceId` | 读取请求归属，缺失时返回 null |
+| `getEnv` | 从应用 profile 读取环境，不使用 trace 中的 ENVIRONMENT 值 |
 | `requireTenantId` / `requireWorkspaceId` | 缺失时抛异常 |
 | `requireEnv` | 缺失、空字符串或仅空白时抛异常 |
 | `isTestData` | 缺失时返回 false，非 Boolean 值拒绝 |
 
-嵌套调用只覆盖传入维度，其余继承外层；正常或异常退出均恢复外层值。已有 trace 时在子 span 中执行，没有 trace 时建立 root。Map 的键和值应非 null，省略维度表示继承，不能用于清空外层身份。
+租户、工作空间和测试标记的嵌套绑定只覆盖传入维度，其余继承外层；正常或异常退出均恢复外层值。环境值保持由应用 profile 决定。已有 trace 时在子 span 中执行，没有 trace 时建立 root。Map 的键和值应非 null，省略维度表示继承，不能用于清空外层身份。
 
 租户参数虽然声明为 `Serializable`，当前为兼容 `TenantContextHolder` 仍要求 `Long`；工作空间可以使用 String 等可序列化类型。`getTenantId()` 优先读取 trace，缺失时回退旧租户 Holder。新回调会恢复进入前的旧租户值，直接调用旧 `setTenantId` 的代码仍需负责清理。
 
-`callWith` 沿用 WindTracer 的异常包装，受检异常转换为运行时异常并保留原因；`callWithTenantId`、`callWithWorkspace` 的兼容签名仍声明 `throws Exception`。
+`callWith`、`callWithTenantId`、`callWithWorkspace` 沿用 WindTracer 的异常包装，受检异常转换为运行时异常并保留原因；这些方法不声明 `throws Exception`。查询忽略的 `callIgnoring` 仍声明受检异常，见第 7.4 节。
 
 请求、消息、定时任务都应在自身入口建立可信上下文。需要在线程池中延续同一上下文时，在提交任务处装饰任务：
 
@@ -440,6 +498,8 @@ executor.execute(ContextPropagationTaskDecorator.of().decorate(() -> {
 ```
 
 装饰器传递捕获时的 trace 和归属值，任务结束后恢复执行线程原上下文。查询忽略状态存放在独立 ThreadLocal 中，不随 trace 传播；异步任务需要放宽范围时，由任务入口重新确认并显式使用忽略 API。
+
+业务权限快照不属于这两个 Holder 的自动传播内容。延迟任务应在实际执行时重新确认主体与范围；传递了租户、工作空间不表示原授权一直有效。
 
 ### 7.3 配置字段与允许范围
 
@@ -509,6 +569,18 @@ FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List
 
 `ownerScopes` 是应用提供的 `Supplier<DataIsolationScope>`，读取本次可信范围。该规则与默认维度取 AND，不受内置维度忽略影响。
 
+已有实体没有实现隔离接口时，可直接配置它的持久属性。例如 `LegacyOrderEntity` 保存 tenantId 和 organizationId：
+
+```java
+FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List.of(
+        new FieldRule(LegacyOrderEntity.class, "tenantId",
+                () -> DataIsolationScope.of(DataIsolationContextHolder.requireTenantId())),
+        new FieldRule(LegacyOrderEntity.class, "organizationId",
+                () -> DataIsolationScope.of(DataIsolationContextHolder.requireWorkspaceId()))));
+```
+
+此处用 require 方法，缺少可信归属时直接拒绝。两条普通字段规则始终取 AND，不响应内置 TENANT/WORKSPACE 忽略；需要该忽略语义时，实体须实现相应接口，并给规则标注维度。若实体已实现接口且只想改属性，使用前面的维度覆盖方式，避免无意叠加两条归属规则。
+
 | 范围结果 | 生成条件 |
 | --- | --- |
 | `DataIsolationScope.of(100L)` | `column = ?` |
@@ -520,6 +592,8 @@ FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List
 默认上下文缺失经 `of(null)` 转为空范围；Supplier 返回 null 则表示必要的范围结果缺失，两种情况不同。范围集合不可修改、不允许 null 元素，元素本身不做深拷贝。新增参数按值的 Java 类型选择 TypeHandler，不自动复用实体字段的专属加密处理器。
 
 Supplier 在每次查询中调用，应读取请求内已准备好的结果；不要在单例初始化时固定某个用户的范围，也不要在 Supplier 中再查权限库或递归调用受管 Mapper。IN 集合不自动分批，没有内置数量上限，接入方需按数据库限制和数据规模控制。
+
+平台操作获准读取多个目标租户时，可用 `FieldRule.forDimension(TENANT, "tenantId", targetTenantScopes)` 覆盖默认租户规则，让 targetTenantScopes 返回已校验的 `ofValues(...)`；保留其他维度。仅某类实体允许此范围时，使用实体级 FieldRule。目标实体未实现 TenantIsolationObject 时使用普通字段规则。账号归属、权限来源租户和目标数据租户应分别确定，不能用“忽略租户”代替一个有限的目标集合。
 
 多个独立字段取 AND。若只允许 `(租户 A, 工作空间 X)`、`(租户 B, 工作空间 Y)`，分别配置两个 IN 集合会产生未授权的交叉组合；应固定单租户范围，或由自定义策略保留成对条件。
 
@@ -544,7 +618,7 @@ List<OrderEntity> rows = DataIsolationQueryIgnoreHolder.callIgnoring(
 
 回调在前，维度在后。嵌套调用合并忽略项，重复值只算一次，空参数不新增忽略项；正常或异常退出都恢复外层状态。`callIgnoring` 原样抛出 Callable 的受检异常，调用处须处理或声明 `throws Exception`。`clear()` 只清理当前线程的查询忽略状态。
 
-FieldDataIsolationStrategy 对被忽略维度跳过 Supplier 与条件生成，但仍检查实体映射。普通字段规则、其他策略、原业务 WHERE 和 Flex 自带租户条件继续生效。忽略同样作用于关系内表上的字段策略，也不会扩大 SQL 语法支持范围。
+FieldDataIsolationStrategy 对被忽略维度跳过 Supplier 与条件生成，但仍检查实体映射。普通字段规则、其他策略和原业务 WHERE 继续生效；迁移期间残留的 Flex 原生租户条件也不会删除。忽略同样作用于关系内表上的字段策略，也不会扩大 SQL 语法支持范围。
 
 忽略不改变当前归属，不关闭插入监听器，也不自动传播到新线程。需要同时读正式和测试数据时，可以在授权后忽略 TEST_DATA，或配置显式多值范围；“忽略”本身不授予访问权限。
 
@@ -577,6 +651,8 @@ FieldDataIsolationStrategy 对被忽略维度跳过 Supplier 与条件生成，�
 | `getOrder()` | Spring Ordered 顺序，越小越早；默认 0，同值保持输入顺序 |
 
 工厂建立实体索引时调用 supports，固定该实体适用的策略；每次读取再调用这些策略的 resolve。因此不能根据当前登录人、有无权限或临时忽略来返回 supports=false，否则请求状态会混入静态匹配结果。实体受本策略保护时应保持匹配，具体空范围或错误在求值阶段表达。
+
+UNION 的各分支分别调用根查询策略，同一实体出现多次也会分别求值；每个 QueryContext 使用所在分支的实体及别名。供应者应读取入口准备好的同一份范围快照，不应因调用次数改变返回值。派生表外层只保留原计数、过滤和分页，隔离条件加在内层实际读取物理表的位置。
 
 根表与内表分开求值，是因为两种查询承担不同责任。例如读取员工列表时，部门表可以只用于证明员工的部门归属；它仍须满足租户和团队边界，但不一定适用“用户可以浏览哪些部门资料”的独立权限。直接复用内表的全部根表策略会错误缩小员工范围，直接跳过内表策略又可能丢失基础边界。resolveRelation 要求每个适用策略明确声明这一行为；未实现时默认拒绝，不能把不明确的处理当作放行。
 
@@ -647,6 +723,22 @@ AND（同一资源、同一授权作用域内的有效权限分支并集）
 
 查询链路分为三个责任明确的步骤：权限入口确认本次操作并准备范围；权限策略通过供应契约取得范围、转换条件；拦截器在列表、计数、聚合和分页之前执行这些约束。供应者读取已经准备好的结果，不在 resolve 中查询角色表、调用远程权限服务或重新解析部门树。查到记录仍不代表已经取得修改、删除或其他动作权限。
 
+**常见业务场景如何落地**
+
+| 场景 | 范围准备与查询表达 | 必须保留的边界 |
+| --- | --- | --- |
+| 指定租户、用户、团队、员工、发卡行或工单记录 | 校验稳定引用后，按该资源的 ID 属性生成等值/IN | 指定对象不能跨出可信目标范围；资源与实体映射由所属模块登记 |
+| 本人处理或指定用户处理的工单 | 将可信用户 ID 映射到当前 handlerId | 协作人、候选人不等于当前处理人 |
+| 本人提交或指定用户提交的工单 | 将实际提交账号 ID 映射到 creatorId | 代客对象、登记员工不能替换实际提交账号 |
+| 指定租户内的工单 | 将合法目标租户集合映射到 tenantId | 该 DATA 分支仍与独立目标租户边界取 AND |
+| 本人所在部门或指定部门的员工 | IAM 解析部门 ID 集合，权限策略生成当前任职 EXISTS；可与指定员工 ID 取 OR | 员工读取另有独立租户、当前团队约束，无 DATA 时也要执行 |
+| 部门仅当前节点或包含后代 | 请求准备阶段按当前树解析 NODE_ONLY/SUBTREE，保留根引用与层级定义 | 不包含兄弟节点，不保存后代快照；下次请求重新解析才能反映树变化 |
+| 无适用 DATA、多个角色贡献 DATA | 明确无绑定，或先汇总同资源、同授权作用域的有效分支 | 功能授权和基础边界独立，不混合不同团队的角色范围 |
+
+这些是查询表达示例，不是产品允许配置的白名单。哪些资源、模式和维度组合合法，由权限产品及其解析入口决定；非法、退役或未知定义必须在那里拒绝，不能静默丢弃后变成无绑定。Wind 不需要为每种业务条件新增策略接口。
+
+原业务筛选会继续取 AND。例如工单列表原先要求“我是处理人、协作人或候选人”，再加“本人提交”的 DATA 条件后，只会得到两者交集。接入方须按该列表的业务用途确认结果，插件不会自动取消原筛选。
+
 **Capte 的现有实现**
 
 以下类型位于 Capte，不由 Wind 模块提供。它们说明如何复用该扩展接口实现数据权限查询隔离；Wind 本身不依赖 Capte 的资源目录。
@@ -685,7 +777,8 @@ public class WorkOrderDataPermissionConfiguration {
     @Bean
     public DataPermissionRegistration workOrderPermissionRegistration() {
         return new DataPermissionRegistration("WORK_ORDER:TICKET", WorkOrder.class, Map.of(
-                "ID", "id", "USER", "handlerId", "REQUESTER_USER", "creatorId"));
+                "ID", "id", "USER", "handlerId", "REQUESTER_USER", "creatorId",
+                "TARGET_TENANT", "tenantId"));
     }
 
     @Bean
@@ -697,7 +790,9 @@ public class WorkOrderDataPermissionConfiguration {
 }
 ```
 
-该配置只展示 ID、处理人和提交人三个维度，沿用 Capte 已有的 MyBatis 基础配置与 TypeHandler 注册。应用仍须提供唯一的 ResolvedResourceScopeSupplier、目标租户 Supplier 和实际工厂的 Mapper 扫描，并核对 Flex 自带租户过滤与目标边界是否一致。已导入 Capte 装配时，不再另注册一份 Wind 默认插件。多工厂配置要求每个启用工厂都登记全部资源对应的 BaseMapper。
+该配置登记 ID、处理人、提交人和目标租户四个 DATA 维度，沿用 Capte 已有的 MyBatis 基础配置与 TypeHandler 注册。workOrderTenantBoundary 是独立的目标租户边界；即使 DATA 为空或无绑定，它仍然执行。应用须提供唯一的 ResolvedResourceScopeSupplier、目标租户 Supplier 和实际工厂的 Mapper 扫描，并按第 7.1 节退役原生租户过滤。已导入 Capte 装配时，不再另注册一份 Wind 默认插件。多工厂配置要求每个启用工厂都登记全部资源对应的 BaseMapper。
+
+Capte 当前便捷配置仍创建普通构造的拦截器。采用严格模式需要在消费应用的装配处改用 strict，并复用已有资源登记调用 validate；仅升级 Wind 制品不会自动改变该配置。不要同时安装普通、严格两个拦截器。
 
 上游供应者为当前工单读取返回如下快照时：
 
@@ -711,6 +806,8 @@ ResolvedResourceScope.restricted("WORK_ORDER:TICKET", Map.of(
 
 Capte 允许不同业务维度映射同一属性，策略内部合并允许值；上游无需按数据库字段归一化。部门等关系维度通过 registration 的 relationConditions 提供参数化条件，与字段分支一起取 OR。根节点及 NODE_ONLY/SUBTREE 由所属业务域在请求准备阶段解析为本次部门集合，不能把全部员工 ID 枚举到字段范围中。
 
+员工的当前部门关系读取可显式导入 Capte 的 `EmployeeDepartmentIsolationConfiguration`，同时登记 Employee、EmployeeDepartment、Department 的 Mapper，并绑定可信租户与团队（WORKSPACE）。该配置提供 ID/DEPARTMENT 权限分支及独立的当前任职边界；当前任职按 `beginTime <= CURRENT_TIMESTAMP` 且 endTime 为空或 `CURRENT_TIMESTAMP < endTime` 判断。部门集合由 IAM 在范围准备阶段解析，不能放进 Supplier 或关系构造回调。此配置仅用于需要当前任职边界的读取，不应自动套到所有员工查询。
+
 | Capte 输入或执行结果 | 读取行为 |
 | --- | --- |
 | 上游明确返回 `noBinding(resourceTypeKey)` | 只省略本资源的 RBAC 条件，基础边界继续执行 |
@@ -722,7 +819,7 @@ Capte 允许不同业务维度映射同一属性，策略内部合并允许值�
 
 Capte 的权限策略在 resolveRelation 中明确返回空列表，表示关系内表不作为独立资源再应用 RBAC；内表的基础字段策略仍执行。这个选择属于该权限策略的职责，不是 Wind 对所有权限实现的默认行为。关联范围示例与限制见下一节。
 
-Capte 接入细节以该仓库 `docs/系分设计/权限与访问控制-数据权限与数据隔离-系分设计.md` 为准。这里提供的是可接入的读取能力；真实范围供应、业务入口启用及完整权限流程仍需消费应用实现和验证。
+Capte 的详细装配见该仓库 `docs/系分设计/权限与访问控制-数据权限与数据隔离-系分设计.md`，产品条件须同时对齐最新的权限产品定义。上面的示例需要应用实现真实范围供应并显式启用；仅有配置类或组件测试，不表示业务授权入口已经接通。
 
 ### 7.7 用关系表约束读取
 
@@ -793,20 +890,34 @@ public List<Condition> resolveRelation(QueryContext context) {
 
 ### 7.8 查询覆盖范围与失败行为
 
+下表中的“受管表”指当前工厂有 BaseMapper 元数据、且至少一个策略适用的表。查询返回实体、DTO 或标量不改变保护对象；通过受支持查询导出数据，也使用相同约束。
+
 | 查询形态 | 行为 |
 | --- | --- |
 | 受管单表的列表、详情、COUNT/SUM、DTO、别名、原 WHERE 中的 OR | 在业务条件之外追加隔离，保留原分组 |
 | 单表 GROUP BY/HAVING、排序、LIMIT/OFFSET、foreach、游标 | 在聚合、分页前应用隔离，保留参数映射 |
+| 单表叶查询组成的 UNION、UNION ALL、UNION DISTINCT | 每个分支独立隔离，保留去重、重复记录及外层排序/分页；其他集合运算拒绝 |
+| `FROM (SELECT ...) alias` 派生包装，包括内层 UNION 和多层计数包装 | 隔离内层物理表叶查询，外层计数、过滤、聚合、排序、分页保持；派生表须有别名 |
 | 可信策略生成的相关 EXISTS | 按第 7.7 节执行内表约束 |
 | 原业务 SQL 中的有限 WHERE EXISTS | 按下文规则执行，关系边界由原 SQL 提供 |
-| 受管的顶层 JOIN、其他子查询、UNION、CTE、SELECT INTO 或不支持的分页形态 | 拒绝；忽略所有维度也不放宽语法限制 |
+| 受管的顶层 JOIN、投影/排序等表达式子查询、CTE、INTERSECT/EXCEPT、LATERAL、SELECT INTO、PREWHERE/QUALIFY 或 LIMIT BY | 拒绝；忽略所有维度也不放宽语法限制 |
 | ResultMap 的嵌套 select、懒加载，包括 discriminator 分支 | 一律拒绝，入口表未受管也一样 |
-| 未登记表或所有策略均不匹配的表 | 不追加条件，不报漏配错误 |
+| 未登记表或所有策略均不匹配的表 | 普通模式保留直通；严格模式要求已登记且匹配策略，或明确声明为公共实体 |
 | INSERT、UPDATE、DELETE | 插件直通，写控制另行执行 |
 
 原业务 SQL 的 EXISTS 只允许 SELECT 1，最多一个 JOIN/INNER JOIN。内表须在同一工厂登记且没有任何适用的 Wind 隔离策略，不支持 schema、重复别名、内部嵌套、分组、排序、分页或锁。带此类子查询时，外层 WHERE 中的 NOT 表达式也会被拒绝。业务负责相关条件及内表边界；此路径不会调用 resolveRelation，不能照搬策略生成条件的能力。
 
-未受管查询通常直通，但仍经过语法解析和全局结构检查：JSQLParser 4.3 无法解析的 SELECT、嵌套查询映射、括号内的 TABLE 查询简写等会报错。已确认无需隔离的单表相同 SQL 可命中解析跳过缓存；SQL 或 Mapper 数量变化会重新检查。
+派生与 UNION 组合中的物理表叶节点都须有实体映射；混合公共与受管分支时，公共分支保留原结果，受管分支各自过滤。允许的原 SQL EXISTS 可以位于叶查询的 WHERE；不能将受管表藏在投影、外层 WHERE 子查询、排序表达式或未支持的 JOIN 中。所有原始及新增参数在改写结束后统一按 SQL 顺序绑定。
+
+例如 `SELECT COUNT(*) FROM (SELECT id FROM t_order WHERE state = ?) orders` 会先在 t_order 查询中追加隔离，再计数；无需把 tenantId 投影到外层。UNION 两个不同实体时，各自使用自己的字段映射和策略，不能只给首个分支加条件。
+
+普通模式的未受管查询、严格模式的已登记公共查询通常直通，但仍经过语法解析和全局结构检查：JSQLParser 5.4 无法解析的 SELECT、嵌套查询映射、TABLE 查询简写、管道式 FROM 查询及含 INSERT/UPDATE/DELETE 的 CTE 会报错。严格模式还拒绝所有 CTE 和未知表。已确认无需隔离的单表相同 SQL 可命中解析跳过缓存；SQL 或 Mapper 数量变化会重新检查。
+
+原 SQL 和策略条件都检查完整词法 token，包括分号后的尾注释。当前拒绝 MySQL/MariaDB 可执行注释（`/*! ... */`、`/*M! ... */`）、嵌套块注释、`//` 注释、不满足空白要求的 `--text`，以及字符串和引用标识符之外的 `#`。这些形式在解析器与数据库之间可能有不同含义，不能原样放行，也不会通过删除内容来改变查询语义。公共查询、不限制范围和临时忽略同样执行此检查。
+
+普通块注释、合法 `-- ` 行注释和优化器提示继续支持；字符串、反引号或双引号标识符中的注释标记不按注释处理。单条语句可以带结尾分号及普通尾注释；分号后出现第二条语句或其他 SQL token 会拒绝。MySQL 的 `#` 行注释应改用 `-- ` 或普通块注释，不要依赖框架猜测数据库方言。
+
+单引号或双引号 token 中，紧邻引号的奇数个反斜杠会被拒绝：数据库 SQL mode 可能将该引号解释为转义字符，而解析器把它当作字符串边界。请优先使用参数绑定，SQL 中固定文本采用标准双写引号；不紧邻引号的普通反斜杠内容不受此检查影响。
 
 动态表名、分表、视图、同义词、无实体映射的标量 SQL，以及直接 JDBC、其他 ORM、存储过程不属于保护契约。表名按简单名称匹配，不支持按 schema 分权；部署时固定 schema/search path，避免同名表混淆。StatementType.STATEMENT 不在已验证范围内。
 
@@ -816,17 +927,38 @@ public List<Condition> resolveRelation(QueryContext context) {
 
 **读取和写入使用同一归属来源**
 
-插件只处理 SELECT；环境、测试标记和工作空间的插入填充见[第 5 节](#insert-listeners)。监听器会覆盖对应字段的已有值，查询忽略不会停止填充。环境缺失或为空白时拒绝插入；工作空间未绑定时允许填 null，业务必填要求应在入口及数据库约束落实。
+插件只处理 SELECT；租户、环境、测试标记和工作空间的插入填充见[第 5 节](#insert-listeners)。监听器会覆盖对应字段的已有值，查询忽略不会停止填充。环境缺失或为空白时拒绝插入；租户、工作空间未绑定时允许填 null，业务必填要求应在入口及数据库约束落实。
 
-租户写入可以继续使用 Flex TenantFactory。账号所属租户、权限来源租户和目标数据租户可能不同，应用必须明确每种值的含义。原生 Flex 已添加 `tenant_id = 10` 时，再追加允许租户 20 的规则只会得到交集，不会覆盖原条件；Wind 的忽略 API 也不会删除 Flex 条件。原生租户配置、上下文、额外策略应共同验证。
+应用通过租户插入监听器填充当前归属，并继续负责写权限校验，无需为保留填充而启用原生租户过滤。读取一个获准的多租户集合，不表示允许向该集合中的任意租户写入；写入目标须由具体操作的可信上下文确定。读插件对 INSERT/UPDATE/DELETE 直通，即使更新前曾读到对象，实际更新或删除仍须带必要的归属和业务条件。
 
 **范围变化与查询缓存**
 
 隔离检查发生在 MyBatis 查询缓存命中前，新增条件与参数进入缓存键；六参数 Executor 查询也会重建 CacheKey。不同的隔离参数可以区分缓存，但关系表变化、权限撤销或 CURRENT_TIMESTAMP 推移未必改变参数，不能自动使旧结果失效。
 
-关系读取应使用短生命周期 SqlSession；需要同会话重查事实时采用 `LocalCacheScope.STATEMENT`。相关 Mapper 不启用二级缓存，或由应用提供经过验证的失效机制。业务自建缓存也须区分可见范围及相关版本。已有游标和已返回结果不会因上下文变化重新过滤，游标应在原授权范围内消费并关闭。
+对于任职、成员关系、到期时间或撤权会影响可见范围的应用，建议先采用以下配置，再验证是否有必要引入结果缓存：
+
+```yaml
+mybatis-flex:
+  configuration:
+    local-cache-scope: statement
+    cache-enabled: false
+```
+
+自建工厂时，在创建 SqlSession 前对其 Configuration 设置 `setLocalCacheScope(LocalCacheScope.STATEMENT)` 和 `setCacheEnabled(false)`。上述配置作用于整个工厂；多工厂应用须分别核对，不能只修改未被业务使用的默认工厂。
+
+STATEMENT 限制一级缓存跨查询复用，cache-enabled=false 关闭 MyBatis 二级缓存。只关闭其中一个仍可能得到旧结果：SESSION 会话可以继续命中本地缓存；二级缓存则可能在新会话中复用旧关系判断。需要保留其他 Mapper 的二级缓存时，须保证受影响的读取不使用二级缓存，并验证关系表更新、到期及撤权的失效机制。只设 TTL 仍会留下过期前的旧权限窗口。
+
+应用还须更新请求范围快照，并管理 Redis 等业务结果缓存；这两个 MyBatis 配置不会处理它们。元数据缓存和“无需隔离 SQL”的解析跳过缓存不保存受管查询结果，不必因关系变化清空。
+
+关闭查询缓存不改变数据库事务的快照语义。使用短生命周期 SqlSession 与适当的事务范围；长事务、已打开游标和已返回结果不会因关系变化自动撤回。要求执行时重新确认权限的操作，应在业务入口重判，不能把“每次查数据库”理解为任何时刻都能立即撤权。游标须在原授权范围内消费并关闭。
 
 **查询成本**
+
+原 SQL 解析使用模块内共享执行器，工作线程上限为 JVM 可用处理器数，等待队列最多 256 项；工作线程不继承请求上下文，空闲 60 秒可回收，daemon 线程不阻止 JVM 退出。Mapper 元数据刷新不重建执行器。队列满时拒绝解析，不在调用线程兜底执行，也不退回未隔离 SQL。
+
+JSQLParser 5.4 的原 SQL 解析超时覆盖排队与执行时间；超时或调用线程中断会取消任务，中断标志保留。策略条件的 parseCondExpression 沿用同步解析方式，不承诺与原 SQL 共享同一超时。Parser 和 AST 每次独立创建，不在线程间共享。
+
+原参数的根属性名在每次查询中建立索引，字段和关系条件共用，避免每个新增参数重复扫描所有原参数；点号、数组下标、additionalParameters 与 Value 后缀的冲突避让保持一致。
 
 受管查询每次解析并改写 SQL，语法树不跨请求缓存；静态实体绑定可以复用。增加 IN 值、OR 分支和 EXISTS 会增加数据库的参数与执行成本。用实际数据量核对索引和查询计划，重点覆盖关联键、归属列与范围列；H2 行为验证不能替代目标数据库的性能验证。
 
@@ -835,15 +967,31 @@ public List<Condition> resolveRelation(QueryContext context) {
 
 ### 接入时验证什么
 
-先验证实际工厂和 Mapper 已接线，再验证读取结果。用两个租户、两个工作空间的数据覆盖默认范围、缺上下文、临时忽略及异常恢复；同时检查生成 SQL 和手写 SQL，避免只验证列表入口。
+先在实际工厂中确认 Wind 插件和实体规则已生效、原生 TenantFactory 未启用，再用两个租户、两个工作空间的数据验证结果。生成 SQL 与 XML/注解 SQL 都应覆盖，不能只检查 Bean 或正常列表。
 
-自定义策略还需覆盖字段并集、空范围、供应失败和内表约束。详情、计数、聚合、分页、导出应使用同一授权结果；写入及副作用按各自业务规则单独校验。目标数据库上的插件组合、类型处理器、关系变化、缓存失效和查询计划由消费应用验证。
+| 验证场景 | 预期结果 |
+| --- | --- |
+| 同一范围查询列表、详情、计数、聚合、分页、导出 | 返回记录、总数与统计使用相同边界；越界 ID 不可见 |
+| 普通实体仅有 tenantId 字段或 Flex 租户注解 | 补显式 Wind 规则后，生成与手写 SQL 均隔离 |
+| 无 DATA、有效空范围、缺失或非法权限范围 | 分别为仅保留基础边界、无记录、明确拒绝 |
+| 多个合法字段或关系分支 | 分支取 OR，租户、团队与原业务条件继续 AND |
+| 单个/多个目标租户、嵌套上下文、异常退出、线程复用 | 只返回获准范围，退出后恢复，不残留前次身份 |
+| 忽略一个或多个内置维度 | 只移除对应字段条件，普通字段和权限策略仍生效；退出后恢复 |
+| 根记录合法、关系记录跨租户或团队 | 不能通过越界关系分支获得访问 |
+| 工单转派、部门移动、新增下级或任职到期 | 在约定的范围重算与缓存策略下反映变化，提交人含义保持不变 |
+| 不支持的 SQL、范围供应失败或解析失败 | 查询失败，不回退为无隔离 SQL |
+| 租户字段填充及 UPDATE/DELETE | 原生租户能力退役后，独立写入机制仍限制合法目标 |
+
+目标数据库上的插件组合、类型处理器、关系时效和查询计划由消费应用验证。字段范围能正确转换成 SQL，不代表主体资格、引用有效性或写操作已经通过授权。
 
 ### 常见问题
 
 | 现象或诊断 | 优先检查 |
 | --- | --- |
 | 查询没有隔离 | 插件是否在实际工厂；表是否有 BaseMapper；实体是否匹配接口或显式规则 |
+| `Entity has no isolation strategy or public declaration` | 为实体补隔离策略；确实无需隔离时才声明为公共实体 |
+| `Query table has no isolation mapping` | 实际 SQL 是否涉及未登记表或严格模式不支持的 schema 限定名 |
+| `Required entity has no protected mapper` | 当前工厂是否登记了该实体的 BaseMapper，是否有适用策略 |
 | 缺少上下文时返回空结果 | 默认规则把 null 转为空范围；入口是否绑定需要的维度 |
 | `Missing isolation scope` | 自定义字段 Supplier 是否返回 null |
 | `Missing or unsupported isolation column mapping` | 配置的是 Java 属性还是物理列；属性是否真实持久化 |
@@ -853,9 +1001,13 @@ public List<Condition> resolveRelation(QueryContext context) {
 | `Unsupported isolation relation predicate` | 正向 EXISTS、别名、列映射、AND 关联键和子查询形态 |
 | `Read isolation supports single-table SELECT only` | 原查询是否有不受支持的 JOIN、子查询或分页结构 |
 | `Cannot parse query` / `Unsupported parameter placement` | 脱敏 SQL、参数映射及实际插件顺序 |
-| 忽略后仍有过滤 | 原 WHERE、Flex TenantFactory、普通字段及其他策略 |
+| `Unsupported SQL comment syntax` | 是否包含可执行、嵌套或歧义注释，以及未引用的 `#`；改用受支持的注释形式 |
+| `Unsupported SQL statement tail` | 结尾分号之后是否还有另一条 SQL；每次只执行一条受支持查询 |
+| `Unsupported SQL quoted literal` | 固定 SQL 文本是否用反斜杠转义引号；改用参数绑定或标准双写引号 |
+| 忽略后仍有过滤 | 原 WHERE、普通字段及其他策略；迁移是否残留 Flex 原生租户过滤 |
+| 生成查询与手写 SQL 结果不同 | 原生 TenantFactory 是否已停用，两类查询是否使用同一工厂、上下文和 Wind 规则 |
 | 新增关系或任职到期后结果未变 | 一级/二级缓存、业务缓存及范围快照是否更新 |
-| 环境字段插入失败 | profile 对应值是否绑定到 ENVIRONMENT，值是否非空白 |
+| 环境字段插入失败 | ServiceInfoUtils 是否能读到非空白的应用 profile |
 | 分页、树或加密字段异常 | counter/converter、children/parent_id 映射、TextEncryptor 初始化与密钥 |
 
 诊断保留 statement ID、异常类型和必要的上下文标识，不输出完整授权集合或敏感明文。发现跨归属结果时先停止受影响入口，核对实际执行 SQL 与上下文；回退使用验证过的应用、依赖和配置组合，不以关闭隔离恢复查询。
@@ -865,7 +1017,7 @@ public List<Condition> resolveRelation(QueryContext context) {
 在仓库根目录先用 `mvn -version` 核对实际 JDK。Wind 4.0 基线使用 JDK 21，4.1 基线使用 JDK 25；编译参数不能让低版本 JDK 加载高版本依赖字节码。
 
 ```bash
-WIND_MYBATIS_TESTS='MybatisQueryMethodHelperTests,MybatisTreeObjectHelperTests,TenantContextHolderTests,DataIsolationContextHolderTests,DataIsolationQueryIgnoreHolderTests,SelectIsolationRewriterTests,SelectIsolationRelationTests,DataIsolationQueryInterceptorIntegrationTests,DataIsolationDefaultsIntegrationTests,DataIsolationMetadataIntegrationTests,WorkspaceIsolationIntegrationTests,DataIsolationReadWriteIntegrationTests,DynamicSqlIsolationIntegrationTests,RelationshipPermissionIntegrationTests,DataIsolationRelationIntegrationTests,FieldDataIsolationStrategyIntegrationTests,FieldDataIsolationStrategyConfigurationTests,DataIsolationSpringIntegrationTests'
+WIND_MYBATIS_TESTS='MybatisQueryMethodHelperTests,MybatisTreeObjectHelperTests,TenantContextHolderTests,DataIsolationContextHolderTests,DataIsolationQueryIgnoreHolderTests,SelectIsolationRewriterTests,SelectIsolationRelationTests,SelectIsolationExecutionTests,DataIsolationQueryInterceptorIntegrationTests,DataIsolationDefaultsIntegrationTests,DataIsolationMetadataIntegrationTests,WorkspaceIsolationIntegrationTests,DataIsolationReadWriteIntegrationTests,DynamicSqlIsolationIntegrationTests,RelationshipPermissionIntegrationTests,DataIsolationRelationIntegrationTests,FieldDataIsolationStrategyIntegrationTests,FieldDataIsolationStrategyConfigurationTests,DataIsolationSpringIntegrationTests,DataIsolationCoverageIntegrationTests,CompositeSelectIsolationIntegrationTests,SqlCommentIsolationIntegrationTests'
 
 mvn -o -pl tests -am clean verify \
   -Dmaven.test.skip=false -DskipTests=false -Dtest.ignore.failure=false \
@@ -880,7 +1032,11 @@ mvn -o -pl tests -am clean verify \
 | [上下文](../../core/src/test/java/com/wind/integration/core/context/DataIsolationContextHolderTests.java)、[查询忽略](../../core/src/test/java/com/wind/integration/core/context/DataIsolationQueryIgnoreHolderTests.java) | 嵌套、异常恢复、线程复用、传播边界及租户 Long 兼容 |
 | [查询隔离](../../tests/src/test/java/com/wind/mybatis/isolation/DataIsolationQueryInterceptorIntegrationTests.java) | 查询形态、参数、插件链、缓存、分页与游标 |
 | [字段策略](../../tests/src/test/java/com/wind/mybatis/plugin/FieldDataIsolationStrategyIntegrationTests.java)、[字段配置](../../tests/src/test/java/com/wind/mybatis/plugin/FieldDataIsolationStrategyConfigurationTests.java) | 显式规则、覆盖选择、实体属性、并集及忽略边界 |
+| [覆盖校验](../../tests/src/test/java/com/wind/mybatis/plugin/DataIsolationCoverageIntegrationTests.java) | 严格模式、公共声明、未知表、启动校验及旧构造兼容 |
+| [注释边界](../../tests/src/test/java/com/wind/mybatis/plugin/SqlCommentIsolationIntegrationTests.java) | 原 SQL/策略条件、完整尾注释、JDBC 前拒绝及字面量兼容 |
+| [复合查询](../../tests/src/test/java/com/wind/mybatis/plugin/CompositeSelectIsolationIntegrationTests.java) | 派生计数、UNION、参数顺序、不同分支的范围和拒绝形态 |
 | [关系结构](src/test/java/com/wind/mybatis/plugin/SelectIsolationRelationTests.java)、[关系执行](../../tests/src/test/java/com/wind/mybatis/isolation/DataIsolationRelationIntegrationTests.java) | 受控 EXISTS、内表策略、拒绝路径及实际 JDBC 参数顺序 |
+| [解析执行器](src/test/java/com/wind/mybatis/plugin/SelectIsolationExecutionTests.java) | 执行器复用、饱和拒绝、排队超时、中断恢复及并发范围隔离 |
 | [读写配合](../../tests/src/test/java/com/wind/mybatis/plugin/DataIsolationReadWriteIntegrationTests.java) | 插入与读取的归属来源、忽略不改变填充 |
 | [Spring 装配](../../tests/src/test/java/com/wind/mybatis/spring/DataIsolationSpringIntegrationTests.java) | Starter 安装、策略集合、Mapper 扫描及并发读取 |
 | [查询与树工具](src/test/java/com/wind/mybatis/flex) | MySQL 条件参数化、树拉平顺序和副本独立性 |
@@ -891,7 +1047,7 @@ mvn -o -pl tests -am clean verify \
 ## 9. 源码索引
 
 - 查询与树：[MybatisQueryHelper](src/main/java/com/wind/mybatis/flex/MybatisQueryHelper.java)、[MybatisQueryMethodHelper](src/main/java/com/wind/mybatis/flex/MybatisQueryMethodHelper.java)、[MybatisTreeObjectHelper](src/main/java/com/wind/mybatis/flex/MybatisTreeObjectHelper.java)。
-- 插入监听：[EnvIsolationFieldInsertListener](src/main/java/com/wind/mybatis/flex/EnvIsolationFieldInsertListener.java)、[TestDataIsolationFieldInsertListener](src/main/java/com/wind/mybatis/flex/TestDataIsolationFieldInsertListener.java)、[WorkspaceIsolationFieldInsertListener](src/main/java/com/wind/mybatis/flex/WorkspaceIsolationFieldInsertListener.java)。
+- 插入监听：[TenantIsolationFieldInsertListener](src/main/java/com/wind/mybatis/flex/TenantIsolationFieldInsertListener.java)、[EnvIsolationFieldInsertListener](src/main/java/com/wind/mybatis/flex/EnvIsolationFieldInsertListener.java)、[TestDataIsolationFieldInsertListener](src/main/java/com/wind/mybatis/flex/TestDataIsolationFieldInsertListener.java)、[WorkspaceIsolationFieldInsertListener](src/main/java/com/wind/mybatis/flex/WorkspaceIsolationFieldInsertListener.java)。
 - 类型处理：[LocaleTypeHandler](src/main/java/com/wind/mybatis/convert/LocaleTypeHandler.java)、[AbstractEncryptBaseTypeHandler](src/main/java/com/wind/mybatis/encrypt/AbstractEncryptBaseTypeHandler.java)、[StringEncryptTypeHandler](src/main/java/com/wind/mybatis/encrypt/StringEncryptTypeHandler.java)、[LocalDateEncryptTypeHandler](src/main/java/com/wind/mybatis/encrypt/LocalDateEncryptTypeHandler.java)。
 - 读隔离：[DataIsolationQueryInterceptor](src/main/java/com/wind/mybatis/plugin/DataIsolationQueryInterceptor.java)、[SelectIsolationRewriter](src/main/java/com/wind/mybatis/plugin/SelectIsolationRewriter.java)、[RelationIsolationPredicate](src/main/java/com/wind/mybatis/plugin/RelationIsolationPredicate.java)、[MybatisFlexReadParameters](src/main/java/com/wind/mybatis/flex/MybatisFlexReadParameters.java)。
 - 隔离策略：[DataIsolationStrategy](src/main/java/com/wind/mybatis/isolation/DataIsolationStrategy.java)、[FieldDataIsolationStrategy](src/main/java/com/wind/mybatis/isolation/FieldDataIsolationStrategy.java)。

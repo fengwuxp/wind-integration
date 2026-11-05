@@ -16,11 +16,4 @@ public interface TenantIsolationObject<I extends Serializable> extends IdObject<
      */
     I getTenantId();
 
-    /**
-     * 设置对象所属的租户。
-     *
-     * @param tenantId 租户 ID
-     */
-    void setTenantId(I tenantId);
-
 }

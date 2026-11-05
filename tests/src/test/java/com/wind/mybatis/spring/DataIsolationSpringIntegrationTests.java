@@ -188,10 +188,5 @@ class DataIsolationSpringIntegrationTests {
         public Long getWorkspaceId() {
             return organizationId;
         }
-
-        @Override
-        public void setWorkspaceId(Long workspaceId) {
-            organizationId = workspaceId;
-        }
     }
 }

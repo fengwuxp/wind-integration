@@ -333,11 +333,6 @@ class SelectIsolationRewriterTests {
         public Long getTenantId() {
             return tenantId;
         }
-
-        @Override
-        public void setTenantId(Long tenantId) {
-            this.tenantId = tenantId;
-        }
     }
 
     interface PublicMapper extends BaseMapper<PublicRecord> {

@@ -181,16 +181,18 @@ flattenTree 接受非空根节点，返回包含根节点的深度优先前序�
 
 四个监听器通过 Flex 的 AbstractInsertListener 检查实体是否实现对应接口：
 
-| 监听器 | 写入内容 |
-| --- | --- |
-| TenantIsolationFieldInsertListener | DataIsolationContextHolder.getTenantId()，未绑定时填 null |
-| EnvIsolationFieldInsertListener | DataIsolationContextHolder.requireEnv()，缺失、空字符串或仅空白时拒绝写入 |
-| TestDataIsolationFieldInsertListener | DataIsolationContextHolder.isTestData()，未绑定时为 false |
-| WorkspaceIsolationFieldInsertListener | DataIsolationContextHolder.getWorkspaceId()，未绑定时填 null |
+| 监听器 | 实体须实现的接口 | 写入内容 |
+| --- | --- | --- |
+| TenantIsolationFieldInsertListener | SettableTenantIsolationObject | DataIsolationContextHolder.getTenantId()，未绑定时填 null |
+| EnvIsolationFieldInsertListener | EnvIsolationObject | DataIsolationContextHolder.requireEnv()，缺失、空字符串或仅空白时拒绝写入 |
+| TestDataIsolationFieldInsertListener | SettableTestDataIsolationObject | DataIsolationContextHolder.isTestData()，未绑定时为 false |
+| WorkspaceIsolationFieldInsertListener | SettableWorkspaceIsolationObject | DataIsolationContextHolder.getWorkspaceId()，未绑定时填 null |
 
 环境值的权威来源是应用的 Spring profile。`DataIsolationContextHolder.getEnv()` 通过 `ServiceInfoUtils.getSpringProfilesActive()` 读取它，读插件和插入监听器使用同一来源；在 trace 中绑定 ENVIRONMENT 不会覆盖应用 profile。
 
-租户监听器直接调用 `TenantIsolationObject.setTenantId`，实体须实现该方法；使用 Lombok `@Setter` 的 tenantId 字段可自动满足接口。物理列可用 `@Column` 重命名；采用其他 Java 属性存储租户时，由 getTenantId/setTenantId 委托到该属性，读取规则另按第 7.3 节配置。当前租户上下文仍采用 Long 兼容约定。
+租户、工作空间和测试数据的查询隔离分别识别 `TenantIsolationObject`、`WorkspaceIsolationObject` 和 `TestDataIsolationObject`。需要插入时填充的实体应实现表中的 Settable 子接口，并装配对应监听器；子接口同时满足查询隔离的识别条件。只有 setter 而未实现子接口的对象不会被这些监听器填充。迁移已有实体时，需要同时调整接口声明和全局监听器注册；仅保留原读取接口会停止对应的自动填充。
+
+租户监听器直接调用 `SettableTenantIsolationObject.setTenantId`；使用 Lombok `@Setter` 的 tenantId 字段可自动提供该方法。物理列可用 `@Column` 重命名；采用其他 Java 属性存储租户时，由 getTenantId/setTenantId 委托到该属性，读取规则另按第 7.3 节配置。当前租户上下文仍采用 Long 兼容约定。
 
 可以挂到实体的 onInsert：
 
@@ -201,8 +203,8 @@ flattenTree 接受非空根节点，返回包含根节点的深度优先前序�
         TestDataIsolationFieldInsertListener.class,
         WorkspaceIsolationFieldInsertListener.class
 })
-public class OrderEntity implements TenantIsolationObject<Long>, EnvIsolationObject,
-        TestDataIsolationObject, WorkspaceIsolationObject<String> {
+public class OrderEntity implements SettableTenantIsolationObject<Long>, EnvIsolationObject,
+        SettableTestDataIsolationObject, SettableWorkspaceIsolationObject<String> {
     // 保留业务字段，并实现各接口的 getter/setter。
 }
 ```
@@ -211,10 +213,10 @@ public class OrderEntity implements TenantIsolationObject<Long>, EnvIsolationObj
 
 ```java
 FlexGlobalConfig globalConfig = FlexGlobalConfig.getDefaultConfig();
-globalConfig.registerInsertListener(new TenantIsolationFieldInsertListener(), TenantIsolationObject.class);
+globalConfig.registerInsertListener(new TenantIsolationFieldInsertListener(), SettableTenantIsolationObject.class);
 globalConfig.registerInsertListener(new EnvIsolationFieldInsertListener(), EnvIsolationObject.class);
-globalConfig.registerInsertListener(new TestDataIsolationFieldInsertListener(), TestDataIsolationObject.class);
-globalConfig.registerInsertListener(new WorkspaceIsolationFieldInsertListener(), WorkspaceIsolationObject.class);
+globalConfig.registerInsertListener(new TestDataIsolationFieldInsertListener(), SettableTestDataIsolationObject.class);
+globalConfig.registerInsertListener(new WorkspaceIsolationFieldInsertListener(), SettableWorkspaceIsolationObject.class);
 ```
 
 注册应在业务写入前完成，具体生命周期沿用项目的 MyBatisFlexCustomizer。onInsert 和全局配置方式参考 [Flex 实体监听器](https://github.com/mybatis-flex/mybatis-flex/blob/main/docs/zh/core/table.md)。
@@ -224,6 +226,8 @@ globalConfig.registerInsertListener(new WorkspaceIsolationFieldInsertListener(),
 退役 Flex 原生租户能力时，可用 TenantIsolationFieldInsertListener 承接实体插入的租户填充，无需启用 TenantFactory 或 `@Column(tenantId = true)`。已有 tenantId 会被当前上下文覆盖，缺少租户时也会覆盖为 null，不保留预填值。更新、删除仍须校验并限定目标归属，插入监听器和读插件都不会补写这些权限条件。
 
 租户和工作空间监听器都允许填 null；如果业务要求每条记录必须有归属，需要入口校验或数据库约束，否则可能写入一条默认查询不可见的记录。
+
+`TestDataIsolationObject.isTestData()` 保留默认 false 的行为；实际存储测试标记的实体应返回自身字段值，使用 Lombok `@Getter` 可生成对应方法。
 
 <a id="type-handlers"></a>
 ## 6. 字段转换与加密
@@ -548,7 +552,7 @@ public class WorkspaceIsolationConfiguration {
 
 **修改实体属性名**
 
-假设 `InvoiceEntity` 实现 `WorkspaceIsolationObject`，实际持久属性为 `organizationId`，接口 getter/setter 委托给该属性。可以在全局工作空间规则之外指定实体规则：
+假设 `InvoiceEntity` 实现 `WorkspaceIsolationObject`，实际持久属性为 `organizationId`，接口 getter 委托给该属性；需要插入填充时实现 `SettableWorkspaceIsolationObject`，并让 setter 委托到同一属性。可以在全局工作空间规则之外指定实体规则：
 
 ```java
 FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List.of(
@@ -1037,7 +1041,7 @@ mvn -o -pl tests -am clean verify \
 | [复合查询](../../tests/src/test/java/com/wind/mybatis/plugin/CompositeSelectIsolationIntegrationTests.java) | 派生计数、UNION、参数顺序、不同分支的范围和拒绝形态 |
 | [关系结构](src/test/java/com/wind/mybatis/plugin/SelectIsolationRelationTests.java)、[关系执行](../../tests/src/test/java/com/wind/mybatis/isolation/DataIsolationRelationIntegrationTests.java) | 受控 EXISTS、内表策略、拒绝路径及实际 JDBC 参数顺序 |
 | [解析执行器](src/test/java/com/wind/mybatis/plugin/SelectIsolationExecutionTests.java) | 执行器复用、饱和拒绝、排队超时、中断恢复及并发范围隔离 |
-| [读写配合](../../tests/src/test/java/com/wind/mybatis/plugin/DataIsolationReadWriteIntegrationTests.java) | 插入与读取的归属来源、忽略不改变填充 |
+| [读写配合](../../tests/src/test/java/com/wind/mybatis/plugin/DataIsolationReadWriteIntegrationTests.java) | 租户、工作空间和测试数据的读取与赋值接口区分、插入与读取的归属来源、忽略不改变填充 |
 | [Spring 装配](../../tests/src/test/java/com/wind/mybatis/spring/DataIsolationSpringIntegrationTests.java) | Starter 安装、策略集合、Mapper 扫描及并发读取 |
 | [查询与树工具](src/test/java/com/wind/mybatis/flex) | MySQL 条件参数化、树拉平顺序和副本独立性 |
 

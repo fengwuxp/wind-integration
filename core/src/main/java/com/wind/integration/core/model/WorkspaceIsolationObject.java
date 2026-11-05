@@ -17,11 +17,4 @@ public interface WorkspaceIsolationObject<W extends Serializable> {
      * @return 工作空间 ID
      */
     W getWorkspaceId();
-
-    /**
-     * 设置工作空间 ID
-     *
-     * @param workspaceId 工作空间 ID
-     */
-    void setWorkspaceId(W workspaceId);
 }

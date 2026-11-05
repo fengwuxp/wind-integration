@@ -268,11 +268,6 @@ class DynamicSqlIsolationIntegrationTests {
         public Long getTenantId() {
             return tenantId;
         }
-
-        @Override
-        public void setTenantId(Long tenantId) {
-            this.tenantId = tenantId;
-        }
     }
 
     interface OrderMapper extends BaseMapper<Order> {

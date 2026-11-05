@@ -15,6 +15,9 @@ import com.wind.integration.core.context.DataIsolationQueryIgnoreHolder;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.core.enums.DataIsolationDimensions;
 import com.wind.integration.core.model.EnvIsolationObject;
+import com.wind.integration.core.model.SettableTenantIsolationObject;
+import com.wind.integration.core.model.SettableTestDataIsolationObject;
+import com.wind.integration.core.model.SettableWorkspaceIsolationObject;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.integration.core.model.TestDataIsolationObject;
 import com.wind.integration.core.model.WorkspaceIsolationObject;
@@ -183,6 +186,93 @@ class DataIsolationReadWriteIntegrationTests {
         Assertions.assertDoesNotThrow(() -> new TenantIsolationFieldInsertListener().onInsert(new Object()));
     }
 
+    /** 只声明租户读取能力的对象无需 setter，也不会被插入监听器改变归属。 */
+    @Test
+    void testTenantListenerIgnoresReadOnlyTenantObject() {
+        TenantIsolationObject<Long> readOnly = new TenantIsolationObject<>() {
+            @Override
+            public Long getId() {
+                return 30L;
+            }
+
+            @Override
+            public Long getTenantId() {
+                return 99L;
+            }
+        };
+        DataIsolationContextHolder.runWithTenant(10L, () -> {
+            new TenantIsolationFieldInsertListener().onInsert(readOnly);
+            Assertions.assertEquals(30L, readOnly.getId());
+            Assertions.assertEquals(99L, readOnly.getTenantId());
+        });
+    }
+
+    /** 存在 setter 不等于声明自动填充能力，只有实现子接口的实体参与租户填充。 */
+    @Test
+    void testTenantListenerRequiresSettableInterfaceEvenWhenSetterExists() {
+        CoverageTenantRecord record = new CoverageTenantRecord();
+        record.setId(31L);
+        record.setTenantId(99L);
+        DataIsolationContextHolder.runWithTenant(10L, () -> new TenantIsolationFieldInsertListener().onInsert(record));
+
+        Assertions.assertEquals(99L, record.getTenantId());
+    }
+
+    /** 只读对象无需实现 setter，工作空间归属与默认正式数据标记不受插入监听器影响。 */
+    @Test
+    void testListenersIgnoreReadOnlyClassificationObjects() {
+        WorkspaceIsolationObject<String> workspace = () -> "ws-original";
+        TestDataIsolationObject testData = new TestDataIsolationObject() {
+        };
+
+        DataIsolationContextHolder.runWith(Map.of(WORKSPACE, "ws-current", TEST_DATA, true), () -> {
+            new WorkspaceIsolationFieldInsertListener().onInsert(workspace);
+            new TestDataIsolationFieldInsertListener().onInsert(testData);
+        });
+
+        Assertions.assertEquals("ws-original", workspace.getWorkspaceId());
+        Assertions.assertFalse(testData.isTestData());
+    }
+
+    /** 仅有 setter 不会参与填充，实体必须声明对应的可赋值子接口。 */
+    @Test
+    void testClassificationListenersRequireSettableInterfacesEvenWhenSettersExist() {
+        QueryOnlyRecord record = new QueryOnlyRecord();
+        record.setWorkspaceId("ws-original");
+        record.setTestData(true);
+
+        DataIsolationContextHolder.runWith(Map.of(WORKSPACE, "ws-current", TEST_DATA, false), () -> {
+            new WorkspaceIsolationFieldInsertListener().onInsert(record);
+            new TestDataIsolationFieldInsertListener().onInsert(record);
+        });
+
+        Assertions.assertEquals("ws-original", record.getWorkspaceId());
+        Assertions.assertTrue(record.isTestData());
+    }
+
+    /** 可赋值子接口同时参与查询隔离，测试数据插入后只在匹配的上下文中可见。 */
+    @Test
+    void testInsertedTestDataIsVisibleOnlyInMatchingContext() {
+        DataIsolationContextHolder.runWith(context(10L, "ws-a", true), () -> {
+            try (SqlSession session = sessionFactory.openSession()) {
+                OrderMapper mapper = session.getMapper(OrderMapper.class);
+                OrderEntity entity = order(10L);
+                entity.setTestData(false);
+
+                Assertions.assertEquals(1, mapper.insert(entity));
+                Assertions.assertEquals("ws-a", entity.getWorkspaceId());
+                Assertions.assertTrue(entity.isTestData());
+                Assertions.assertEquals(List.of(4L, 10L), mapper.ids());
+                Assertions.assertTrue(mapper.selectOneById(10L).isTestData());
+                DataIsolationContextHolder.runWith(context(10L, "ws-a", false),
+                        () -> Assertions.assertNull(mapper.selectOneById(10L)));
+                DataIsolationContextHolder.runWith(context(10L, "ws-b", true),
+                        () -> Assertions.assertNull(mapper.selectOneById(10L)));
+                session.rollback();
+            }
+        });
+    }
+
     @Test
     void testDefaultReadsAndCachesFollowAllFourDimensions() {
         try (SqlSession session = sessionFactory.openSession()) {
@@ -346,7 +436,7 @@ class DataIsolationReadWriteIntegrationTests {
             TenantIsolationFieldInsertListener.class, EnvIsolationFieldInsertListener.class,
             TestDataIsolationFieldInsertListener.class, WorkspaceIsolationFieldInsertListener.class
     })
-    static class OrderEntity implements TenantIsolationObject<Long>, WorkspaceIsolationObject<String>, EnvIsolationObject, TestDataIsolationObject {
+    static class OrderEntity implements SettableTenantIsolationObject<Long>, SettableWorkspaceIsolationObject<String>, EnvIsolationObject, SettableTestDataIsolationObject {
         @Id
         private Long id;
         private Long tenantId;
@@ -359,8 +449,15 @@ class DataIsolationReadWriteIntegrationTests {
 
     @Getter
     @Setter
+    static class QueryOnlyRecord implements WorkspaceIsolationObject<String>, TestDataIsolationObject {
+        private String workspaceId;
+        private boolean testData;
+    }
+
+    @Getter
+    @Setter
     @Table(value = "t_tenant_listener", onInsert = TenantIsolationFieldInsertListener.class, mapperGenerateEnable = false)
-    static class TenantRecord implements TenantIsolationObject<Long> {
+    static class TenantRecord implements SettableTenantIsolationObject<Long> {
         @Id
         private Long id;
         @Column("account_key")

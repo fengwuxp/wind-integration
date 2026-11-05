@@ -8,10 +8,8 @@ package com.wind.integration.core.model;
  **/
 public interface TestDataIsolationObject {
 
-    void setTestData(boolean testData);
-
     /**
-     * @return 是否为测试数据
+     * @return 是否为测试数据，默认 false；存储测试标记的对象应返回实际字段值
      */
     default boolean isTestData() {
         return false;

@@ -10,6 +10,7 @@ import com.mybatisflex.core.mybatis.FlexSqlSessionFactoryBuilder;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.integration.core.context.DataIsolationContextHolder;
 import com.wind.integration.core.context.DataIsolationQueryIgnoreHolder;
+import com.wind.integration.core.model.SettableWorkspaceIsolationObject;
 import com.wind.integration.core.model.WorkspaceIsolationObject;
 import com.wind.mybatis.flex.WorkspaceIsolationFieldInsertListener;
 import com.wind.mybatis.isolation.DataIsolationScope;
@@ -324,7 +325,7 @@ class FieldDataIsolationStrategyConfigurationTests {
     @Getter
     @Setter
     @Table(value = "configured_workspace_item", onInsert = WorkspaceIsolationFieldInsertListener.class)
-    static class ConfiguredItem implements WorkspaceIsolationObject<Long> {
+    static class ConfiguredItem implements SettableWorkspaceIsolationObject<Long> {
         @Id
         private Long id;
         @Column("organization_id")

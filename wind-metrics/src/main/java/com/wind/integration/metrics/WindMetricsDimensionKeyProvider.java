@@ -1,6 +1,8 @@
 package com.wind.integration.metrics;
 
 import com.wind.common.query.WindQuery;
+import com.wind.common.query.cursor.CursorBasedQuery;
+import com.wind.common.query.cursor.CursorPagination;
 import com.wind.common.query.supports.QueryOrderField;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -46,10 +48,22 @@ public interface WindMetricsDimensionKeyProvider {
      * @throws RuntimeException              读取失败，不能将失败转成空页
      */
     @NonNull
-    List<Map<String, Serializable>> queryDimensionKeys(
-            @NotEmpty Set<@NotBlank String> dimensions,
-            @Positive int queryPage,
-            @Positive int querySize);
+    @Deprecated(forRemoval = true)
+    default List<Map<String, Serializable>> queryDimensionKeys(@NotEmpty Set<@NotBlank String> dimensions, @Positive int queryPage, @Positive int querySize) {
+        throw new UnsupportedOperationException("Time-bounded dimension key enumeration is not supported");
+    }
+
+    /**
+     * 查询一页维度键
+     *
+     * @param dimension 业务维度
+     * @param options   查询配置
+     * @return 游标分页结果
+     */
+    @NonNull
+    default CursorPagination<List<Serializable>> queryDimensionKeys(@NotNull String dimension, @NotNull CursorBasedQuery<? extends QueryOrderField> options) {
+        throw new UnsupportedOperationException("Time-bounded dimension key enumeration is not supported");
+    }
 
     /**
      * 按本轮固定目标时间枚举一页完整业务键，分页选项复用 {@link WindQuery}。
@@ -72,19 +86,17 @@ public interface WindMetricsDimensionKeyProvider {
      * 本接口不承诺跨重启复用游标或历史时点视图。不支持本重载的旧实现默认明确失败，不委托旧入口
      * 忽略目标时间。</p>
      *
-     * @param dimensions     完整业务键字段名集合，非 null；无维度的全局场景可为空
+     * @param dimensions      完整业务键字段名集合，非 null；无维度的全局场景可为空
      * @param targetWatermark 本轮固定的目标时间；由宿主按业务时区解释，遍历期间保持不变
-     * @param options        查询大小、查询类型和排序/分页选项；实现不得将其作为输出参数修改
+     * @param options         查询大小、查询类型和排序/分页选项；实现不得将其作为输出参数修改
      * @return 至多 querySize 个完整键；空列表仅表示 Provider 遍历结束
      * @throws IllegalArgumentException      参数不合法、大小越界或条件与续读位置不一致
      * @throws UnsupportedOperationException 实现不支持时间范围枚举、维度组合或指定查询选项
      * @throws RuntimeException              读取失败，不能将失败转成空页
      */
     @NonNull
-    default List<Map<String, Serializable>> queryDimensionKeys(
-            @NotNull Set<@NotBlank String> dimensions,
-            @NotNull LocalDateTime targetWatermark,
-            @NotNull WindQuery<? extends QueryOrderField> options) {
+    default CursorPagination<List<Map<String, Serializable>>> queryDimensionKeys(@NotNull Set<@NotBlank String> dimensions, @NotNull LocalDateTime targetWatermark,
+                                                                                 @NotNull CursorBasedQuery<? extends QueryOrderField> options) {
         throw new UnsupportedOperationException("Time-bounded dimension key enumeration is not supported");
     }
 

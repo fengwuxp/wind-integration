@@ -5,7 +5,6 @@ import com.wind.common.util.ServiceInfoUtils;
 import com.wind.integration.core.enums.DataIsolationDimensions;
 import com.wind.trace.WindTraceContext;
 import com.wind.trace.WindTracer;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
@@ -19,7 +18,6 @@ import java.util.concurrent.Callable;
  * @author wuxp
  * @since 2026-10-16
  */
-@NullMarked
 public final class DataIsolationContextHolder {
 
     private DataIsolationContextHolder() {
@@ -33,8 +31,8 @@ public final class DataIsolationContextHolder {
      * @param tenantId 租户 ID
      * @param action   执行方法
      */
-    public static void runWithTenant(Serializable tenantId, Runnable action) {
-        runWith(Map.of(DataIsolationDimensions.TENANT, tenantId), action);
+    public static void runWithTenant(@Nullable Serializable tenantId, Runnable action) {
+        runWith(tenantId == null ? Map.of() : Map.of(DataIsolationDimensions.TENANT, tenantId), action);
     }
 
     /**
@@ -45,8 +43,8 @@ public final class DataIsolationContextHolder {
      * @param <T>      返回值类型
      * @return 返回值
      */
-    public static <T> T callWithTenantId(Serializable tenantId, Callable<T> action) {
-        return callWith(Map.of(DataIsolationDimensions.TENANT, tenantId), action);
+    public static <T> T callWithTenantId(@Nullable Serializable tenantId, Callable<T> action) {
+        return callWith(tenantId == null ? Map.of() : Map.of(DataIsolationDimensions.TENANT, tenantId), action);
     }
 
     /**
@@ -55,8 +53,8 @@ public final class DataIsolationContextHolder {
      * @param workspaceId 工作空间 ID
      * @param action      执行方法
      */
-    public static void runWithWorkspace(Serializable workspaceId, Runnable action) {
-        runWith(Map.of(DataIsolationDimensions.WORKSPACE, workspaceId), action);
+    public static void runWithWorkspace(@Nullable Serializable workspaceId, Runnable action) {
+        runWith(workspaceId == null ? Map.of() : Map.of(DataIsolationDimensions.WORKSPACE, workspaceId), action);
     }
 
     /**
@@ -66,8 +64,8 @@ public final class DataIsolationContextHolder {
      * @param action      执行方法
      * @return 返回值
      */
-    public static <T> T callWithWorkspace(Serializable workspaceId, Callable<T> action) {
-        return callWith(Map.of(DataIsolationDimensions.WORKSPACE, workspaceId), action);
+    public static <T> T callWithWorkspace(@Nullable Serializable workspaceId, Callable<T> action) {
+        return callWith(workspaceId == null ? Map.of() : Map.of(DataIsolationDimensions.WORKSPACE, workspaceId), action);
     }
 
     /**
@@ -125,7 +123,7 @@ public final class DataIsolationContextHolder {
 
     @Nullable
     public static <T> T getTenantId() {
-        Serializable result = getDataIsolationDimensioId(DataIsolationDimensions.TENANT);
+        Serializable result = getDataIsolationDimensionId(DataIsolationDimensions.TENANT);
         // 兼容逻辑
         return result == null ? (T) TenantContextHolder.getTenantId() : (T) result;
     }
@@ -136,7 +134,7 @@ public final class DataIsolationContextHolder {
 
     @Nullable
     public static <T> T getWorkspaceId() {
-        return getDataIsolationDimensioId(DataIsolationDimensions.WORKSPACE);
+        return getDataIsolationDimensionId(DataIsolationDimensions.WORKSPACE);
     }
 
     public static <T> T requireWorkspaceId() {
@@ -155,7 +153,7 @@ public final class DataIsolationContextHolder {
     }
 
     public static boolean isTestData() {
-        Object value = getDataIsolationDimensioId(DataIsolationDimensions.TEST_DATA);
+        Object value = getDataIsolationDimensionId(DataIsolationDimensions.TEST_DATA);
         if (value == null) {
             return false;
         }
@@ -166,7 +164,7 @@ public final class DataIsolationContextHolder {
     }
 
     @Nullable
-    public static <T> T getDataIsolationDimensioId(DataIsolationDimensions dimensions) {
+    public static <T> T getDataIsolationDimensionId(DataIsolationDimensions dimensions) {
         WindTraceContext context = WindTracer.TRACER.currentContext().orElseGet(WindTraceContext::root);
         return context.getContextVariable(dimensions.getTraceAttributeName());
     }

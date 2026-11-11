@@ -13,6 +13,7 @@ import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.integration.core.model.WorkspaceIsolationObject;
 import lombok.Getter;
 import lombok.Setter;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.datasource.unpooled.UnpooledDataSource;
 import org.apache.ibatis.exceptions.PersistenceException;
@@ -67,7 +68,7 @@ class RelationshipPermissionIntegrationTests {
                 new FlexDataSource("default", source, false)));
         configuration.setLocalCacheScope(LocalCacheScope.STATEMENT);
         configuration.setCacheEnabled(false);
-        configuration.addInterceptor(new DataIsolationQueryInterceptor());
+        configuration.addInterceptor(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()))));
         configuration.addInterceptor(new QueryCounter(queries));
         configuration.addMapper(MemberMapper.class);
         configuration.addMapper(RelationMapper.class);

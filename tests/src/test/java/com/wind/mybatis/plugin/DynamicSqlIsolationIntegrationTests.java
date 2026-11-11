@@ -10,6 +10,7 @@ import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.integration.core.context.DataIsolationContextHolder;
 import com.wind.integration.core.model.TenantIsolationObject;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
 import org.apache.ibatis.cache.CacheKey;
 import org.apache.ibatis.datasource.unpooled.UnpooledDataSource;
 import org.apache.ibatis.executor.Executor;
@@ -142,7 +143,7 @@ class DynamicSqlIsolationIntegrationTests {
     void testUnmanagedFlexQueriesKeepNativeParameterBinding() {
         FlexDataSource flexSource = new FlexDataSource("default", dataSource, false);
         FlexConfiguration configuration = new FlexConfiguration(new Environment("flex", new JdbcTransactionFactory(), flexSource));
-        configuration.addInterceptor(new DataIsolationQueryInterceptor());
+        configuration.addInterceptor(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()))));
         configuration.addMapper(PublicMapper.class);
         SqlSessionFactory factory = new FlexSqlSessionFactoryBuilder().build(configuration);
 
@@ -240,11 +241,11 @@ class DynamicSqlIsolationIntegrationTests {
         Configuration configuration = new Configuration(new Environment("dynamic", new JdbcTransactionFactory(), dataSource));
         configuration.addMapper(OrderMapper.class);
         if (isolationFirst) {
-            configuration.addInterceptor(new DataIsolationQueryInterceptor());
+            configuration.addInterceptor(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()))));
             configuration.addInterceptor(audit);
         } else {
             configuration.addInterceptor(audit);
-            configuration.addInterceptor(new DataIsolationQueryInterceptor());
+            configuration.addInterceptor(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()))));
         }
         SqlSource switching = sourceFactory.apply(configuration);
         ResultMap result = new ResultMap.Builder(configuration, "dynamic.result", Long.class, List.of()).build();

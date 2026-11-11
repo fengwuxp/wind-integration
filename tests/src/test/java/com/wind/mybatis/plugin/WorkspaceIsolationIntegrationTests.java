@@ -80,7 +80,6 @@ class WorkspaceIsolationIntegrationTests {
         } else {
             System.setProperty(SPRING_PROFILES_ACTIVE, previousProfile);
         }
-        DataIsolationQueryIgnoreHolder.clear();
         TenantContextHolder.clear();
     }
 
@@ -121,7 +120,7 @@ class WorkspaceIsolationIntegrationTests {
 
     @Test
     void testMissingWorkspaceReturnsNoRowsAndNullCustomSupplierFails() {
-        SqlSessionFactory defaults = factory(new DataIsolationQueryInterceptor(), OrderMapper.class);
+        SqlSessionFactory defaults = factory(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()))), OrderMapper.class);
         SqlSessionFactory configured = factory(interceptor(), OrderMapper.class);
         DataIsolationContextHolder.runWith(Map.of(TENANT, 10L, TEST_DATA, true), () -> {
             try (SqlSession session = defaults.openSession()) {

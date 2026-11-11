@@ -2,7 +2,6 @@ package com.wind.integration.core.context;
 
 import com.wind.integration.core.enums.DataIsolationDimensions;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -10,7 +9,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 
 /**
- * 当前上下文临时忽略的隔离维度；回调退出时恢复原忽略状态，不自动传播到异步线程。
+ * 当前调用作用域临时忽略的隔离维度；回调退出时自动恢复，不自动传播到其他线程。
  * 读取范围由规则的供应者提供；手动忽略不删除业务 SQL 已有条件。
  *
  * @author wuxp
@@ -19,7 +18,7 @@ import java.util.concurrent.Callable;
 @NullMarked
 public final class DataIsolationQueryIgnoreHolder {
 
-    private static final ThreadLocal<@Nullable Set<DataIsolationDimensions>> IGNORED_DIMENSIONS = new ThreadLocal<>();
+    private static final ScopedValue<IgnoreScope> IGNORED_DIMENSIONS = ScopedValue.newInstance();
 
     private DataIsolationQueryIgnoreHolder() {
         throw new AssertionError();
@@ -36,12 +35,11 @@ public final class DataIsolationQueryIgnoreHolder {
      * @param dimensions 待忽略的一个或多个维度；空参数不新增忽略项，重复维度按一个处理
      */
     public static void runIgnoring(Runnable action, DataIsolationDimensions... dimensions) {
-        Set<DataIsolationDimensions> previous = enterIgnoring(dimensions);
-        try {
+        if (dimensions.length == 0) {
             action.run();
-        } finally {
-            restore(previous);
+            return;
         }
+        ScopedValue.where(IGNORED_DIMENSIONS, ignoring(dimensions)).run(action);
     }
 
     /**
@@ -54,40 +52,33 @@ public final class DataIsolationQueryIgnoreHolder {
      * @throws Exception 执行逻辑抛出的异常
      */
     public static <T> T callIgnoring(Callable<T> action, DataIsolationDimensions... dimensions) throws Exception {
-        Set<DataIsolationDimensions> previous = enterIgnoring(dimensions);
-        try {
-            return action.call();
-        } finally {
-            restore(previous);
-        }
-    }
-
-    public static void clear() {
-        IGNORED_DIMENSIONS.remove();
-    }
-
-    private static Set<DataIsolationDimensions> enterIgnoring(DataIsolationDimensions[] dimensions) {
-        Set<DataIsolationDimensions> previous = current();
         if (dimensions.length == 0) {
-            return previous;
+            return action.call();
         }
+        return ScopedValue.where(IGNORED_DIMENSIONS, ignoring(dimensions)).call(action::call);
+    }
+
+    private static IgnoreScope ignoring(DataIsolationDimensions[] dimensions) {
         Set<DataIsolationDimensions> ignored = EnumSet.noneOf(DataIsolationDimensions.class);
-        ignored.addAll(previous);
+        ignored.addAll(current());
         Collections.addAll(ignored, dimensions);
-        IGNORED_DIMENSIONS.set(ignored);
-        return previous;
+        return new IgnoreScope(Thread.currentThread(), Set.copyOf(ignored));
     }
 
     private static Set<DataIsolationDimensions> current() {
-        Set<DataIsolationDimensions> dimensions = IGNORED_DIMENSIONS.get();
-        return dimensions == null ? Set.of() : dimensions;
+        if (!IGNORED_DIMENSIONS.isBound()) {
+            return Set.of();
+        }
+        IgnoreScope scope = IGNORED_DIMENSIONS.get();
+        if (scope.owner() != Thread.currentThread()) {
+            return Set.of();
+        }
+        return scope.dimensions();
     }
 
-    private static void restore(Set<DataIsolationDimensions> dimensions) {
-        if (dimensions.isEmpty()) {
-            IGNORED_DIMENSIONS.remove();
-        } else {
-            IGNORED_DIMENSIONS.set(dimensions);
-        }
+    /**
+     * 结构化子任务会继承 ScopedValue 绑定，忽略权限仍仅供创建作用域的线程使用。
+     */
+    private record IgnoreScope(Thread owner, Set<DataIsolationDimensions> dimensions) {
     }
 }

@@ -68,7 +68,7 @@ class FieldDataIsolationStrategyIntegrationTests {
     @Test
     void testDefaultTenantAndMappedOrdinaryFieldApplyTogether() {
         FieldDataIsolationStrategy fields = fieldsFor(ScopedItem.class);
-        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(new FieldDataIsolationStrategy(), fields)), ScopedMapper.class);
+        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()), fields)), ScopedMapper.class);
         DataIsolationContextHolder.runWith(Map.of(TENANT, 10L), () -> {
             try (SqlSession session = factory.openSession()) {
                 ScopedMapper mapper = session.getMapper(ScopedMapper.class);
@@ -101,7 +101,7 @@ class FieldDataIsolationStrategyIntegrationTests {
 
     @Test
     void testOrdinaryFieldRuleDoesNotRequireIsolationInterface() {
-        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(new FieldDataIsolationStrategy(), fieldsFor(PlainItem.class))),
+        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()), fieldsFor(PlainItem.class))),
                 PlainMapper.class);
         try (SqlSession session = factory.openSession()) {
             PlainMapper mapper = session.getMapper(PlainMapper.class);
@@ -131,7 +131,7 @@ class FieldDataIsolationStrategyIntegrationTests {
 
     @Test
     void testOrdinaryFieldRuleDoesNotRestrictOtherEntities() {
-        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(new FieldDataIsolationStrategy(), fieldsFor(ScopedItem.class))),
+        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()), fieldsFor(ScopedItem.class))),
                 PlainMapper.class);
         try (SqlSession session = factory.openSession()) {
             assertEquals(List.of(1L, 2L, 3L), plainIds(session.getMapper(PlainMapper.class)));
@@ -140,7 +140,7 @@ class FieldDataIsolationStrategyIntegrationTests {
 
     @Test
     void testSingleMultipleEmptyUnrestrictedAndMissingScopesRemainDistinct() {
-        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(new FieldDataIsolationStrategy(), fieldsFor(PlainItem.class))),
+        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()), fieldsFor(PlainItem.class))),
                 PlainMapper.class);
         try (SqlSession session = factory.openSession()) {
             PlainMapper mapper = session.getMapper(PlainMapper.class);
@@ -163,7 +163,7 @@ class FieldDataIsolationStrategyIntegrationTests {
 
     @Test
     void testIgnoringBuiltinDimensionKeepsOrdinaryFieldRestriction() {
-        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(new FieldDataIsolationStrategy(), fieldsFor(ScopedItem.class))),
+        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()), fieldsFor(ScopedItem.class))),
                 ScopedMapper.class);
         DataIsolationContextHolder.runWith(Map.of(TENANT, 10L), () -> {
             try (SqlSession session = factory.openSession()) {
@@ -182,7 +182,7 @@ class FieldDataIsolationStrategyIntegrationTests {
         FieldDataIsolationStrategy fields = new FieldDataIsolationStrategy(List.of(
                 new FieldRule(PlainItem.class, "ownerId", () -> ownerScope),
                 new FieldRule(PlainItem.class, "departmentId", () -> DataIsolationScope.of(100L))));
-        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(new FieldDataIsolationStrategy(), fields)), PlainMapper.class);
+        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()), fields)), PlainMapper.class);
         try (SqlSession session = factory.openSession()) {
             PlainMapper mapper = session.getMapper(PlainMapper.class);
             assertEquals(List.of(1L), plainIds(mapper));
@@ -203,7 +203,7 @@ class FieldDataIsolationStrategyIntegrationTests {
             executionOrder.add("owner");
             return DataIsolationScope.of("alice");
         })), 0);
-        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(new FieldDataIsolationStrategy(), last, first, middle)), PlainMapper.class);
+        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()), last, first, middle)), PlainMapper.class);
 
         try (SqlSession session = factory.openSession()) {
             assertEquals(List.of(1L), plainIds(session.getMapper(PlainMapper.class)));
@@ -233,7 +233,7 @@ class FieldDataIsolationStrategyIntegrationTests {
         DataIsolationStrategy denied = strategy(10, "denied", executionOrder, context -> {
             throw new IllegalStateException("后续隔离拒绝");
         });
-        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(new FieldDataIsolationStrategy(), denied, empty)), PlainMapper.class);
+        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()), denied, empty)), PlainMapper.class);
 
         try (SqlSession session = factory.openSession()) {
             PersistenceException error = assertThrows(PersistenceException.class,
@@ -245,7 +245,7 @@ class FieldDataIsolationStrategyIntegrationTests {
 
     @Test
     void testRegisteringMapperAfterFirstReadActivatesOrdinaryFieldRule() {
-        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(new FieldDataIsolationStrategy(), fieldsFor(PlainItem.class))),
+        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()), fieldsFor(PlainItem.class))),
                 SummaryMapper.class);
         try (SqlSession session = factory.openSession()) {
             SummaryMapper mapper = session.getMapper(SummaryMapper.class);
@@ -259,7 +259,7 @@ class FieldDataIsolationStrategyIntegrationTests {
     void testMissingConfiguredPropertyFailsBeforeReturningUnscopedRows() {
         FieldDataIsolationStrategy fields = new FieldDataIsolationStrategy(List.of(
                 new FieldRule(PlainItem.class, "unknownProperty", () -> ownerScope)));
-        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(new FieldDataIsolationStrategy(), fields)), PlainMapper.class);
+        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()), fields)), PlainMapper.class);
         try (SqlSession session = factory.openSession()) {
             assertThrows(PersistenceException.class, () -> plainIds(session.getMapper(PlainMapper.class)));
         }
@@ -313,7 +313,7 @@ class FieldDataIsolationStrategyIntegrationTests {
                 DataIsolationStrategy.Condition.of("field_plain_item.owner_key = ? ORDER BY id", "alice"), "Cannot parse isolation condition");
         for (Map.Entry<DataIsolationStrategy.Condition, String> rejected : unsupported.entrySet()) {
             DataIsolationStrategy strategy = strategy(0, "invalid", new ArrayList<>(), context -> List.of(rejected.getKey()));
-            SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(new FieldDataIsolationStrategy(), strategy)), PlainMapper.class);
+            SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()), strategy)), PlainMapper.class);
             try (SqlSession session = factory.openSession()) {
                 PersistenceException error = assertThrows(PersistenceException.class,
                         () -> plainIds(session.getMapper(PlainMapper.class)));

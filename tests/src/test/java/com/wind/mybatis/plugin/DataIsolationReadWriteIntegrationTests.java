@@ -27,6 +27,7 @@ import com.wind.mybatis.flex.TestDataIsolationFieldInsertListener;
 import com.wind.mybatis.flex.WorkspaceIsolationFieldInsertListener;
 import lombok.Getter;
 import lombok.Setter;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Select;
@@ -81,7 +82,7 @@ class DataIsolationReadWriteIntegrationTests {
         }
         FlexConfiguration configuration = new FlexConfiguration(new Environment("holder", new JdbcTransactionFactory(),
                 new FlexDataSource("default", source, false)));
-        configuration.addInterceptor(new DataIsolationQueryInterceptor());
+        configuration.addInterceptor(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()))));
         configuration.addMapper(OrderMapper.class);
         configuration.addMapper(TenantMapper.class);
         sessionFactory = new FlexSqlSessionFactoryBuilder().build(configuration);
@@ -98,7 +99,6 @@ class DataIsolationReadWriteIntegrationTests {
         }
         TenantManager.setTenantFactory(previousTenantFactory);
         TenantContextHolder.clear();
-        DataIsolationQueryIgnoreHolder.clear();
     }
 
     /** 插入与读取使用应用 profile，trace 中不同的环境值不改变字段填充。 */

@@ -146,6 +146,22 @@ class FieldDataIsolationStrategyConfigurationTests {
         }
     }
 
+    /**
+     * 规则通过父类实现的隔离接口匹配实体，并使用持久化元数据解析自定义列名。
+     */
+    @Test
+    void testExplicitDimensionMatchesInheritedInterface() {
+        FieldDataIsolationStrategy fields = new FieldDataIsolationStrategy(List.of(
+                FieldRule.forDimension(WORKSPACE, "workspaceId", () -> workspaceScope)));
+        SqlSessionFactory factory = factory(fields, StandardMapper.class);
+
+        try (var session = factory.openSession()) {
+            assertEquals(List.of(1L), standardIds(session.getMapper(StandardMapper.class)));
+            workspaceScope = DataIsolationScope.of(200L);
+            assertEquals(List.of(2L), standardIds(session.getMapper(StandardMapper.class)));
+        }
+    }
+
     @Test
     void testInheritedEntityUsesParentRule() {
         FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List.of(

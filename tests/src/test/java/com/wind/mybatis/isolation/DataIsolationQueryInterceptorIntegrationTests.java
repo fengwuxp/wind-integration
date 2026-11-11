@@ -1,5 +1,12 @@
 package com.wind.mybatis.isolation;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.turbo.TurboFilter;
+import ch.qos.logback.core.read.ListAppender;
+import ch.qos.logback.core.spi.FilterReply;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.Table;
@@ -46,6 +53,7 @@ import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.mapping.ResultMap;
 import org.apache.ibatis.mapping.SqlCommandType;
+import org.apache.ibatis.mapping.SqlSource;
 import org.apache.ibatis.plugin.Interceptor;
 import org.apache.ibatis.plugin.Intercepts;
 import org.apache.ibatis.plugin.Invocation;
@@ -65,6 +73,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
 
 import java.sql.Connection;
 import java.sql.Statement;
@@ -111,7 +121,6 @@ class DataIsolationQueryInterceptorIntegrationTests {
 
     @AfterEach
     void tearDown() {
-        DataIsolationQueryIgnoreHolder.clear();
         TenantContextHolder.clear();
     }
 
@@ -148,6 +157,284 @@ class DataIsolationQueryInterceptorIntegrationTests {
     }
 
     @Test
+    void testDebugLogsSummarizeQueryWithoutSqlOrParameterValues() {
+        try (IsolationLogs logs = new IsolationLogs(); SqlSession session = sessionFactory.openSession()) {
+            Assertions.assertEquals(List.of(1L), session.getMapper(ReadMapper.class)
+                    .byIdOrName(1L, "private-query-value-marker"));
+
+            List<String> messages = logs.appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+            String statementId = ReadMapper.class.getName() + ".byIdOrName";
+            List<String> summaries = messages.stream().filter(message -> message.startsWith("Read isolation prepared:")).toList();
+            Assertions.assertEquals(1, summaries.size());
+            String summary = summaries.getFirst();
+            Assertions.assertTrue(summary.contains(statementId));
+            Assertions.assertTrue(summary.contains("sqlChanged=true"));
+            Assertions.assertTrue(summary.contains("parameterCount=5"));
+            Assertions.assertTrue(summary.contains("elapsedMicros="));
+            Assertions.assertFalse(messages.stream().anyMatch(message -> message.contains("private-query-value-marker")
+                    || message.contains("SELECT ")));
+            Assertions.assertFalse(messages.stream().anyMatch(message -> message.startsWith("Resolving read isolation:")));
+            Assertions.assertTrue(logs.appender.list.stream().allMatch(event -> event.getLevel() == Level.DEBUG));
+            Assertions.assertTrue(logs.appender.list.stream().allMatch(event -> event.getThrowableProxy() == null));
+        }
+    }
+
+    /**
+     * 前后 SQL 在同一 TRACE 事件中对照；查询照常隔离，值、字面量和注释均不进入诊断日志。
+     */
+    @Test
+    void testTraceLogsBeforeAndAfterSqlWithoutSensitiveValues() {
+        try (IsolationLogs logs = new IsolationLogs(Level.TRACE); SqlSession session = sessionFactory.openSession()) {
+            Assertions.assertEquals(List.of(1L), session.getMapper(ReadMapper.class)
+                    .diagnosticQuery(1L, "private-query-value-marker"));
+
+            String statementId = ReadMapper.class.getName() + ".diagnosticQuery";
+            List<ILoggingEvent> sqlEvents = logs.appender.list.stream()
+                    .filter(event -> event.getMessage().startsWith("Read isolation SQL:")).toList();
+            Assertions.assertEquals(1, sqlEvents.size());
+            ILoggingEvent event = sqlEvents.getFirst();
+            Assertions.assertEquals(Level.TRACE, event.getLevel());
+            Assertions.assertTrue(event.getMessage().contains("before={}"));
+            Assertions.assertTrue(event.getMessage().contains("after={}"));
+            Object[] arguments = event.getArgumentArray();
+            Assertions.assertEquals(4, arguments.length);
+            Assertions.assertEquals(statementId, arguments[0]);
+            Assertions.assertEquals(true, arguments[1]);
+            String before = (String) arguments[2];
+            String after = (String) arguments[3];
+            Assertions.assertTrue(before.contains("SELECT id FROM t_read_isolation"));
+            Assertions.assertFalse(before.contains("tenant_id"));
+            Assertions.assertTrue(after.contains("tenant_id = ?"));
+            Assertions.assertTrue(after.contains("env = ?"));
+            Assertions.assertTrue(after.contains("is_test = ?"));
+            List<String> messages = logs.appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+            Assertions.assertTrue(messages.stream().anyMatch(message -> message.contains(statementId)
+                    && message.contains(IsolatedEntity.class.getName())
+                    && message.contains(FieldDataIsolationStrategy.class.getName())));
+            for (String marker : List.of("private-query-value-marker", "private-query-literal-marker", "private-query-comment-marker")) {
+                Assertions.assertFalse(messages.stream().anyMatch(message -> message.contains(marker)), marker);
+            }
+            Assertions.assertTrue(logs.appender.list.stream().allMatch(logEvent -> logEvent.getThrowableProxy() == null));
+        }
+    }
+
+    /**
+     * Flex 自定义参数仍需适配，但全维忽略不改 SQL 文本，不能把 BoundSql 换对象记成 SQL 改写。
+     */
+    @Test
+    void testTraceReportsUnchangedSqlAfterFlexParameterAdaptation() {
+        Configuration original = sessionFactory.getConfiguration();
+        FlexDataSource dataSource = new FlexDataSource("default", original.getEnvironment().getDataSource(), false);
+        FlexConfiguration configuration = new FlexConfiguration(new Environment("flex", new JdbcTransactionFactory(), dataSource));
+        configuration.addInterceptor(interceptor());
+        configuration.addMapper(FlexReadMapper.class);
+        SqlSessionFactory factory = new FlexSqlSessionFactoryBuilder().build(configuration);
+        TenantFactory previous = TenantManager.getTenantFactory();
+        TenantManager.setTenantFactory(() -> new Object[]{TenantContextHolder.requireTenantId()});
+        try (IsolationLogs logs = new IsolationLogs(Level.TRACE); SqlSession session = factory.openSession()) {
+            QueryWrapper query = QueryWrapper.create().where(new QueryColumn("name")
+                    .eq(new TypeHandlerObject(new LocaleTypeHandler(), Locale.forLanguageTag("one"), JdbcType.VARCHAR)));
+            DataIsolationQueryIgnoreHolder.runIgnoring(() -> {
+                IsolatedEntity entity = session.getMapper(FlexReadMapper.class).selectOneByQuery(query);
+                Assertions.assertEquals(1L, entity.getId());
+            }, TENANT, ENVIRONMENT, TEST_DATA);
+
+            List<ILoggingEvent> sqlEvents = logs.appender.list.stream()
+                    .filter(event -> event.getMessage().startsWith("Read isolation SQL:")).toList();
+            Assertions.assertEquals(1, sqlEvents.size());
+            Object[] arguments = sqlEvents.getFirst().getArgumentArray();
+            Assertions.assertEquals(false, arguments[1]);
+            Assertions.assertEquals(arguments[2], arguments[3]);
+            Assertions.assertTrue(arguments[2].toString().contains("t_read_isolation"));
+            Assertions.assertTrue(logs.appender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.startsWith("Read isolation prepared:") && message.contains("sqlChanged=false")));
+        } finally {
+            TenantManager.setTenantFactory(previous);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"OFF", "DEBUG", "TRACE"})
+    void testRejectedQueryLogsFailureStageWithoutParserSqlDetails(String levelName) {
+        Level level = Level.valueOf(levelName);
+        try (IsolationLogs logs = new IsolationLogs(level)) {
+            PersistenceException failure = Assertions.assertThrows(PersistenceException.class,
+                    () -> selectBoundarySql("SELECT 'private-query-literal-marker' FROM"));
+
+            Assertions.assertTrue(failure.getMessage().contains("Cannot parse query for read isolation"));
+            if (level == Level.OFF) {
+                Assertions.assertTrue(logs.appender.list.isEmpty());
+                return;
+            }
+            String statementId = ReadMapper.class.getName() + ".boundarySql";
+            Assertions.assertTrue(logs.appender.list.stream().anyMatch(event -> event.getLevel() == Level.WARN
+                    && event.getFormattedMessage().contains(statementId)
+                    && event.getFormattedMessage().contains("stage=REWRITE")
+                    && event.getFormattedMessage().contains(IllegalStateException.class.getName())));
+            Assertions.assertFalse(logs.appender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.contains("private-query-literal-marker") || message.contains("SELECT ")));
+            Assertions.assertTrue(logs.appender.list.stream().allMatch(event -> event.getThrowableProxy() == null));
+        }
+    }
+
+    /**
+     * 每次求值得到不同记录；任何日志引起的额外求值都会跳过第二条应返回的记录。
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"OFF", "DEBUG", "TRACE"})
+    void testDiagnosticLevelsDoNotReevaluateDynamicSql(String levelName) {
+        Configuration configuration = sessionFactory.getConfiguration();
+        String statementId = ReadMapper.class.getName() + ".changingSql";
+        AtomicInteger evaluations = new AtomicInteger();
+        SqlSource source = parameter -> {
+            long id = switch (evaluations.incrementAndGet()) {
+                case 1 -> 1L;
+                case 2 -> 5L;
+                default -> 3L;
+            };
+            return new BoundSql(configuration, "SELECT id FROM t_read_isolation WHERE id = " + id, List.of(), parameter);
+        };
+        ResultMap result = new ResultMap.Builder(configuration, statementId + "Result", Long.class, List.of()).build();
+        configuration.addMappedStatement(new MappedStatement.Builder(configuration, statementId, source, SqlCommandType.SELECT)
+                .resultMaps(List.of(result)).build());
+
+        try (IsolationLogs logs = new IsolationLogs(Level.valueOf(levelName)); SqlSession session = sessionFactory.openSession()) {
+            Assertions.assertEquals(List.of(1L), session.selectList(statementId));
+            Assertions.assertEquals(List.of(5L), session.selectList(statementId));
+            Assertions.assertEquals(2, evaluations.get());
+        }
+    }
+
+    /**
+     * 原 SQL 超过诊断长度上限时仅省略日志内容，合法长注释不能影响实际查询与隔离。
+     */
+    @Test
+    void testTraceOmitsOversizedSqlWithoutChangingQueryResult() {
+        String sql = "SELECT id FROM t_read_isolation /* private-long-comment-marker " + "x".repeat(20000) + " */ ORDER BY id";
+        try (IsolationLogs logs = new IsolationLogs(Level.TRACE)) {
+            Assertions.assertEquals(List.of(1L, 5L), selectBoundarySql(sql));
+
+            List<ILoggingEvent> sqlEvents = logs.appender.list.stream()
+                    .filter(event -> event.getMessage().startsWith("Read isolation SQL:")).toList();
+            Assertions.assertEquals(1, sqlEvents.size());
+            Object[] arguments = sqlEvents.getFirst().getArgumentArray();
+            String before = (String) arguments[2];
+            String after = (String) arguments[3];
+            Assertions.assertEquals("<SQL omitted; length=" + sql.length() + "; reason=input-too-long>", before);
+            Assertions.assertTrue(after.contains("tenant_id = ?"));
+            Assertions.assertFalse(logs.appender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .anyMatch(message -> message.contains("private-long-comment-marker")));
+        }
+    }
+
+    /**
+     * 日志后端直接抛出异常时，准备摘要或 SQL 对照失败均不能中止已通过隔离校验的查询。
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"DEBUG", "TRACE"})
+    void testDiagnosticAppenderFailureDoesNotChangeQueryResult(String levelName) {
+        AtomicInteger failures = new AtomicInteger();
+        Logger logger = (Logger) LoggerFactory.getLogger(DataIsolationQueryInterceptor.class);
+        ListAppender<ILoggingEvent> appender = failingLogAppender(Level.valueOf(levelName), failures);
+        try (IsolationLogs logs = new IsolationLogs(logger, Level.TRACE, appender); SqlSession session = sessionFactory.openSession()) {
+            Assertions.assertEquals(List.of(1L, 5L), session.getMapper(ReadMapper.class).ids());
+            Assertions.assertEquals(1, failures.get());
+        }
+    }
+
+    @Test
+    void testRejectedQueryKeepsOriginalFailureWhenWarnAppenderThrows() {
+        AtomicInteger failures = new AtomicInteger();
+        Logger logger = (Logger) LoggerFactory.getLogger(DataIsolationQueryInterceptor.class);
+        try (IsolationLogs logs = new IsolationLogs(logger, Level.TRACE, failingLogAppender(Level.WARN, failures))) {
+            PersistenceException failure = Assertions.assertThrows(PersistenceException.class,
+                    () -> selectBoundarySql("SELECT 'private-query-literal-marker' FROM"));
+
+            Assertions.assertTrue(failure.getMessage().contains("Cannot parse query for read isolation"));
+            Assertions.assertFalse(failure.getMessage().contains("diagnostic-appender-failure"));
+            Assertions.assertEquals(1, failures.get());
+        }
+    }
+
+    /**
+     * 重写器日志提交失败不影响隔离、公共表快速路径及全维忽略，真实不支持的查询仍须拒绝。
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"DEBUG", "TRACE"})
+    void testRewriterAppenderFailurePreservesQueryBehavior(String levelName) {
+        sessionFactory.getConfiguration().addMapper(DiagnosticPublicMapper.class);
+        AtomicInteger failures = new AtomicInteger();
+        Logger logger = (Logger) LoggerFactory.getLogger("com.wind.mybatis.plugin.SelectIsolationRewriter");
+        ListAppender<ILoggingEvent> appender = failingLogAppender(Level.valueOf(levelName), failures);
+        try (IsolationLogs logs = new IsolationLogs(logger, Level.TRACE, appender); SqlSession session = sessionFactory.openSession()) {
+            ReadMapper mapper = session.getMapper(ReadMapper.class);
+            Assertions.assertEquals(List.of(1L, 5L), mapper.ids());
+            Assertions.assertEquals(2L, mapper.publicCount());
+            Assertions.assertEquals(2L, mapper.publicCount());
+            DataIsolationQueryIgnoreHolder.runIgnoring(() ->
+                    Assertions.assertEquals(List.of(1L, 2L, 3L, 4L, 5L), mapper.ids()), TENANT, ENVIRONMENT, TEST_DATA);
+            Assertions.assertEquals(List.of(1L, 5L), mapper.ids());
+            Assertions.assertTrue(failures.get() > 0);
+
+            PersistenceException failure = Assertions.assertThrows(PersistenceException.class, mapper::joined);
+            Assertions.assertTrue(failure.getMessage().contains("Read isolation supports single-table SELECT only"));
+            Assertions.assertFalse(failure.getMessage().contains("diagnostic-appender-failure"));
+        }
+    }
+
+    /**
+     * 级别过滤器在两个隔离日志入口抛异常时，不能中止正常读取，也不能掩盖真实的 SQL 拒绝。
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"DEBUG", "TRACE"})
+    void testLoggingLevelFilterFailurePreservesQueryBehavior(String levelName) {
+        sessionFactory.getConfiguration().addMapper(DiagnosticPublicMapper.class);
+        Level failedLevel = Level.valueOf(levelName);
+        String interceptorLogger = DataIsolationQueryInterceptor.class.getName();
+        String rewriterLogger = "com.wind.mybatis.plugin.SelectIsolationRewriter";
+        AtomicInteger interceptorFailures = new AtomicInteger();
+        AtomicInteger rewriterFailures = new AtomicInteger();
+        LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
+        TurboFilter filter = new TurboFilter() {
+            @Override
+            public FilterReply decide(Marker marker, Logger logger, Level level, String format, Object[] arguments, Throwable throwable) {
+                if (level != failedLevel) {
+                    return FilterReply.NEUTRAL;
+                }
+                if (interceptorLogger.equals(logger.getName())) {
+                    interceptorFailures.incrementAndGet();
+                } else if (rewriterLogger.equals(logger.getName())) {
+                    rewriterFailures.incrementAndGet();
+                } else {
+                    return FilterReply.NEUTRAL;
+                }
+                throw new IllegalStateException("diagnostic-level-filter-failure");
+            }
+        };
+        filter.setContext(context);
+        filter.start();
+        context.addTurboFilter(filter);
+        try (IsolationLogs logs = new IsolationLogs(Level.TRACE); SqlSession session = sessionFactory.openSession()) {
+            ReadMapper mapper = session.getMapper(ReadMapper.class);
+            Assertions.assertEquals(List.of(1L, 5L), mapper.ids());
+            Assertions.assertEquals(2L, mapper.publicCount());
+            Assertions.assertEquals(2L, mapper.publicCount());
+            DataIsolationQueryIgnoreHolder.runIgnoring(() ->
+                    Assertions.assertEquals(List.of(1L, 2L, 3L, 4L, 5L), mapper.ids()), TENANT, ENVIRONMENT, TEST_DATA);
+            Assertions.assertEquals(List.of(1L, 5L), mapper.ids());
+            Assertions.assertTrue(interceptorFailures.get() > 0);
+            Assertions.assertTrue(rewriterFailures.get() > 0);
+
+            PersistenceException failure = Assertions.assertThrows(PersistenceException.class, mapper::joined);
+            Assertions.assertTrue(failure.getMessage().contains("Read isolation supports single-table SELECT only"));
+            Assertions.assertFalse(failure.getMessage().contains("diagnostic-level-filter-failure"));
+        } finally {
+            context.getTurboFilterList().remove(filter);
+            filter.stop();
+        }
+    }
+
+    @Test
     void testCursorUsesTheSameScope() throws Exception {
         try (SqlSession session = sessionFactory.openSession(); Cursor<Long> cursor = session.getMapper(ReadMapper.class).cursor()) {
             List<Long> ids = new ArrayList<>();
@@ -156,16 +443,17 @@ class DataIsolationQueryInterceptorIntegrationTests {
         }
     }
 
-    @Test
-    void testScopeValuesSeparateLocalAndSecondLevelCaches() {
-        try (SqlSession session = sessionFactory.openSession()) {
+    @ParameterizedTest
+    @ValueSource(strings = {"OFF", "DEBUG", "TRACE"})
+    void testScopeValuesSeparateLocalAndSecondLevelCaches(String levelName) {
+        try (IsolationLogs logs = new IsolationLogs(Level.valueOf(levelName)); SqlSession session = sessionFactory.openSession()) {
             ReadMapper mapper = session.getMapper(ReadMapper.class);
             Assertions.assertEquals(List.of(1L, 5L), mapper.ids());
             TenantContextHolder.runWithTenantId(20L, () -> Assertions.assertEquals(List.of(3L), mapper.ids()));
             Assertions.assertEquals(List.of(1L, 5L), mapper.ids());
             session.commit();
         }
-        try (SqlSession session = sessionFactory.openSession()) {
+        try (IsolationLogs logs = new IsolationLogs(Level.valueOf(levelName)); SqlSession session = sessionFactory.openSession()) {
             TenantContextHolder.runWithTenantId(20L,
                     () -> Assertions.assertEquals(List.of(3L), session.getMapper(ReadMapper.class).ids()));
         }
@@ -440,6 +728,56 @@ class DataIsolationQueryInterceptorIntegrationTests {
         return new DataIsolationQueryInterceptor(List.of(fields));
     }
 
+    private ListAppender<ILoggingEvent> failingLogAppender(Level failedLevel, AtomicInteger failures) {
+        return new ListAppender<>() {
+            @Override
+            public void doAppend(ILoggingEvent event) {
+                if (event.getLevel() == failedLevel) {
+                    failures.incrementAndGet();
+                    throw new IllegalStateException("diagnostic-appender-failure");
+                }
+            }
+        };
+    }
+
+    private static final class IsolationLogs implements AutoCloseable {
+
+        private final Logger logger;
+
+        private final Level previousLevel;
+
+        private final boolean previousAdditive;
+
+        private final ListAppender<ILoggingEvent> appender;
+
+        private IsolationLogs() {
+            this(Level.DEBUG);
+        }
+
+        private IsolationLogs(Level level) {
+            this((Logger) LoggerFactory.getLogger("com.wind.mybatis.plugin"), level, new ListAppender<>());
+        }
+
+        private IsolationLogs(Logger logger, Level level, ListAppender<ILoggingEvent> appender) {
+            this.logger = logger;
+            this.appender = appender;
+            previousLevel = logger.getLevel();
+            previousAdditive = logger.isAdditive();
+            appender.start();
+            logger.addAppender(appender);
+            logger.setLevel(level);
+            logger.setAdditive(false);
+        }
+
+        @Override
+        public void close() {
+            logger.detachAppender(appender);
+            appender.stop();
+            logger.setLevel(previousLevel);
+            logger.setAdditive(previousAdditive);
+        }
+    }
+
     @Intercepts(@Signature(type = Executor.class, method = "query", args = {
             MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class
     }))
@@ -471,6 +809,17 @@ class DataIsolationQueryInterceptorIntegrationTests {
     }
 
     interface FlexReadMapper extends BaseMapper<IsolatedEntity> {
+    }
+
+    @Getter
+    @Setter
+    @Table("t_public")
+    static class DiagnosticPublicRecord {
+        @Id
+        private Long id;
+    }
+
+    interface DiagnosticPublicMapper extends BaseMapper<DiagnosticPublicRecord> {
     }
 
     @Getter
@@ -514,6 +863,10 @@ class DataIsolationQueryInterceptorIntegrationTests {
 
         @Select("SELECT id FROM t_read_isolation WHERE id = #{id} OR name = #{name} ORDER BY id")
         List<Long> byIdOrName(@Param("id") long id, @Param("name") String name);
+
+        @Select("SELECT id FROM t_read_isolation WHERE id = #{id} OR name = #{name} "
+                + "OR name = 'private-query-literal-marker' /* private-query-comment-marker */ ORDER BY id")
+        List<Long> diagnosticQuery(@Param("id") long id, @Param("name") String name);
 
         @Select("SELECT id FROM t_read_isolation ORDER BY id")
         Cursor<Long> cursor();

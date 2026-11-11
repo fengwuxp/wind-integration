@@ -15,7 +15,6 @@ import com.wind.common.util.ServiceInfoUtils;
 import com.wind.integration.core.context.DataIsolationContextHolder;
 import com.wind.integration.core.model.EnvIsolationObject;
 import com.wind.integration.core.model.TestDataIsolationObject;
-import com.wind.integration.core.context.DataIsolationQueryIgnoreHolder;
 import com.wind.mybatis.isolation.DataIsolationScope;
 import com.wind.mybatis.isolation.DataIsolationStrategy.FieldRule;
 import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
@@ -77,14 +76,13 @@ class DataIsolationDefaultsIntegrationTests {
         } else {
             System.setProperty(SPRING_PROFILES_ACTIVE, previousProfile);
         }
-        DataIsolationQueryIgnoreHolder.clear();
     }
 
     @Test
-    void testRegisteredEntityIsIsolatedWithoutTableConfiguration() throws Exception {
+    void testRegisteredEntityIsIsolatedWithExplicitBuiltInRules() throws Exception {
         FlexConfiguration configuration = new FlexConfiguration(new Environment(
                 "automatic", new JdbcTransactionFactory(), dataSource));
-        configuration.addInterceptor(new DataIsolationQueryInterceptor());
+        configuration.addInterceptor(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(List.of()))));
         configuration.addMapper(DataMapper.class);
         sqlSessionFactory = new FlexSqlSessionFactoryBuilder().build(configuration);
 
@@ -92,6 +90,36 @@ class DataIsolationDefaultsIntegrationTests {
                 .stream().map(DataEntity::getId).sorted().toList());
         assertEquals(List.of(2L), inContext(false, () -> selectList(QueryWrapper.create()))
                 .stream().map(DataEntity::getId).sorted().toList());
+    }
+
+    /**
+     * 实体虽然实现多个隔离接口，但只执行显式配置的环境规则。
+     */
+    @Test
+    void testExplicitEnvironmentRuleDoesNotEnableTestDataIsolation() throws Exception {
+        FieldDataIsolationStrategy fields = new FieldDataIsolationStrategy(List.of(
+                FieldRule.forDimension(ENVIRONMENT, "env", () -> DataIsolationScope.of("sit"))));
+        sqlSessionFactory = factory(DataMapper.class, fields);
+
+        assertEquals(List.of(1L, 2L), inContext(true, () -> selectList(QueryWrapper.create()))
+                .stream().map(DataEntity::getId).sorted().toList());
+    }
+
+    /**
+     * 只实现环境接口而未配置环境规则时不自动隔离；不匹配的测试数据规则不读取范围。
+     */
+    @Test
+    void testIsolationInterfaceDoesNotEnableAnUnconfiguredDimension() {
+        FieldDataIsolationStrategy fields = new FieldDataIsolationStrategy(List.of(
+                FieldRule.forDimension(TEST_DATA, "testData", () -> {
+                    throw new AssertionError("未实现测试数据接口的实体不应读取该范围");
+                })));
+        SqlSessionFactory factory = factory(EnvOnlyMapper.class, fields);
+
+        try (SqlSession session = factory.openSession()) {
+            assertEquals(List.of(1L, 2L, 3L), session.getMapper(EnvOnlyMapper.class)
+                    .selectListByQuery(QueryWrapper.create()).stream().map(DataFields::getId).sorted().toList());
+        }
     }
 
     @Test
@@ -156,9 +184,13 @@ class DataIsolationDefaultsIntegrationTests {
     }
 
     private SqlSessionFactory factory(Class<?> mapperType, List<FieldRule> rules) {
+        return factory(mapperType, FieldDataIsolationStrategy.withDefaults(rules));
+    }
+
+    private SqlSessionFactory factory(Class<?> mapperType, FieldDataIsolationStrategy fields) {
         FlexConfiguration configuration = new FlexConfiguration(new Environment(
                 "test", new JdbcTransactionFactory(), dataSource));
-        configuration.addInterceptor(new DataIsolationQueryInterceptor(List.of(FieldDataIsolationStrategy.withDefaults(rules))));
+        configuration.addInterceptor(new DataIsolationQueryInterceptor(List.of(fields)));
         configuration.addMapper(mapperType);
         return new FlexSqlSessionFactoryBuilder().build(configuration);
     }

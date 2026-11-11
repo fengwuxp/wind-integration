@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -19,7 +20,6 @@ class DataIsolationQueryIgnoreHolderTests {
 
     @AfterEach
     void tearDown() {
-        DataIsolationQueryIgnoreHolder.clear();
         TenantContextHolder.clear();
     }
 
@@ -73,13 +73,14 @@ class DataIsolationQueryIgnoreHolderTests {
     }
 
     @Test
-    void testTenantAndIgnoredDimensionsAreClearedIndependently() {
+    void testIgnoringScopeAndTenantContextHaveIndependentLifetimes() {
         TenantContextHolder.runWithTenantId(10L, () -> {
             DataIsolationQueryIgnoreHolder.runIgnoring(() -> {
-                DataIsolationQueryIgnoreHolder.clear();
-                Assertions.assertFalse(DataIsolationQueryIgnoreHolder.isIgnored(ENVIRONMENT));
+                Assertions.assertTrue(DataIsolationQueryIgnoreHolder.isIgnored(ENVIRONMENT));
                 Assertions.assertEquals(10L, TenantContextHolder.requireTenantId());
             }, ENVIRONMENT);
+            Assertions.assertFalse(DataIsolationQueryIgnoreHolder.isIgnored(ENVIRONMENT));
+            Assertions.assertEquals(10L, TenantContextHolder.requireTenantId());
             DataIsolationQueryIgnoreHolder.runIgnoring(() -> {
                 TenantContextHolder.clear();
                 Assertions.assertNull(TenantContextHolder.getTenantId());
@@ -116,6 +117,47 @@ class DataIsolationQueryIgnoreHolderTests {
 
         Assertions.assertFalse(ignoredByChild);
         Assertions.assertFalse(DataIsolationQueryIgnoreHolder.isIgnored(ENVIRONMENT));
+    }
+
+    /**
+     * 忽略回调失败后，复用同一工作线程的下一任务不继承忽略权限。
+     */
+    @Test
+    void testIgnoringDoesNotLeakWhenWorkerIsReusedAfterFailure() throws Exception {
+        IllegalStateException failure = new IllegalStateException("模拟业务失败");
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            var task = executor.submit(() -> DataIsolationQueryIgnoreHolder.runIgnoring(() -> {
+                Assertions.assertTrue(DataIsolationQueryIgnoreHolder.isIgnored(TENANT));
+                throw failure;
+            }, TENANT));
+            ExecutionException actual = Assertions.assertThrows(ExecutionException.class,
+                    () -> task.get(5, TimeUnit.SECONDS));
+            Assertions.assertSame(failure, actual.getCause());
+            Assertions.assertFalse(executor.submit(() -> DataIsolationQueryIgnoreHolder.isIgnored(TENANT))
+                    .get(5, TimeUnit.SECONDS));
+        }
+    }
+
+    /**
+     * 虚拟线程不继承父线程的忽略权限；自身显式忽略的维度仅在其回调内生效。
+     */
+    @Test
+    void testVirtualThreadUsesItsOwnIgnoreScope() throws Exception {
+        DataIsolationQueryIgnoreHolder.callIgnoring(() -> {
+            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                executor.submit(() -> {
+                    Assertions.assertFalse(DataIsolationQueryIgnoreHolder.isIgnored(TENANT));
+                    DataIsolationQueryIgnoreHolder.runIgnoring(() -> {
+                        Assertions.assertTrue(DataIsolationQueryIgnoreHolder.isIgnored(WORKSPACE));
+                        Assertions.assertFalse(DataIsolationQueryIgnoreHolder.isIgnored(TENANT));
+                    }, WORKSPACE);
+                    Assertions.assertFalse(DataIsolationQueryIgnoreHolder.isIgnored(WORKSPACE));
+                }).get(5, TimeUnit.SECONDS);
+            }
+            Assertions.assertTrue(DataIsolationQueryIgnoreHolder.isIgnored(TENANT));
+            return null;
+        }, TENANT);
+        Assertions.assertFalse(DataIsolationQueryIgnoreHolder.isIgnored(TENANT));
     }
 
     @Test

@@ -130,7 +130,7 @@ class DataIsolationCoverageIntegrationTests {
     @Test
     void testStrictCoverageRejectsUnclassifiedEntity() {
         DataIsolationQueryInterceptor interceptor = DataIsolationQueryInterceptor.strict(
-                List.of(new FieldDataIsolationStrategy()), Set.of());
+                List.of(FieldDataIsolationStrategy.withDefaults(List.of())), Set.of());
         SqlSessionFactory factory = factory(interceptor, PlainMapper.class);
 
         assertThrows(IllegalStateException.class, () -> interceptor.validate(factory.getConfiguration()));

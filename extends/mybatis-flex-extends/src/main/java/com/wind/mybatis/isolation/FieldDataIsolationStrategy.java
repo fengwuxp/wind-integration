@@ -19,7 +19,8 @@ import java.util.regex.Pattern;
 
 /**
  * 基于实体持久属性的允许值集合生成行级读取隔离条件，各规则以 AND 组合。
- * 无参启用四个内置维度；显式列表只使用传入规则，withDefaults 保留默认约定。
+ * 构造方法仅使用传入规则；withDefaults 显式选择四个内置维度约定。
+ * 规则按实体类型或其实现的接口匹配，仅实现隔离接口不会自动启用规则。
  * 本策略不计算授权、不控制返回列，也不负责写入归属校验。
  *
  * @author wuxp
@@ -40,10 +41,6 @@ public final class FieldDataIsolationStrategy implements DataIsolationStrategy {
      * 缓存当前策略对实体元数据的静态绑定；键包含实体类型和列映射，不缓存请求范围。
      */
     private final Map<EntityMetadata, Map<FieldRule, String>> entityBindings = new ConcurrentHashMap<>();
-
-    public FieldDataIsolationStrategy() {
-        this(defaultRules(), List.of(), 0);
-    }
 
     public FieldDataIsolationStrategy(List<FieldRule> rules) {
         this(rules, 0);
@@ -74,7 +71,9 @@ public final class FieldDataIsolationStrategy implements DataIsolationStrategy {
     }
 
     /**
-     * 保留默认维度，每个实体优先使用最具体的自定义维度规则；普通字段规则作为额外约束加入。
+     * 显式启用租户、工作空间、环境和测试数据四个内置维度。
+     * 每个实体优先使用最具体的自定义维度规则；普通字段规则作为额外约束加入。
+     * 只需部分维度时应使用显式规则构造方法。
      */
     public static FieldDataIsolationStrategy withDefaults(List<FieldRule> overrides) {
         return new FieldDataIsolationStrategy(defaultRules(), overrides, 0);

@@ -12,16 +12,142 @@ import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.mapping.ParameterMapping;
 import org.apache.ibatis.mapping.SqlCommandType;
+import org.apache.ibatis.reflection.MetaObject;
+import org.apache.ibatis.reflection.SystemMetaObject;
 import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static com.wind.integration.core.enums.DataIsolationDimensions.TENANT;
 
 class SelectIsolationRewriterTests {
+
+    @Test
+    void testRewriteAddsTenantWhereClause() {
+        Configuration configuration = configuration();
+        String sql = "SELECT id FROM protected_records";
+        MappedStatement statement = statement(configuration, sql);
+        BoundSql original = statement.getBoundSql(null);
+
+        BoundSql rewritten = rewriter(configuration).rewrite(statement, original);
+
+        assertRewrittenSql(rewritten, "SELECT id FROM protected_records WHERE (protected_records.tenant_id = ?)", List.of(10L));
+        Assertions.assertEquals(sql, original.getSql());
+        Assertions.assertTrue(original.getParameterMappings().isEmpty());
+    }
+
+    /**
+     * 原 OR 条件作为整体与租户条件取 AND；新增租户参数位于业务参数之后、分页参数之前。
+     */
+    @Test
+    void testRewriteGroupsOriginalOrBeforeTenantAndPagination() {
+        Configuration configuration = configuration();
+        String sql = "SELECT r.id FROM protected_records r WHERE r.id = ? OR r.id = ? ORDER BY r.id LIMIT ? OFFSET ?";
+        MappedStatement statement = statement(configuration, sql);
+        List<ParameterMapping> mappings = List.of(
+                new ParameterMapping.Builder(configuration, "firstId", Long.class).build(),
+                new ParameterMapping.Builder(configuration, "secondId", Long.class).build(),
+                new ParameterMapping.Builder(configuration, "limit", Integer.class).build(),
+                new ParameterMapping.Builder(configuration, "offset", Integer.class).build());
+        Map<String, Object> input = Map.of("firstId", 1L, "secondId", 3L, "limit", 5, "offset", 0);
+        BoundSql original = new BoundSql(configuration, sql, mappings, input);
+
+        BoundSql rewritten = rewriter(configuration).rewrite(statement, original);
+
+        assertRewrittenSql(rewritten, """
+                SELECT r.id FROM protected_records r
+                WHERE (r.id = ? OR r.id = ?) AND ((r.tenant_id = ?))
+                ORDER BY r.id LIMIT ? OFFSET ?
+                """, List.of(1L, 3L, 10L, 5, 0));
+        Assertions.assertSame(input, rewritten.getParameterObject());
+        Assertions.assertEquals(sql, original.getSql());
+        Assertions.assertEquals(mappings, original.getParameterMappings());
+    }
+
+    @Test
+    void testRewriteUsesInForMultipleTenants() {
+        Configuration configuration = configuration();
+        MappedStatement statement = statement(configuration, "SELECT r.id FROM protected_records r");
+        SelectIsolationRewriter rewriter = new SelectIsolationRewriter(configuration,
+                new FieldDataIsolationStrategy(List.of(FieldRule.forDimension(TENANT, "tenantId",
+                        () -> DataIsolationScope.ofValues(List.of(10L, 20L))))));
+
+        BoundSql rewritten = rewriter.rewrite(statement, statement.getBoundSql(null));
+
+        assertRewrittenSql(rewritten, "SELECT r.id FROM protected_records r WHERE (r.tenant_id IN (?, ?))", List.of(10L, 20L));
+    }
+
+    @Test
+    void testRewriteDeniesEmptyTenantScope() {
+        Configuration configuration = configuration();
+        MappedStatement statement = statement(configuration, "SELECT r.id FROM protected_records r");
+        SelectIsolationRewriter rewriter = new SelectIsolationRewriter(configuration,
+                new FieldDataIsolationStrategy(List.of(FieldRule.forDimension(TENANT, "tenantId",
+                        () -> DataIsolationScope.ofValues(List.of())))));
+
+        BoundSql rewritten = rewriter.rewrite(statement, statement.getBoundSql(null));
+
+        assertRewrittenSql(rewritten, "SELECT r.id FROM protected_records r WHERE (1 = 0)", List.of());
+    }
+
+    @Test
+    void testUnrestrictedScopeKeepsOriginalSqlAndBindings() {
+        Configuration configuration = configuration();
+        String sql = "SELECT r.id FROM protected_records r WHERE r.id = ?";
+        MappedStatement statement = statement(configuration, sql);
+        BoundSql original = new BoundSql(configuration, sql,
+                List.of(new ParameterMapping.Builder(configuration, "id", Long.class).build()), Map.of("id", 1L));
+        SelectIsolationRewriter rewriter = new SelectIsolationRewriter(configuration,
+                new FieldDataIsolationStrategy(List.of(FieldRule.forDimension(TENANT, "tenantId", DataIsolationScope::unrestrictedScope))));
+
+        BoundSql rewritten = rewriter.rewrite(statement, original);
+
+        assertRewrittenSql(rewritten, sql, List.of(1L));
+        Assertions.assertSame(original, rewritten);
+    }
+
+    /**
+     * 两个 UNION 分支分别追加各自别名限定的条件，不能只过滤第一个分支。
+     */
+    @Test
+    void testRewriteIsolatesEveryUnionBranch() {
+        Configuration configuration = configuration();
+        String sql = "SELECT a.id FROM protected_records a UNION ALL SELECT b.id FROM protected_records b ORDER BY id";
+        MappedStatement statement = statement(configuration, sql);
+
+        BoundSql rewritten = rewriter(configuration).rewrite(statement, statement.getBoundSql(null));
+
+        assertRewrittenSql(rewritten, """
+                SELECT a.id FROM protected_records a WHERE (a.tenant_id = ?)
+                UNION ALL
+                SELECT b.id FROM protected_records b WHERE (b.tenant_id = ?)
+                ORDER BY id
+                """, List.of(10L, 10L));
+    }
+
+    /**
+     * 计数包装在读取底表时隔离，外层无需投影或引用 tenant_id。
+     */
+    @Test
+    void testRewritePlacesIsolationInsideDerivedCount() {
+        Configuration configuration = configuration();
+        String sql = "SELECT COUNT(*) FROM (SELECT r.id FROM protected_records r WHERE r.id > ?) records";
+        MappedStatement statement = statement(configuration, sql);
+        BoundSql original = new BoundSql(configuration, sql,
+                List.of(new ParameterMapping.Builder(configuration, "minimum", Long.class).build()), Map.of("minimum", 3L));
+
+        BoundSql rewritten = rewriter(configuration).rewrite(statement, original);
+
+        assertRewrittenSql(rewritten, """
+                SELECT COUNT(*) FROM
+                (SELECT r.id FROM protected_records r WHERE (r.id > ?) AND ((r.tenant_id = ?))) records
+                """, List.of(3L, 10L));
+    }
 
     @Test
     void testParameterNamesAvoidNestedPropertiesAndAdditionalValues() {
@@ -130,13 +256,21 @@ class SelectIsolationRewriterTests {
     @Test
     void testRepeatedPublicEntityQuerySkipsSqlParsing() {
         Configuration configuration = configuration();
-        SelectIsolationRewriter rewriter = rewriter(configuration);
         String sql = "SELECT id FROM public_records WHERE id = ?";
         MappedStatement statement = statement(configuration, sql);
         BoundSql boundSql = statement.getBoundSql(1L);
 
-        Assertions.assertSame(boundSql, rewriter.rewrite(statement, boundSql));
-        Assertions.assertSame(boundSql, rewriter.rewrite(statement, boundSql));
+        try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+            SelectIsolationRewriter rewriter = new SelectIsolationRewriter(configuration, executor,
+                    new FieldDataIsolationStrategy(List.of(FieldRule.forDimension(TENANT, "tenantId", () -> DataIsolationScope.of(10L)))));
+            Assertions.assertSame(boundSql, rewriter.rewrite(statement, boundSql));
+            executor.shutdown();
+
+            Assertions.assertSame(boundSql, rewriter.rewrite(statement, boundSql));
+            BoundSql changed = new BoundSql(configuration, "SELECT id FROM protected_records", List.of(), null);
+            IllegalStateException failure = Assertions.assertThrows(IllegalStateException.class, () -> rewriter.rewrite(statement, changed));
+            Assertions.assertTrue(failure.getMessage().contains("Cannot parse query for read isolation"));
+        }
     }
 
     @Test
@@ -160,17 +294,24 @@ class SelectIsolationRewriterTests {
     @Test
     void testUnregisteredOrComplexQueriesDoNotEnterFastPath() {
         Configuration configuration = configuration();
-        SelectIsolationRewriter rewriter = rewriter(configuration);
         String unknownSql = "SELECT id FROM another_public_table";
         String complexSql = "SELECT p.id FROM public_records p JOIN public_records q ON p.id = q.id";
         MappedStatement statement = statement(configuration, unknownSql);
 
         BoundSql unknown = statement.getBoundSql(null);
-        Assertions.assertSame(unknown, rewriter.rewrite(statement, unknown));
-        Assertions.assertSame(unknown, rewriter.rewrite(statement, unknown));
         BoundSql complex = new BoundSql(configuration, complexSql, List.of(), null);
-        Assertions.assertSame(complex, rewriter.rewrite(statement, complex));
-        Assertions.assertSame(complex, rewriter.rewrite(statement, complex));
+        try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+            SelectIsolationRewriter rewriter = new SelectIsolationRewriter(configuration, executor,
+                    new FieldDataIsolationStrategy(List.of(FieldRule.forDimension(TENANT, "tenantId", () -> DataIsolationScope.of(10L)))));
+            Assertions.assertSame(unknown, rewriter.rewrite(statement, unknown));
+            Assertions.assertSame(complex, rewriter.rewrite(statement, complex));
+            executor.shutdown();
+
+            for (BoundSql query : List.of(unknown, complex)) {
+                IllegalStateException failure = Assertions.assertThrows(IllegalStateException.class, () -> rewriter.rewrite(statement, query));
+                Assertions.assertTrue(failure.getMessage().contains("Cannot parse query for read isolation"));
+            }
+        }
     }
 
     @Test
@@ -280,6 +421,17 @@ class SelectIsolationRewriterTests {
             Assertions.assertThrows(IllegalStateException.class,
                     () -> rewriter.rewrite(statement, statement.getBoundSql(null)));
         }
+    }
+
+    private void assertRewrittenSql(BoundSql rewritten, String expectedSql, List<?> expectedValues) {
+        Assertions.assertEquals(expectedSql.replaceAll("\\s+", " ").trim(), rewritten.getSql());
+        MetaObject input = SystemMetaObject.forObject(rewritten.getParameterObject());
+        List<Object> values = rewritten.getParameterMappings().stream().map(mapping -> {
+            String property = mapping.getProperty();
+            return rewritten.hasAdditionalParameter(property)
+                    ? rewritten.getAdditionalParameter(property) : input.getValue(property);
+        }).toList();
+        Assertions.assertEquals(expectedValues, values);
     }
 
     private Configuration configuration() {

@@ -25,6 +25,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
+import static com.wind.integration.core.enums.DataIsolationDimensions.TENANT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -36,6 +37,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @Timeout(20)
 class SelectIsolationExecutionTests {
+
+    /**
+     * 多个重写器的真实解析任务共享有界资源，不能随 Mapper 元数据重建而累积常驻线程。
+     */
+    @Test
+    void testDefaultParserPoolIsSharedAcrossRewriters() {
+        Configuration configuration = configuration();
+        MappedStatement statement = statement(configuration);
+        FieldDataIsolationStrategy fields = new FieldDataIsolationStrategy(List.of(
+                FieldRule.forDimension(TENANT, "tenantId", () -> DataIsolationScope.of(10L))));
+        int threadLimit = Math.max(4, Runtime.getRuntime().availableProcessors());
+
+        for (int i = 0; i <= threadLimit; i++) {
+            SelectIsolationRewriter rewriter = new SelectIsolationRewriter(configuration, fields);
+            assertTenant(rewriter.rewrite(statement, statement.getBoundSql(null)), 10L);
+        }
+
+        List<Thread> parserThreads = Thread.getAllStackTraces().keySet().stream()
+                .filter(thread -> thread.isAlive() && thread.getName().startsWith("wind-isolation-parser-"))
+                .toList();
+        assertFalse(parserThreads.isEmpty());
+        assertTrue(parserThreads.size() <= threadLimit, "解析线程数不能随重写器数量持续增长");
+        assertTrue(parserThreads.stream().allMatch(Thread::isDaemon));
+    }
 
     @Test
     void testRepeatedQueriesReuseBorrowedExecutor() {

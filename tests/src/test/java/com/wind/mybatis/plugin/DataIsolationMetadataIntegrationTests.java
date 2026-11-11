@@ -59,7 +59,6 @@ class DataIsolationMetadataIntegrationTests {
 
     @AfterEach
     void tearDown() {
-        DataIsolationQueryIgnoreHolder.clear();
         TenantContextHolder.clear();
     }
 

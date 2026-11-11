@@ -1,7 +1,7 @@
 package com.wind.mybatis.plugin;
 
 import com.wind.mybatis.isolation.DataIsolationStrategy;
-import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.cache.CacheKey;
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.mapping.BoundSql;
@@ -27,12 +27,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 在 MyBatis 执行层实现读隔离：在生成查询缓存键前绑定范围，不拦截 INSERT/UPDATE/DELETE。
+ * 仅执行显式传入的策略，不自动添加内置维度规则。
  * 从当前工厂的 BaseMapper 实体元数据自动发现表和隔离字段。
  * 支持单表、派生包装、UNION 及限定的 WHERE EXISTS；其他关联、CTE 及嵌套查询映射拒绝执行。
  *
  * @author wuxp
  * @since 2026-10-16
  */
+@Slf4j
 @Intercepts({
         @Signature(type = Executor.class, method = "query", args = {
                 MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class
@@ -53,13 +55,6 @@ public final class DataIsolationQueryInterceptor implements Interceptor {
     private final Set<Class<?>> publicEntities;
 
     private final Map<Configuration, SelectIsolationRewriter> rewriters = new ConcurrentHashMap<>();
-
-    /**
-     * 使用默认字段策略，按实体接口和当前上下文启用租户、工作空间、环境和测试数据隔离。
-     */
-    public DataIsolationQueryInterceptor() {
-        this(List.of(new FieldDataIsolationStrategy()));
-    }
 
     /**
      * 使用完整策略集合，不隐式追加默认策略。按优先级升序执行，同值保持输入顺序，各策略条件取 AND。
@@ -116,28 +111,88 @@ public final class DataIsolationQueryInterceptor implements Interceptor {
         if (statement.getSqlCommandType() != SqlCommandType.SELECT) {
             return invocation.proceed();
         }
-        rejectNestedQueries(statement, statement.getResultMaps(), new HashSet<>());
-        Object parameter = args[1];
-        BoundSql original = args.length == 6 ? (BoundSql) args[5] : statement.getBoundSql(parameter);
-        BoundSql isolated = rewriterFor(statement.getConfiguration()).rewrite(statement, original);
-        if (isolated == original) {
-            if (args.length != 6) {
-                // 固定已检查的 SQL，避免动态 SqlSource 在执行时生成不同的查询。
-                args[0] = copyStatement(statement, original);
+        boolean debugEnabled = isDebugLoggingEnabled();
+        long started = debugEnabled ? System.nanoTime() : 0;
+        PreparationStage stage = PreparationStage.RESULT_MAPPING;
+        BoundSql original;
+        BoundSql isolated;
+        try {
+            rejectNestedQueries(statement, statement.getResultMaps(), new HashSet<>());
+            stage = PreparationStage.BOUND_SQL;
+            Object parameter = args[1];
+            original = args.length == 6 ? (BoundSql) args[5] : statement.getBoundSql(parameter);
+            stage = PreparationStage.METADATA;
+            SelectIsolationRewriter rewriter = rewriterFor(statement.getConfiguration());
+            stage = PreparationStage.REWRITE;
+            isolated = rewriter.rewrite(statement, original);
+            stage = PreparationStage.STATEMENT_COPY;
+            if (isolated == original) {
+                if (args.length != 6) {
+                    // 固定已检查的 SQL，避免动态 SqlSource 在执行时生成不同的查询。
+                    args[0] = copyStatement(statement, original);
+                }
+            } else {
+                MappedStatement copy = copyStatement(statement, isolated);
+                Object isolatedParameter = isolated.getParameterObject();
+                args[0] = copy;
+                args[1] = isolatedParameter;
+                if (args.length == 6) {
+                    stage = PreparationStage.CACHE_KEY;
+                    Executor executor = (Executor) invocation.getTarget();
+                    RowBounds rowBounds = (RowBounds) args[2];
+                    args[4] = executor.createCacheKey(copy, isolatedParameter, rowBounds, isolated);
+                    args[5] = isolated;
+                }
             }
-            return invocation.proceed();
+        } catch (RuntimeException failure) {
+            logRejectedQuery(statement, stage, failure);
+            throw failure;
         }
-        MappedStatement copy = copyStatement(statement, isolated);
-        Object isolatedParameter = isolated.getParameterObject();
-        args[0] = copy;
-        args[1] = isolatedParameter;
-        if (args.length == 6) {
-            Executor executor = (Executor) invocation.getTarget();
-            RowBounds rowBounds = (RowBounds) args[2];
-            args[4] = executor.createCacheKey(copy, isolatedParameter, rowBounds, isolated);
-            args[5] = isolated;
-        }
+        logPreparedQuery(statement, original, isolated, debugEnabled, started);
         return invocation.proceed();
+    }
+
+    private void logPreparedQuery(MappedStatement statement, BoundSql original, BoundSql isolated, boolean debugEnabled, long started) {
+        try {
+            boolean traceEnabled = log.isTraceEnabled();
+            if (!debugEnabled && !traceEnabled) {
+                return;
+            }
+            long elapsedMicros = debugEnabled ? (System.nanoTime() - started) / 1000 : 0;
+            boolean sqlChanged = !original.getSql().equals(isolated.getSql());
+            if (debugEnabled) {
+                log.debug("Read isolation prepared: statement={}, sqlChanged={}, parameterCount={}, elapsedMicros={}",
+                        statement.getId(), sqlChanged, isolated.getParameterMappings().size(), elapsedMicros);
+            }
+            if (traceEnabled) {
+                String before = IsolationSqlDiagnostics.format(original.getSql());
+                String after = sqlChanged ? IsolationSqlDiagnostics.format(isolated.getSql()) : before;
+                log.trace("Read isolation SQL: statement={}, sqlChanged={}, before={}, after={}",
+                        statement.getId(), sqlChanged, before, after);
+            }
+        } catch (RuntimeException ignored) {
+            // 诊断展示或日志提交失败不改变查询结果；避免在失败的日志链上递归记录。
+        }
+    }
+
+    private boolean isDebugLoggingEnabled() {
+        try {
+            return log.isDebugEnabled();
+        } catch (RuntimeException ignored) {
+            // 过滤器故障时关闭本次摘要，不阻止实际查询。
+            return false;
+        }
+    }
+
+    private void logRejectedQuery(MappedStatement statement, PreparationStage stage, RuntimeException failure) {
+        try {
+            // 异常详情可能含 SQL 或业务值，只记定位摘要，原异常交回调用方。
+            StackTraceElement[] stack = failure.getStackTrace();
+            log.warn("Read isolation rejected: statement={}, stage={}, failureType={}, failureSite={}",
+                    statement.getId(), stage, failure.getClass().getName(), stack.length == 0 ? "unknown" : stack[0]);
+        } catch (RuntimeException ignored) {
+            // 保留查询原始异常，不让日志提交异常将其覆盖。
+        }
     }
 
     private SelectIsolationRewriter rewriterFor(Configuration configuration) {
@@ -206,4 +261,18 @@ public final class DataIsolationQueryInterceptor implements Interceptor {
         return builder.build();
     }
 
+    /**
+     * 查询进入 Executor 之前的隔离准备阶段，用于定位失败位置。
+     *
+     * @author wuxp
+     * @since 2026-11-09
+     */
+    private enum PreparationStage {
+        RESULT_MAPPING,
+        BOUND_SQL,
+        METADATA,
+        REWRITE,
+        STATEMENT_COPY,
+        CACHE_KEY
+    }
 }

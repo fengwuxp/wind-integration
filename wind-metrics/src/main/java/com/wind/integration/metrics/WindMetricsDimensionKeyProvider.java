@@ -5,14 +5,11 @@ import com.wind.common.query.cursor.CursorBasedQuery;
 import com.wind.common.query.cursor.CursorPagination;
 import com.wind.common.query.supports.QueryOrderField;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import org.jspecify.annotations.NonNull;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -33,27 +30,6 @@ import java.util.Set;
 public interface WindMetricsDimensionKeyProvider {
 
     /**
-     * 查询一页维度键；每个 Map 是一个完整组合，不能把组合拆成分别分页的维度值。
-     *
-     * <p>返回的键名集合与 dimensions 一致，值非空，不包含额外运行上下文。
-     * 请求维度的 Set 顺序不决定分页顺序。不足 querySize 的非空页仍是有效数据，
-     * 调用方继续递增页码直到空列表；空列表只表示遍历结束，不能表示不支持或执行失败。</p>
-     *
-     * @param dimensions 非空的业务逻辑维度名集合，名称非空白
-     * @param queryPage  从 1 开始的页码
-     * @param querySize  正整数页大小，按完整组合计数；实现可以限制最大值
-     * @return 至多 querySize 个完整维度键，容器及元素非空；空列表表示结束
-     * @throws IllegalArgumentException      参数不合法或超出实现声明的分页范围
-     * @throws UnsupportedOperationException 不支持请求的维度组合
-     * @throws RuntimeException              读取失败，不能将失败转成空页
-     */
-    @NonNull
-    @Deprecated(forRemoval = true)
-    default List<Map<String, Serializable>> queryDimensionKeys(@NotEmpty Set<@NotBlank String> dimensions, @Positive int queryPage, @Positive int querySize) {
-        throw new UnsupportedOperationException("Time-bounded dimension key enumeration is not supported");
-    }
-
-    /**
      * 查询一页维度键
      *
      * @param dimension 业务维度
@@ -61,7 +37,7 @@ public interface WindMetricsDimensionKeyProvider {
      * @return 游标分页结果
      */
     @NonNull
-    default CursorPagination<List<Serializable>> queryDimensionKeys(@NotNull String dimension, @NotNull CursorBasedQuery<? extends QueryOrderField> options) {
+    default CursorPagination<Serializable> queryDimensionKeys(@NotNull String dimension, @NotNull CursorBasedQuery<? extends QueryOrderField> options) {
         throw new UnsupportedOperationException("Time-bounded dimension key enumeration is not supported");
     }
 
@@ -95,8 +71,8 @@ public interface WindMetricsDimensionKeyProvider {
      * @throws RuntimeException              读取失败，不能将失败转成空页
      */
     @NonNull
-    default CursorPagination<List<Map<String, Serializable>>> queryDimensionKeys(@NotNull Set<@NotBlank String> dimensions, @NotNull LocalDateTime targetWatermark,
-                                                                                 @NotNull CursorBasedQuery<? extends QueryOrderField> options) {
+    default CursorPagination<Map<String, Serializable>> queryDimensionKeys(@NotNull Set<@NotBlank String> dimensions, @NotNull LocalDateTime targetWatermark,
+                                                                           @NotNull CursorBasedQuery<? extends QueryOrderField> options) {
         throw new UnsupportedOperationException("Time-bounded dimension key enumeration is not supported");
     }
 

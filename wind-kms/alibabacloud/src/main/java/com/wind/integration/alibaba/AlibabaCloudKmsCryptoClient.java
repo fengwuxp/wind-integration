@@ -168,8 +168,8 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
             }
             if (LOGGER.isLoggable(Level.INFO)) {
                 String accessKeyId = config.getAccessKeyId();
-                String accessKeyPrefix = accessKeyId == null ? "<credential-provider>" : accessKeyId.substring(0, Math.min(5, accessKeyId.length()));
-                LOGGER.info(String.format("alibaba cloud kms init, the first 5 characters of AK = %s", accessKeyPrefix));
+                String accessKeyPrefix = accessKeyId == null || accessKeyId.length() <= 4 ? "<credential-provider>" : accessKeyId.substring((accessKeyId.length() - 4));
+                LOGGER.info(String.format("alibaba cloud kms init, the last 4 characters of AK = %s", accessKeyPrefix));
                 LOGGER.info("alibaba cloud kms, use endpoint = " + config.getEndpoint());
             }
             return new Client(config);

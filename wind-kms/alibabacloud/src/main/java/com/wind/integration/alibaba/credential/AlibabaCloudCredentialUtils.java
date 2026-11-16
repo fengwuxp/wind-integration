@@ -1,6 +1,7 @@
 package com.wind.integration.alibaba.credential;
 
 import com.aliyun.credentials.models.Config;
+import com.wind.common.annotations.VisibleForTesting;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.exception.BaseException;
 import com.wind.common.exception.DefaultExceptionCode;
@@ -89,7 +90,7 @@ public final class AlibabaCloudCredentialUtils {
         AssertUtils.isTrue(Files.exists(filepath), "alibaba cloud credential file not found");
         try {
             String content = Files.readString(filepath);
-            String config = loadDecryptor().decrypt(content);
+            String config = loadDecryptor().decrypt(content.trim());
             BufferedReader reader = new BufferedReader(new StringReader(config));
             List<String> result = reader.lines().filter(StringUtils::hasText).toList();
             AssertUtils.isTrue(result.size() >= 2, "alibaba cloud credential file format error");
@@ -105,7 +106,8 @@ public final class AlibabaCloudCredentialUtils {
      * @return WindKmsClientCredentialsDecryptor
      */
     @NotNull
-    private static WindKmsClientCredentialsDecryptor loadDecryptor() {
+    @VisibleForTesting
+    static WindKmsClientCredentialsDecryptor loadDecryptor() {
         ServiceLoader<WindKmsClientCredentialsDecryptor> services = ServiceLoader.load(WindKmsClientCredentialsDecryptor.class);
         return services.findFirst().orElseThrow(() -> new IllegalStateException("No " + WindKmsClientCredentialsDecryptor.class.getName() + " found"));
     }

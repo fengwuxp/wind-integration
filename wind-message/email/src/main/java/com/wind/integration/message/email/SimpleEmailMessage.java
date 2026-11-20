@@ -19,7 +19,7 @@ public record SimpleEmailMessage(String title, String message, String format, Se
     }
 
     public boolean isHtml() {
-        return WindSendMessageConstants.TEXT_FORMAT.equals(format);
+        return WindSendMessageConstants.HTML_FORMAT.equals(format);
     }
 
     public static SimpleEmailMessage text(String title, String message, Set<String> receivers) {

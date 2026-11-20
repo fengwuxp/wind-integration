@@ -1,0 +1,2 @@
+com.wind.integration.alibaba.configuration.AlibabaCloudCredentialsAutoConfiguration
+com.wind.integration.alibaba.configuration.AlibabaCloudEmailAutoConfiguration

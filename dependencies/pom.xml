@@ -25,6 +25,16 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
+                <artifactId>wind-alibabacloud-credentials</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-alibabacloud-spring-boot-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
                 <artifactId>wind-oss-api</artifactId>
                 <version>${project.version}</version>
             </dependency>

@@ -14,6 +14,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-alibabacloud-credentials</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.aliyun</groupId>
             <artifactId>dm20151123</artifactId>
         </dependency>
@@ -30,4 +34,16 @@
             <artifactId>kotlin-stdlib</artifactId>
         </dependency>
     </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- 测试仅替换 SDK 外部 HTTP 通信。 -->
+                    <argLine>${jacoco-coverage-agent} -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

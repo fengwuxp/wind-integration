@@ -24,6 +24,8 @@
         <module>wind-money</module>
         <module>tests</module>
         <module>dependencies</module>
+        <module>wind-alibabacloud-credentials</module>
+        <module>wind-alibabacloud-spring-boot-starter</module>
         <module>wind-oss</module>
         <module>wind-kms</module>
         <module>wind-metrics</module>
@@ -99,6 +101,16 @@
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-operator</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-alibabacloud-credentials</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-alibabacloud-spring-boot-starter</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

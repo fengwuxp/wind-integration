@@ -14,6 +14,10 @@
     <dependencies>
         <dependency>
             <groupId>com.wind.integration</groupId>
+            <artifactId>wind-alibabacloud-credentials</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
             <artifactId>wind-oss-api</artifactId>
         </dependency>
         <dependency>
@@ -21,5 +25,18 @@
             <artifactId>aliyun-sdk-oss</artifactId>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- 在测试 JVM 启动时加载 Mockito，避免依赖运行时自附加。 -->
+                    <argLine>${jacoco-coverage-agent} -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>

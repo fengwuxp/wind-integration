@@ -1,5 +1,6 @@
 package com.wind.integration.message.email.alibabacloud;
 
+import com.wind.integration.alibaba.credentials.AlibabaCloudProductProperties;
 import com.wind.integration.message.email.SimpleEmailMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -19,11 +20,11 @@ class AlibabaCloudEmailMessageSenderTests {
 
     @BeforeEach
     void setup() {
-        AlibabaCloudEmailProperties properties = new AlibabaCloudEmailProperties();
+        AlibabaCloudProductProperties properties = new AlibabaCloudProductProperties();
         properties.setAccessKey("test");
         properties.setSecretKey("test");
         properties.setEndpoint("dm.us-east-1.aliyuncs.com");
-        sender = new AlibabaCloudEmailMessageSender("test@email.com", properties);
+        sender = AlibabaCloudEmailMessageSender.fromProperties(properties, () -> "test@email.com");
     }
 
     @Test

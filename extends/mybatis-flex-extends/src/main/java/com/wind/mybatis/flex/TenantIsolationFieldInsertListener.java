@@ -4,6 +4,8 @@ import com.mybatisflex.annotation.AbstractInsertListener;
 import com.wind.integration.core.context.DataIsolationContextHolder;
 import com.wind.integration.core.model.SettableTenantIsolationObject;
 
+import java.io.Serializable;
+
 /**
  * 为可设置租户归属的实体填充当前租户，缺少上下文时填 null。
  * Flex 按 Class 解析监听目标，父类泛型使用原始接口。
@@ -15,6 +17,9 @@ public class TenantIsolationFieldInsertListener extends AbstractInsertListener<S
 
     @Override
     public void doInsert(SettableTenantIsolationObject entity) {
-        entity.setTenantId(DataIsolationContextHolder.getTenantId());
+        Serializable tenantId = DataIsolationContextHolder.getTenantId();
+        if (tenantId != null) {
+            entity.setTenantId(tenantId);
+        }
     }
 }

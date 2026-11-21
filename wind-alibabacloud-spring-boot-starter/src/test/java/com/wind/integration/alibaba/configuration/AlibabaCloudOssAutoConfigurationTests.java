@@ -1,4 +1,4 @@
-package com.wind.integration.oss.configuration;
+package com.wind.integration.alibaba.configuration;
 
 import com.aliyun.credentials.models.Config;
 import com.aliyun.credentials.exception.CredentialException;
@@ -50,7 +50,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-class WindOssAutoConfigurationTests {
+class AlibabaCloudOssAutoConfigurationTests {
 
     @TempDir
     Path directory;
@@ -59,10 +59,10 @@ class WindOssAutoConfigurationTests {
     void testProductAccessKeyBindingAndSignature() throws Exception {
         List<HttpUriRequest> requests = new ArrayList<>();
         try (MockedStatic<HttpClients> ignored = interceptHttp(requests)) {
-            contextRunner().withPropertyValues("wind.alibaba.cloud.oss.access-key=product-id", "wind.alibaba.cloud.oss.secret-key=product-secret")
+            contextRunner().withPropertyValues("wind.oss.alibaba.access-key=product-id", "wind.oss.alibaba.secret-key=product-secret")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
-                        Assertions.assertSame(context.getBean(WindOssClient.class), context.getBean("alibabaCloudOssClient"));
+                        Assertions.assertSame(context.getBean(WindOssClient.class), context.getBean(AlibabaCloudOssAutoConfiguration.OSS_CLIENT_BEAN_NAME));
                         context.getBean(WindOssClient.class).deleteFile("test-bucket", "test-object");
                     });
         }
@@ -80,20 +80,20 @@ class WindOssAutoConfigurationTests {
         mail.setType("unused-mail-type");
         List<HttpUriRequest> requests = new ArrayList<>();
         try (MockedStatic<HttpClients> ignored = interceptHttp(requests)) {
-            contextRunner().withBean("windAlibabaCloudOssProperties", AlibabaCloudProductProperties.class, () -> product)
-                    .withBean("windAlibabaCloudEmailProperties", AlibabaCloudProductProperties.class, () -> mail)
-                    .withPropertyValues("wind.alibaba.cloud.credentials.type=unused-global-type")
+            contextRunner().withBean(AlibabaCloudOssAutoConfiguration.OSS_PROPERTIES_BEAN_NAME, AlibabaCloudProductProperties.class, () -> product)
+                    .withBean(AlibabaCloudEmailAutoConfiguration.EMAIL_PROPERTIES_BEAN_NAME, AlibabaCloudProductProperties.class, () -> mail)
+                    .withPropertyValues("wind.alibaba.credentials.type=unused-global-type")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
-                        Assertions.assertSame(product, context.getBean("windAlibabaCloudOssProperties"));
+                        Assertions.assertSame(product, context.getBean(AlibabaCloudOssAutoConfiguration.OSS_PROPERTIES_BEAN_NAME));
                         context.getBean(WindOssClient.class).deleteFile("test-bucket", "test-object");
                     });
-            contextRunner().withBean("windAlibabaCloudEmailProperties", AlibabaCloudProductProperties.class, () -> mail)
-                    .withPropertyValues("wind.alibaba.cloud.credentials.type=unused-global-type",
-                            "wind.alibaba.cloud.oss.access-key=bound-oss-id", "wind.alibaba.cloud.oss.secret-key=bound-oss-secret")
+            contextRunner().withBean(AlibabaCloudEmailAutoConfiguration.EMAIL_PROPERTIES_BEAN_NAME, AlibabaCloudProductProperties.class, () -> mail)
+                    .withPropertyValues("wind.alibaba.credentials.type=unused-global-type",
+                            "wind.oss.alibaba.access-key=bound-oss-id", "wind.oss.alibaba.secret-key=bound-oss-secret")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
-                        Assertions.assertNotSame(mail, context.getBean("windAlibabaCloudOssProperties"));
+                        Assertions.assertNotSame(mail, context.getBean(AlibabaCloudOssAutoConfiguration.OSS_PROPERTIES_BEAN_NAME));
                         context.getBean(WindOssClient.class).deleteFile("test-bucket", "test-object");
                     });
         }
@@ -113,7 +113,7 @@ class WindOssAutoConfigurationTests {
             AlibabaCloudOssClient custom = AlibabaCloudOssClient.withCredential(credential,
                     "https://oss-cn-hangzhou.aliyuncs.com", new ClientConfiguration());
             contextRunner().withBean(WindOssClient.class, () -> custom)
-                    .withPropertyValues("wind.alibaba.cloud.oss.access-key=unused-partial")
+                    .withPropertyValues("wind.oss.alibaba.access-key=unused-partial")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
                         Assertions.assertSame(custom, context.getBean(WindOssClient.class));
@@ -133,7 +133,7 @@ class WindOssAutoConfigurationTests {
     @ParameterizedTest
     @ValueSource(strings = {"access-key=", "secret-key=", "access-key=partial-id", "secret-key=partial-secret"})
     void testRejectIncompleteProductCredentials(String property) {
-        contextRunner().withPropertyValues("wind.alibaba.cloud.oss." + property)
+        contextRunner().withPropertyValues("wind.oss.alibaba." + property)
                 .run(context -> Assertions.assertNotNull(context.getStartupFailure()));
     }
 
@@ -142,7 +142,7 @@ class WindOssAutoConfigurationTests {
         WindOssClient custom = Mockito.mock(WindOssClient.class);
         try (MockedConstruction<OSSClient> sdk = Mockito.mockConstruction(OSSClient.class)) {
             contextRunner().withBean(WindOssClient.class, () -> custom)
-                    .withPropertyValues("wind.alibaba.cloud.oss.access-key=partial")
+                    .withPropertyValues("wind.oss.alibaba.access-key=partial")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
                         Assertions.assertSame(custom, context.getBean(WindOssClient.class));
@@ -154,7 +154,7 @@ class WindOssAutoConfigurationTests {
     @Test
     void testContextClosesSdkCreatedByAutoConfiguration() {
         try (MockedConstruction<OSSClient> sdk = Mockito.mockConstruction(OSSClient.class)) {
-            contextRunner().withPropertyValues("wind.alibaba.cloud.oss.access-key=product-id", "wind.alibaba.cloud.oss.secret-key=product-secret")
+            contextRunner().withPropertyValues("wind.oss.alibaba.access-key=product-id", "wind.oss.alibaba.secret-key=product-secret")
                     .run(context -> Assertions.assertNull(context.getStartupFailure()));
 
             Assertions.assertEquals(1, sdk.constructed().size());
@@ -179,9 +179,9 @@ class WindOssAutoConfigurationTests {
     void testNewProductStsConfigurationUsesNewEndpoint() throws Exception {
         List<HttpUriRequest> requests = new ArrayList<>();
         try (MockedStatic<HttpClients> ignored = interceptHttp(requests)) {
-            contextRunner().withPropertyValues("wind.alibaba.cloud.oss.type=sts",
-                            "wind.alibaba.cloud.oss.access-key=STS.product", "wind.alibaba.cloud.oss.secret-key=product-secret",
-                            "wind.alibaba.cloud.oss.security-token=product-token", "wind.alibaba.cloud.oss.endpoint=https://oss-cn-shanghai.aliyuncs.com")
+            contextRunner().withPropertyValues("wind.oss.alibaba.type=sts",
+                            "wind.oss.alibaba.access-key=STS.product", "wind.oss.alibaba.secret-key=product-secret",
+                            "wind.oss.alibaba.security-token=product-token", "wind.oss.alibaba.endpoint=https://oss-cn-shanghai.aliyuncs.com")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
                         context.getBean(WindOssClient.class).deleteFile("test-bucket", "test-object");
@@ -195,9 +195,9 @@ class WindOssAutoConfigurationTests {
     void testProductEndpointOnlyUsesGlobalCredentials() throws Exception {
         List<HttpUriRequest> requests = new ArrayList<>();
         try (MockedStatic<HttpClients> ignored = interceptHttp(requests)) {
-            contextRunner().withPropertyValues("wind.alibaba.cloud.credentials.type=sts",
-                            "wind.alibaba.cloud.credentials.access-key=STS.global", "wind.alibaba.cloud.credentials.secret-key=global-secret",
-                            "wind.alibaba.cloud.credentials.security-token=global-token", "wind.alibaba.cloud.oss.endpoint=https://oss-cn-shanghai.aliyuncs.com")
+            contextRunner().withPropertyValues("wind.alibaba.credentials.type=sts",
+                            "wind.alibaba.credentials.access-key=STS.global", "wind.alibaba.credentials.secret-key=global-secret",
+                            "wind.alibaba.credentials.security-token=global-token", "wind.oss.alibaba.endpoint=https://oss-cn-shanghai.aliyuncs.com")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
                         context.getBean(WindOssClient.class).deleteFile("test-bucket", "test-object");
@@ -211,8 +211,8 @@ class WindOssAutoConfigurationTests {
     void testProductIdentityDoesNotResolveInvalidGlobal() throws Exception {
         List<HttpUriRequest> requests = new ArrayList<>();
         try (MockedStatic<HttpClients> ignored = interceptHttp(requests)) {
-            contextRunner().withPropertyValues("wind.alibaba.cloud.credentials.type=invalid-global",
-                            "wind.alibaba.cloud.oss.access-key=product-id", "wind.alibaba.cloud.oss.secret-key=product-secret")
+            contextRunner().withPropertyValues("wind.alibaba.credentials.type=invalid-global",
+                            "wind.oss.alibaba.access-key=product-id", "wind.oss.alibaba.secret-key=product-secret")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
                         context.getBean(WindOssClient.class).deleteFile("test-bucket", "test-object");
@@ -224,8 +224,8 @@ class WindOssAutoConfigurationTests {
     @ParameterizedTest
     @ValueSource(strings = {"access-key=partial", "security-token=orphan", "type=sts"})
     void testPartialProductIdentityDoesNotMergeWithGlobal(String property) {
-        contextRunner().withPropertyValues("wind.alibaba.cloud.oss." + property,
-                        "wind.alibaba.cloud.credentials.access-key=global-id", "wind.alibaba.cloud.credentials.secret-key=global-secret")
+        contextRunner().withPropertyValues("wind.oss.alibaba." + property,
+                        "wind.alibaba.credentials.access-key=global-id", "wind.alibaba.credentials.secret-key=global-secret")
                 .run(context -> Assertions.assertNotNull(context.getStartupFailure()));
     }
 
@@ -234,10 +234,10 @@ class WindOssAutoConfigurationTests {
         Path token = directory.resolve("missing-oidc-token");
         List<HttpUriRequest> requests = new ArrayList<>();
         try (MockedStatic<HttpClients> ignored = interceptHttp(requests)) {
-            contextRunner().withPropertyValues("wind.alibaba.cloud.credentials.type=oidc_role_arn",
-                            "wind.alibaba.cloud.credentials.role-arn=acs:ram::123456789:role/test-role",
-                            "wind.alibaba.cloud.credentials.oidc-provider-arn=acs:ram::123456789:oidc-provider/test",
-                            "wind.alibaba.cloud.credentials.oidc-token-file-path=" + token)
+            contextRunner().withPropertyValues("wind.alibaba.credentials.type=oidc_role_arn",
+                            "wind.alibaba.credentials.role-arn=acs:ram::123456789:role/test-role",
+                            "wind.alibaba.credentials.oidc-provider-arn=acs:ram::123456789:oidc-provider/test",
+                            "wind.alibaba.credentials.oidc-token-file-path=" + token)
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
                         CredentialException failure = Assertions.assertThrows(CredentialException.class,
@@ -268,17 +268,17 @@ class WindOssAutoConfigurationTests {
                                  .getBytes(StandardCharsets.UTF_8), "UTF-8", FormatType.JSON);
                          return response;
                      }))) {
-            contextRunner().withPropertyValues("wind.alibaba.cloud.credentials.access-key=initial-id",
-                            "wind.alibaba.cloud.credentials.secret-key=initial-secret")
+            contextRunner().withPropertyValues("wind.alibaba.credentials.access-key=initial-id",
+                            "wind.alibaba.credentials.secret-key=initial-secret")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
                         context.getBean(WindOssClient.class).deleteFile("test-bucket", "test-object");
                     });
-            contextRunner().withPropertyValues("wind.alibaba.cloud.credentials.type=oidc_role_arn",
-                            "wind.alibaba.cloud.credentials.role-arn=acs:ram::123456789:role/test-role",
-                            "wind.alibaba.cloud.credentials.oidc-provider-arn=acs:ram::123456789:oidc-provider/test",
-                            "wind.alibaba.cloud.credentials.oidc-token-file-path=" + token,
-                            "wind.alibaba.cloud.credentials.sts-endpoint=sts.example.invalid")
+            contextRunner().withPropertyValues("wind.alibaba.credentials.type=oidc_role_arn",
+                            "wind.alibaba.credentials.role-arn=acs:ram::123456789:role/test-role",
+                            "wind.alibaba.credentials.oidc-provider-arn=acs:ram::123456789:oidc-provider/test",
+                            "wind.alibaba.credentials.oidc-token-file-path=" + token,
+                            "wind.alibaba.credentials.sts-endpoint=sts.example.invalid")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
                         Assertions.assertTrue(exchanges.isEmpty());
@@ -293,17 +293,17 @@ class WindOssAutoConfigurationTests {
     }
 
     @Test
-    void testRemovedLegacyPrefixDoesNotProvideIdentity() {
-        contextRunner().withPropertyValues("wind.oss.alibaba.access-key=removed-id", "wind.oss.alibaba.secret-key=removed-secret")
+    void testIntermediateCloudPrefixDoesNotProvideIdentity() {
+        contextRunner().withPropertyValues("wind.alibaba.cloud.oss.access-key=removed-id", "wind.alibaba.cloud.oss.secret-key=removed-secret")
                 .run(context -> Assertions.assertNotNull(context.getStartupFailure()));
     }
 
     @Test
     void testEndpointIsRequiredFromProductConfiguration() {
         new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class, WindOssAutoConfiguration.class))
-                .withPropertyValues("wind.oss.default-bucket-name=", "wind.oss.alibaba.endpoint=https://oss-cn-hangzhou.aliyuncs.com",
-                        "wind.alibaba.cloud.credentials.access-key=global-id", "wind.alibaba.cloud.credentials.secret-key=global-secret")
+                .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class, AlibabaCloudCredentialsAutoConfiguration.class, AlibabaCloudOssAutoConfiguration.class))
+                .withPropertyValues("wind.oss.default-bucket-name=", "wind.alibaba.cloud.oss.endpoint=https://oss-cn-hangzhou.aliyuncs.com",
+                        "wind.alibaba.credentials.access-key=global-id", "wind.alibaba.credentials.secret-key=global-secret")
                 .run(context -> Assertions.assertNotNull(context.getStartupFailure()));
     }
 
@@ -311,7 +311,7 @@ class WindOssAutoConfigurationTests {
     void testCustomClientDoesNotResolveInvalidGlobalCredentials() {
         WindOssClient custom = Mockito.mock(WindOssClient.class);
         contextRunner().withBean(WindOssClient.class, () -> custom)
-                .withPropertyValues("wind.alibaba.cloud.credentials.type=invalid-global")
+                .withPropertyValues("wind.alibaba.credentials.type=invalid-global")
                 .run(context -> {
                     Assertions.assertNull(context.getStartupFailure());
                     Assertions.assertSame(custom, context.getBean(WindOssClient.class));
@@ -340,10 +340,10 @@ class WindOssAutoConfigurationTests {
         List<CredentialsProvider> providers = new ArrayList<>();
         try (MockedConstruction<OSSClient> ignored = Mockito.mockConstruction(OSSClient.class,
                 (sdk, context) -> providers.add((CredentialsProvider) context.arguments().get(1)))) {
-            contextRunner().withBean("alibabaCloudDefaultCredential", com.aliyun.credentials.Client.class, () -> shared)
+            contextRunner().withBean(AlibabaCloudCredentialsAutoConfiguration.DEFAULT_CREDENTIAL_BEAN_NAME, com.aliyun.credentials.Client.class, () -> shared)
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
-                        Assertions.assertSame(shared, context.getBean("alibabaCloudDefaultCredential"));
+                        Assertions.assertSame(shared, context.getBean(AlibabaCloudCredentialsAutoConfiguration.DEFAULT_CREDENTIAL_BEAN_NAME));
                         Assertions.assertEquals("first-token", providers.getFirst().getCredentials().getSecurityToken());
                         current.set(CredentialModel.builder().type("sts").accessKeyId("STS.second")
                                 .accessKeySecret("second-secret").securityToken("second-token").build());
@@ -371,10 +371,19 @@ class WindOssAutoConfigurationTests {
     }
 
     @Test
+    void testIntermediateDefaultBucketPropertyDoesNotCreateTemplate() {
+        newPrefixRunner().withPropertyValues("wind.alibaba.cloud.oss.default-bucket-name=intermediate-bucket").run(context -> {
+            Assertions.assertNull(context.getStartupFailure());
+            Assertions.assertTrue(context.getBeansOfType(BucketOperationsTemplate.class).isEmpty());
+        });
+    }
+
+    @Test
     void testDefaultBucketCreatesWorkingTemplate() throws Exception {
         List<HttpUriRequest> requests = new ArrayList<>();
         try (MockedStatic<HttpClients> ignored = interceptHttp(requests)) {
-            newPrefixRunner().withPropertyValues("wind.oss.default-bucket-name=default-bucket").run(context -> {
+            newPrefixRunner().withPropertyValues("wind.oss.default-bucket-name=default-bucket",
+                    "wind.alibaba.cloud.oss.default-bucket-name=intermediate-bucket").run(context -> {
                 Assertions.assertNull(context.getStartupFailure());
                 context.getBean(BucketOperationsTemplate.class).deleteFile("test-object");
             });
@@ -388,21 +397,20 @@ class WindOssAutoConfigurationTests {
         new ApplicationContextRunner()
                 .withClassLoader(new FilteredClassLoader(excludedPackage))
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class,
-                        ConfigurationPropertiesAutoConfiguration.class, WindOssAutoConfiguration.class))
+                        ConfigurationPropertiesAutoConfiguration.class, AlibabaCloudCredentialsAutoConfiguration.class, AlibabaCloudOssAutoConfiguration.class))
                 .run(context -> {
                     Assertions.assertNull(context.getStartupFailure());
-                    Assertions.assertFalse(context.containsBean("alibabaCloudOssClient"));
-                    Assertions.assertFalse(context.containsBean("alibabaCloudOssProperties"));
-                    Assertions.assertFalse(context.containsBean("windAlibabaCloudOssProperties"));
+                    Assertions.assertFalse(context.containsBean(AlibabaCloudOssAutoConfiguration.OSS_CLIENT_BEAN_NAME));
+                    Assertions.assertFalse(context.containsBean(AlibabaCloudOssAutoConfiguration.OSS_PROPERTIES_BEAN_NAME));
                 });
     }
 
     private static ApplicationContextRunner newPrefixRunner() {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class,
-                        ConfigurationPropertiesAutoConfiguration.class, WindOssAutoConfiguration.class))
-                .withPropertyValues("wind.alibaba.cloud.oss.endpoint=https://oss-cn-hangzhou.aliyuncs.com",
-                        "wind.alibaba.cloud.oss.access-key=product-id", "wind.alibaba.cloud.oss.secret-key=product-secret");
+                        ConfigurationPropertiesAutoConfiguration.class, AlibabaCloudCredentialsAutoConfiguration.class, AlibabaCloudOssAutoConfiguration.class))
+                .withPropertyValues("wind.oss.alibaba.endpoint=https://oss-cn-hangzhou.aliyuncs.com",
+                        "wind.oss.alibaba.access-key=product-id", "wind.oss.alibaba.secret-key=product-secret");
     }
 
     private static void assertIdentity(HttpUriRequest request, String accessKeyId, String token) {
@@ -416,8 +424,8 @@ class WindOssAutoConfigurationTests {
 
     private static ApplicationContextRunner contextRunner() {
         return new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class, WindOssAutoConfiguration.class))
-                .withPropertyValues("wind.oss.default-bucket-name=", "wind.alibaba.cloud.oss.endpoint=https://oss-cn-hangzhou.aliyuncs.com");
+                .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class, AlibabaCloudCredentialsAutoConfiguration.class, AlibabaCloudOssAutoConfiguration.class))
+                .withPropertyValues("wind.oss.default-bucket-name=", "wind.oss.alibaba.endpoint=https://oss-cn-hangzhou.aliyuncs.com");
     }
 
     private static MockedStatic<HttpClients> interceptHttp(List<HttpUriRequest> requests) throws Exception {

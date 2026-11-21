@@ -1,2 +1,3 @@
 com.wind.integration.alibaba.configuration.AlibabaCloudCredentialsAutoConfiguration
 com.wind.integration.alibaba.configuration.AlibabaCloudEmailAutoConfiguration
+com.wind.integration.alibaba.configuration.AlibabaCloudOssAutoConfiguration

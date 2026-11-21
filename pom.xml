@@ -125,11 +125,6 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
-                <artifactId>wind-oss-spring-boot-starter</artifactId>
-                <version>${revision}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.wind.integration</groupId>
                 <artifactId>wind-kms-api</artifactId>
                 <version>${revision}</version>
             </dependency>

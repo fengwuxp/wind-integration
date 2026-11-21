@@ -17,6 +17,7 @@ import com.wind.integration.alibaba.credentials.AlibabaCloudCredentialsPropertie
 import com.wind.integration.alibaba.credentials.AlibabaCloudProductProperties;
 import com.wind.integration.message.email.SimpleEmailMessage;
 import com.wind.integration.message.email.alibabacloud.AlibabaCloudEmailMessageSender;
+import com.wind.integration.message.email.alibabacloud.AlibabaCloudEmailAccountSupplier;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -39,7 +40,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 
 class AlibabaCloudCredentialsAutoConfigurationTests {
 
@@ -51,19 +51,36 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
                     AlibabaCloudCredentialsProperties.class).hasCredentials());
             Assertions.assertFalse(context.containsBean(AlibabaCloudEmailAutoConfiguration.EMAIL_SENDER_BEAN_NAME));
         });
-        runner().withPropertyValues("wind.alibaba.cloud.credentials.type=invalid")
+        runner().withPropertyValues("wind.alibaba.credentials.type=invalid")
                 .run(context -> Assertions.assertNull(context.getStartupFailure()));
     }
 
     @Test
     void testStarterDoesNotRequireMailDependency() {
         runner().withClassLoader(new FilteredClassLoader("com.wind.integration.message.email"))
-                .withPropertyValues("wind.alibaba.cloud.credentials.access-key=test-id", "wind.alibaba.cloud.credentials.secret-key=test-secret")
+                .withPropertyValues("wind.alibaba.credentials.access-key=test-id", "wind.alibaba.credentials.secret-key=test-secret")
                 .run(context -> {
                     Assertions.assertNull(context.getStartupFailure());
-                    Assertions.assertFalse(context.containsBean("windAlibabaCloudEmailProperties"));
+                    Assertions.assertFalse(context.containsBean(AlibabaCloudEmailAutoConfiguration.EMAIL_PROPERTIES_BEAN_NAME));
                     Client credential = context.getBean(AlibabaCloudCredentialsAutoConfiguration.DEFAULT_CREDENTIAL_BEAN_NAME, Client.class);
                     Assertions.assertEquals("test-id", credential.getCredential().getAccessKeyId());
+                });
+    }
+
+    @Test
+    void testCloudProductPrefixesNoLongerBindCredentials() {
+        runner().withPropertyValues("wind.alibaba.cloud.credentials.access-key=old-global-id",
+                        "wind.alibaba.cloud.credentials.secret-key=old-global-secret",
+                        "wind.alibaba.cloud.dm.access-key=old-mail-id", "wind.alibaba.cloud.dm.secret-key=old-mail-secret",
+                        "wind.alibaba.cloud.dm.endpoint=dm.old.invalid")
+                .run(context -> {
+                    Assertions.assertNull(context.getStartupFailure());
+                    AlibabaCloudCredentialsProperties global = context.getBean(
+                            AlibabaCloudCredentialsAutoConfiguration.GLOBAL_PROPERTIES_BEAN_NAME, AlibabaCloudCredentialsProperties.class);
+                    AlibabaCloudProductProperties mail = context.getBean(AlibabaCloudEmailAutoConfiguration.EMAIL_PROPERTIES_BEAN_NAME, AlibabaCloudProductProperties.class);
+                    Assertions.assertFalse(global.hasCredentials());
+                    Assertions.assertFalse(mail.hasCredentials());
+                    Assertions.assertNull(mail.getEndpoint());
                 });
     }
 
@@ -71,7 +88,7 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
     void testUnrelatedCredentialBeanDoesNotSuppressApplicationDefault() {
         Client independent = AlibabaCloudCredentialsFactory.accessKey("independent-id", "independent-secret");
         runner().withBean("otherCredential", Client.class, () -> independent)
-                .withPropertyValues("wind.alibaba.cloud.credentials.access-key=global-id", "wind.alibaba.cloud.credentials.secret-key=global-secret")
+                .withPropertyValues("wind.alibaba.credentials.access-key=global-id", "wind.alibaba.credentials.secret-key=global-secret")
                 .run(context -> {
                     Assertions.assertNull(context.getStartupFailure());
                     Client global = context.getBean(AlibabaCloudCredentialsAutoConfiguration.DEFAULT_CREDENTIAL_BEAN_NAME, Client.class);
@@ -86,12 +103,12 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
         List<TeaRequest> requests = new ArrayList<>();
         try (MockedStatic<Tea> ignored = interceptMail(requests)) {
             runner().withUserConfiguration(AccountConfiguration.class)
-                    .withPropertyValues("wind.alibaba.cloud.credentials.type=sts", "wind.alibaba.cloud.credentials.access-key=STS.global",
-                            "wind.alibaba.cloud.credentials.secret-key=global-secret", "wind.alibaba.cloud.credentials.security-token=global-token",
-                            "wind.alibaba.cloud.dm.endpoint=dm.example.invalid")
+                    .withPropertyValues("wind.alibaba.credentials.type=sts", "wind.alibaba.credentials.access-key=STS.global",
+                            "wind.alibaba.credentials.secret-key=global-secret", "wind.alibaba.credentials.security-token=global-token",
+                            "wind.message.email.alibaba.endpoint=dm.example.invalid")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
-                        AlibabaCloudProductProperties product = context.getBean("windAlibabaCloudEmailProperties", AlibabaCloudProductProperties.class);
+                        AlibabaCloudProductProperties product = context.getBean(AlibabaCloudEmailAutoConfiguration.EMAIL_PROPERTIES_BEAN_NAME, AlibabaCloudProductProperties.class);
                         Assertions.assertFalse(product.hasCredentials());
                         Assertions.assertEquals("dm.example.invalid", product.getEndpoint());
                         context.getBean(AlibabaCloudEmailMessageSender.class).sendMessage(message());
@@ -108,8 +125,8 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
         List<TeaRequest> requests = new ArrayList<>();
         try (MockedStatic<Tea> ignored = interceptMail(requests)) {
             runner().withUserConfiguration(AccountConfiguration.class)
-                    .withPropertyValues("wind.alibaba.cloud.credentials.type=invalid", "wind.alibaba.cloud.dm.access-key=local-id",
-                            "wind.alibaba.cloud.dm.secret-key=local-secret", "wind.alibaba.cloud.dm.endpoint=dm.example.invalid")
+                    .withPropertyValues("wind.alibaba.credentials.type=invalid", "wind.message.email.alibaba.access-key=local-id",
+                            "wind.message.email.alibaba.secret-key=local-secret", "wind.message.email.alibaba.endpoint=dm.example.invalid")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
                         context.getBean(AlibabaCloudEmailMessageSender.class).sendMessage(message());
@@ -121,11 +138,11 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
 
     @Test
     void testMailPropertiesBindCommonProductConfiguration() {
-        runner().withPropertyValues("wind.alibaba.cloud.dm.endpoint=dm.example.invalid",
-                        "wind.alibaba.cloud.dm.access-key=mail-id", "wind.alibaba.cloud.dm.secret-key=mail-secret")
+        runner().withPropertyValues("wind.message.email.alibaba.endpoint=dm.example.invalid",
+                        "wind.message.email.alibaba.access-key=mail-id", "wind.message.email.alibaba.secret-key=mail-secret")
                 .run(context -> {
                     Assertions.assertNull(context.getStartupFailure());
-                    AlibabaCloudProductProperties product = context.getBean("windAlibabaCloudEmailProperties", AlibabaCloudProductProperties.class);
+                    AlibabaCloudProductProperties product = context.getBean(AlibabaCloudEmailAutoConfiguration.EMAIL_PROPERTIES_BEAN_NAME, AlibabaCloudProductProperties.class);
                     Assertions.assertEquals("mail-id", product.getAccessKey());
                     Assertions.assertEquals("mail-secret", product.getSecretKey());
                     Assertions.assertEquals("dm.example.invalid", product.getEndpoint());
@@ -141,11 +158,11 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
         List<TeaRequest> requests = new ArrayList<>();
         try (MockedStatic<Tea> ignored = interceptMail(requests)) {
             runner().withUserConfiguration(AccountConfiguration.class)
-                    .withBean("windAlibabaCloudEmailProperties", AlibabaCloudProductProperties.class, () -> product)
-                    .withPropertyValues("wind.alibaba.cloud.credentials.type=invalid")
+                    .withBean(AlibabaCloudEmailAutoConfiguration.EMAIL_PROPERTIES_BEAN_NAME, AlibabaCloudProductProperties.class, () -> product)
+                    .withPropertyValues("wind.alibaba.credentials.type=invalid")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
-                        Assertions.assertSame(product, context.getBean("windAlibabaCloudEmailProperties"));
+                        Assertions.assertSame(product, context.getBean(AlibabaCloudEmailAutoConfiguration.EMAIL_PROPERTIES_BEAN_NAME));
                         context.getBean(AlibabaCloudEmailMessageSender.class).sendMessage(message());
                     });
         }
@@ -158,9 +175,9 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
         List<TeaRequest> requests = new ArrayList<>();
         try (MockedStatic<Tea> ignored = interceptMail(requests)) {
             runner().withUserConfiguration(AccountConfiguration.class)
-                    .withPropertyValues("wind.alibaba.cloud.credentials.type=access_key",
-                            "wind.alibaba.cloud.credentials.access-key=global-id", "wind.alibaba.cloud.credentials.secret-key=global-secret",
-                            "wind.alibaba.cloud.dm.endpoint=dm.example.invalid")
+                    .withPropertyValues("wind.alibaba.credentials.type=access_key",
+                            "wind.alibaba.credentials.access-key=global-id", "wind.alibaba.credentials.secret-key=global-secret",
+                            "wind.message.email.alibaba.endpoint=dm.example.invalid")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
                         context.getBean(AlibabaCloudEmailMessageSender.class).sendMessage(message());
@@ -196,11 +213,11 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
                          return response;
                      }))) {
             runner().withUserConfiguration(AccountConfiguration.class)
-                    .withPropertyValues("wind.alibaba.cloud.credentials.type=oidc_role_arn",
-                            "wind.alibaba.cloud.credentials.role-arn=acs:ram::123456789:role/test-role",
-                            "wind.alibaba.cloud.credentials.oidc-provider-arn=acs:ram::123456789:oidc-provider/test-provider",
-                            "wind.alibaba.cloud.credentials.oidc-token-file-path=${test.oidc-file}",
-                            "test.oidc-file=/test/ack-projected-token", "wind.alibaba.cloud.dm.endpoint=dm.example.invalid")
+                    .withPropertyValues("wind.alibaba.credentials.type=oidc_role_arn",
+                            "wind.alibaba.credentials.role-arn=acs:ram::123456789:role/test-role",
+                            "wind.alibaba.credentials.oidc-provider-arn=acs:ram::123456789:oidc-provider/test-provider",
+                            "wind.alibaba.credentials.oidc-token-file-path=${test.oidc-file}",
+                            "test.oidc-file=/test/ack-projected-token", "wind.message.email.alibaba.endpoint=dm.example.invalid")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
                         Assertions.assertTrue(exchanges.isEmpty());
@@ -222,8 +239,8 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
     @ValueSource(strings = {"access-key=partial", "security-token=", "type=unknown"})
     void testIncompleteMailIdentityCannotMergeWithGlobal(String property) {
         runner().withUserConfiguration(AccountConfiguration.class)
-                .withPropertyValues("wind.alibaba.cloud.credentials.access-key=global-id", "wind.alibaba.cloud.credentials.secret-key=global-secret",
-                        "wind.alibaba.cloud.dm.endpoint=dm.example.invalid", "wind.alibaba.cloud.dm." + property)
+                .withPropertyValues("wind.alibaba.credentials.access-key=global-id", "wind.alibaba.credentials.secret-key=global-secret",
+                        "wind.message.email.alibaba.endpoint=dm.example.invalid", "wind.message.email.alibaba." + property)
                 .run(context -> Assertions.assertNotNull(context.getStartupFailure()));
     }
 
@@ -250,7 +267,7 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
         try (MockedStatic<Tea> ignored = interceptMail(requests)) {
             runner().withUserConfiguration(AccountConfiguration.class)
                     .withBean(AlibabaCloudCredentialsAutoConfiguration.DEFAULT_CREDENTIAL_BEAN_NAME, Client.class, () -> credential)
-                    .withPropertyValues("wind.alibaba.cloud.dm.endpoint=dm.example.invalid")
+                    .withPropertyValues("wind.message.email.alibaba.endpoint=dm.example.invalid")
                     .run(context -> {
                         Assertions.assertNull(context.getStartupFailure());
                         AlibabaCloudEmailMessageSender sender = context.getBean(AlibabaCloudEmailMessageSender.class);
@@ -268,7 +285,7 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
         AlibabaCloudEmailMessageSender custom = Mockito.mock(AlibabaCloudEmailMessageSender.class);
         runner().withUserConfiguration(AccountConfiguration.class)
                 .withBean(AlibabaCloudEmailMessageSender.class, () -> custom)
-                .withPropertyValues("wind.alibaba.cloud.credentials.type=invalid", "wind.alibaba.cloud.dm.access-key=partial")
+                .withPropertyValues("wind.alibaba.credentials.type=invalid", "wind.message.email.alibaba.access-key=partial")
                 .run(context -> {
                     Assertions.assertNull(context.getStartupFailure());
                     Assertions.assertSame(custom, context.getBean(AlibabaCloudEmailMessageSender.class));
@@ -283,8 +300,8 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
     @Configuration(proxyBeanMethods = false)
     static class AccountConfiguration {
 
-        @Bean(AlibabaCloudEmailAutoConfiguration.ACCOUNT_SUPPLIER_BEAN_NAME)
-        Supplier<String> accountSupplier() {
+        @Bean
+        AlibabaCloudEmailAccountSupplier accountSupplier() {
             return () -> "sender@example.test";
         }
     }

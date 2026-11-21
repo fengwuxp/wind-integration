@@ -45,11 +45,6 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.integration</groupId>
-                <artifactId>wind-oss-spring-boot-starter</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.wind.integration</groupId>
                 <artifactId>wind-kms-api</artifactId>
                 <version>${project.version}</version>
             </dependency>

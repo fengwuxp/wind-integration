@@ -1,6 +1,6 @@
 # 阿里云 KMS
 
-KMS 不读取 `wind.alibaba.cloud`，但无参 `defaults()` 会响应 ACK 注入的 OIDC 环境变量。给同一应用启用 RRSA 时，需要核对 KMS 角色权限或保留显式凭据来源；仅将 Spring profile 切回 AK 不会关闭该环境路由。参见[两阶段迁移指南](../../wind-alibabacloud-spring-boot-starter/MIGRATION.md)。
+KMS 不读取 Spring 的全局或产品凭据配置，但无参 `defaults()` 会响应 ACK 注入的 OIDC 环境变量。给同一应用启用 RRSA 时，需要核对 KMS 角色权限或保留显式凭据来源；仅将 Spring profile 切回 AK 不会关闭该环境路由。参见[两阶段迁移指南](../../wind-alibabacloud-spring-boot-starter/MIGRATION.md)。
 
 `AlibabaCloudKmsCryptoClient` 提供加密、解密和凭据读取能力。应用可以使用公共凭据工厂创建一个官方凭据客户端，再为 KMS 指定独立的端点和超时。
 

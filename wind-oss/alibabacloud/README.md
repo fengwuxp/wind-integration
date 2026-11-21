@@ -6,36 +6,44 @@
 
 下方 YAML 与 `.properties` 为等价写法，选择一种使用；同一组配置不要在两种文件中重复维护。使用 `.properties` 时，认证 profile 文件对应为 `application-ak.properties`、`application-ack.properties`。
 
-Spring Boot 应用引入 OSS Starter，它会传递引入本模块和公共凭据 Starter，无需重复声明后端依赖。以下版本对应当前源码，应用应替换为实际可用且一致的发布版本；已由项目 BOM 管理时可省略版本：
+Spring Boot 应用显式引入公共 Starter 和本 OSS 产品模块；本模块在 Starter 中为可选依赖，不会自动传递到应用。以下版本对应当前源码，应用应替换为实际可用且一致的发布版本；已由项目 BOM 管理时可省略版本：
 
 ```xml
 <dependency>
     <groupId>com.wind.integration</groupId>
-    <artifactId>wind-oss-spring-boot-starter</artifactId>
+    <artifactId>wind-alibabacloud-spring-boot-starter</artifactId>
+    <version>4.1.0-SNAPSHOT</version>
+</dependency>
+<dependency>
+    <groupId>com.wind.integration</groupId>
+    <artifactId>wind-oss-alibabacloud</artifactId>
     <version>4.1.0-SNAPSHOT</version>
 </dependency>
 ```
+
+原 `wind-oss-spring-boot-starter` 已退役，OSS 自动装配迁入公共 Starter 的 `AlibabaCloudOssAutoConfiguration`。同时使用邮件时，再显式加入 `wind-message-emial-albabacloud`。未引入 OSS 产品模块或 SDK 时，OSS 自动配置退让。
 
 在 `application.yml` 中配置 OSS 自己的身份和实际 endpoint，环境变量由应用部署提供：
 
 ```yaml
 wind:
-  alibaba:
-    cloud:
-      oss:
-        endpoint: ${OSS_ENDPOINT}
-        type: access_key
-        access-key: ${OSS_ACCESS_KEY_ID}
-        secret-key: ${OSS_ACCESS_KEY_SECRET}
+  oss:
+    alibaba:
+      endpoint: ${OSS_ENDPOINT}
+      type: access_key
+      access-key: ${OSS_ACCESS_KEY_ID}
+      secret-key: ${OSS_ACCESS_KEY_SECRET}
+    default-bucket-name: ${OSS_BUCKET:}
 ```
 
 等价的 `application.properties`：
 
 ```properties
-wind.alibaba.cloud.oss.endpoint=${OSS_ENDPOINT}
-wind.alibaba.cloud.oss.type=access_key
-wind.alibaba.cloud.oss.access-key=${OSS_ACCESS_KEY_ID}
-wind.alibaba.cloud.oss.secret-key=${OSS_ACCESS_KEY_SECRET}
+wind.oss.alibaba.endpoint=${OSS_ENDPOINT}
+wind.oss.default-bucket-name=${OSS_BUCKET:}
+wind.oss.alibaba.type=access_key
+wind.oss.alibaba.access-key=${OSS_ACCESS_KEY_ID}
+wind.oss.alibaba.secret-key=${OSS_ACCESS_KEY_SECRET}
 ```
 
 业务服务直接构造注入 `WindOssClient`，不再手动 `new` 或调用工厂创建第二个实例。例如以下类放入应用组件扫描范围：
@@ -61,33 +69,88 @@ public class ObjectStorageService {
 }
 ```
 
-下载流由调用方关闭；OSS 客户端由 Spring 在容器关闭时释放，不在每次业务请求后关闭。使用默认 `BucketOperationsTemplate` 时，另配置 `wind.oss.default-bucket-name`，其前缀不变。
+下载流由调用方关闭；OSS 客户端由 Spring 在容器关闭时释放，不在每次业务请求后关闭。`wind.oss.default-bucket-name` 沿用原键，用于 OSS 通用默认 `BucketOperationsTemplate`；示例在 `OSS_BUCKET` 未设置时取空值，不创建模板。该字段与阿里云配置同属 `wind.oss`，不参与身份选择。
 
-ACK 已配置 RRSA、角色权限并注入两个 ARN 和 `ALIBABA_CLOUD_OIDC_TOKEN_FILE` 后，仅切换 OSS 时，将上述 `oss` 认证组替换为：
+ACK 已配置 RRSA、角色权限并注入两个 ARN 和 `ALIBABA_CLOUD_OIDC_TOKEN_FILE` 后，仅切换 OSS 时，将上述 `wind.oss.alibaba` 认证组替换为：
 
 ```yaml
 wind:
-  alibaba:
-    cloud:
-      oss:
-        endpoint: ${OSS_ENDPOINT}
-        type: oidc_role_arn
+  oss:
+    alibaba:
+      endpoint: ${OSS_ENDPOINT}
+      type: oidc_role_arn
+    default-bucket-name: ${OSS_BUCKET:}
 ```
 
 等价的 `application.properties`：
 
 ```properties
-wind.alibaba.cloud.oss.endpoint=${OSS_ENDPOINT}
-wind.alibaba.cloud.oss.type=oidc_role_arn
+wind.oss.alibaba.endpoint=${OSS_ENDPOINT}
+wind.oss.default-bucket-name=${OSS_BUCKET:}
+wind.oss.alibaba.type=oidc_role_arn
 ```
 
 必须从实际生效的全部配置来源移除原 OSS AK/SK、静态 SecurityToken，不能只覆盖 `type`。也可按[两阶段迁移指南](../../wind-alibabacloud-spring-boot-starter/MIGRATION.md)使用互斥认证 profile；重启或重新装配后生效，SDK 负责 OIDC 换证与 STS 刷新。该配置只选择 OSS 身份，邮件和 KMS 的配置保持独立；同一 Pod 的 OIDC 环境注入对 KMS 默认路由的影响见迁移指南。
 
-应用已有 `WindOssClient` Bean 时，自动装配会退让；仅修改 YAML 不会替换自建客户端。需要多个产品共享身份时，再使用 `wind.alibaba.cloud.credentials`，并移除 OSS 产品下整组认证字段。完整选择顺序、自定义 Bean 和 Bucket 配置见 [OSS Starter 文档](../wind-oss-spring-boot-starter/README.md)；旧 AK/SK 配置和代码升级按[迁移指南](../../wind-alibabacloud-spring-boot-starter/MIGRATION.md)执行。
+应用已有 `WindOssClient` Bean 时，自动装配会退让，不创建额外客户端或凭据来源；仅修改 YAML 不会替换自建客户端。配置属性仍会绑定，字段类型等绑定错误仍会报错。需要多个产品共享身份时，再使用 `wind.alibaba.credentials`，并移除 OSS 产品下整组认证字段。完整选择顺序和 Bucket 配置见[公共 Starter 文档](../../wind-alibabacloud-spring-boot-starter/README.md)；旧 AK/SK 配置和代码升级按[迁移指南](../../wind-alibabacloud-spring-boot-starter/MIGRATION.md)执行。
+
+### 静态 STS 与自定义客户端
+
+短期使用外部签发的 STS 时，将 OSS 认证组整体替换为以下配置；endpoint 和默认 Bucket 保留在公共配置中：
+
+```yaml
+wind:
+  oss:
+    alibaba:
+      type: sts
+      access-key: ${OSS_STS_ACCESS_KEY_ID}
+      secret-key: ${OSS_STS_ACCESS_KEY_SECRET}
+      security-token: ${OSS_STS_SECURITY_TOKEN}
+```
+
+等价的 `.properties` 配置，两种格式选择一种：
+
+```properties
+wind.oss.alibaba.type=sts
+wind.oss.alibaba.access-key=${OSS_STS_ACCESS_KEY_ID}
+wind.oss.alibaba.secret-key=${OSS_STS_ACCESS_KEY_SECRET}
+wind.oss.alibaba.security-token=${OSS_STS_SECURITY_TOKEN}
+```
+
+三元组必须来自同一次签发，不会自动续期。身份选择以整组为单位，残缺的产品配置不会从全局补字段或回退。
+
+需要自定义连接参数时可自行提供 `WindOssClient` Bean。以下示例显式选择 OIDC，并调整连接池大小；它只从产品属性读取 endpoint，不受 YAML 中 AK/SK 选择影响：
+
+```java
+import com.wind.integration.alibaba.configuration.AlibabaCloudOssAutoConfiguration;
+import com.wind.integration.alibaba.credentials.AlibabaCloudCredentialsFactory;
+import com.wind.integration.alibaba.credentials.AlibabaCloudProductProperties;
+import com.wind.integration.oss.WindOssClient;
+import com.wind.integration.oss.alibaba.AlibabaCloudOssClient;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration(proxyBeanMethods = false)
+public class OssClientConfiguration {
+
+    @Bean
+    public WindOssClient ossClient(
+            @Qualifier(AlibabaCloudOssAutoConfiguration.OSS_PROPERTIES_BEAN_NAME)
+            AlibabaCloudProductProperties properties) {
+        var connection = AlibabaCloudOssClient.getDefaultClientConfiguration();
+        connection.setMaxConnections(512);
+        return AlibabaCloudOssClient.withCredential(AlibabaCloudCredentialsFactory.oidcRoleArn(),
+                properties.getEndpoint(), connection);
+    }
+}
+```
+
+该实例仍由 Spring 管理关闭，共享凭据客户端不随它关闭。应用需要共享全局身份时，也可注入带 `@Qualifier("alibabaCloudDefaultCredential")` 的官方凭据 Client，传给同一 `withCredential(...)` 入口。
 
 ## 推荐环境配置
 
-以下为非 Spring 或应用明确选择手工装配的入口，不会读取 Spring 的 `wind.alibaba.cloud` 配置。
+以下为非 Spring 或应用明确选择手工装配的入口，不会读取 Spring 的 `wind.alibaba.credentials` 或 `wind.oss.alibaba` 配置。
 
 ```java
 try (AlibabaCloudOssClient oss = AlibabaCloudOssClient.defaults(endpoint)) {
@@ -158,10 +221,10 @@ try (AlibabaCloudOssClient oss = AlibabaCloudOssClient.withCredential(
 
 多个产品需要统一身份时，将公共工厂创建的同一个凭据客户端传给各自的 `withCredential`；需要独立身份的 OSS 客户端传入另一个凭据实例。单个客户端不会按 Bucket 自动切换身份。
 
-从 AK/SK 切到 ACK OIDC 时应替换整组认证配置并重新装配或重启，不能只改 type 而保留旧密钥。Spring 应用将不同认证组分别放入互斥的 profile，公共配置只放产品 endpoint；详见 [Spring 配置示例](../wind-oss-spring-boot-starter/README.md)。
+从 AK/SK 切到 ACK OIDC 时应替换整组认证配置并重新装配或重启，不能只改 type 而保留旧密钥。Spring 应用将不同认证组分别放入互斥的 profile，公共配置保留产品 endpoint 和可选默认 Bucket；详见 [Spring 配置示例](../../wind-alibabacloud-spring-boot-starter/README.md)。
 
 OSS SDK 创建请求上下文时，适配层只调用一次 `credential.getCredential()`，从同一份快照读取 AK、SK 和 Token；缓存与刷新由凭据 SDK 负责，OSS 适配层不会缓存临时凭据。同一请求内部的重试沿用该上下文中的凭据。
 
 构造器为包级可见，应用通过 `defaults(...)` 或 `withCredential(...)` 创建实例，原来的跨包构造调用需要迁移到工厂方法。所有实例均通过 `close()` 关闭底层 OSS 客户端并释放连接池，不关闭凭据客户端。
 
-现有上传、下载、元数据及 URL 方法语义保持不变；`getFileUrl`、`getFileInternalUrl` 返回地址，不会生成带临时凭据的预签名下载链接。Spring Boot 配置示例见 [Starter 文档](../wind-oss-spring-boot-starter/README.md)。
+现有上传、下载、元数据及 URL 方法语义保持不变；`getFileUrl`、`getFileInternalUrl` 返回地址，不会生成带临时凭据的预签名下载链接。Spring Boot 配置与验证命令见[公共 Starter 文档](../../wind-alibabacloud-spring-boot-starter/README.md)。

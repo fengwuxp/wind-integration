@@ -25,9 +25,9 @@
 
 ```yaml
 wind:
-  alibaba:
-    cloud:
-      dm:
+  message:
+    email:
+      alibaba:
         endpoint: ${MAIL_ENDPOINT}
         type: access_key
         access-key: ${MAIL_ACCESS_KEY_ID}
@@ -40,18 +40,17 @@ app:
 等价的 `application.properties`：
 
 ```properties
-wind.alibaba.cloud.dm.endpoint=${MAIL_ENDPOINT}
-wind.alibaba.cloud.dm.type=access_key
-wind.alibaba.cloud.dm.access-key=${MAIL_ACCESS_KEY_ID}
-wind.alibaba.cloud.dm.secret-key=${MAIL_ACCESS_KEY_SECRET}
+wind.message.email.alibaba.endpoint=${MAIL_ENDPOINT}
+wind.message.email.alibaba.type=access_key
+wind.message.email.alibaba.access-key=${MAIL_ACCESS_KEY_ID}
+wind.message.email.alibaba.secret-key=${MAIL_ACCESS_KEY_SECRET}
 app.mail.sender=${MAIL_SENDER}
 ```
 
-添加以下配置类，放入应用组件扫描范围。Supplier 的 Bean 名称必须为 `alibabaCloudEmailAccountSupplier`：
+添加以下配置类，放入应用组件扫描范围。Spring 按 `AlibabaCloudEmailAccountSupplier` 类型装配，Bean 名称不限：
 
 ```java
-import java.util.function.Supplier;
-
+import com.wind.integration.message.email.alibabacloud.AlibabaCloudEmailAccountSupplier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -59,22 +58,22 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 public class MailAccountConfiguration {
 
-    @Bean("alibabaCloudEmailAccountSupplier")
-    public Supplier<String> emailAccount(@Value("${app.mail.sender}") String account) {
+    @Bean
+    public AlibabaCloudEmailAccountSupplier emailAccount(@Value("${app.mail.sender}") String account) {
         return () -> account;
     }
 }
 ```
 
-业务服务通过构造器注入 `com.wind.integration.message.email.alibabacloud.AlibabaCloudEmailMessageSender`，调用其 `sendMessage(message)`；自动创建的 Bean 名为 `alibabaCloudEmailMessageSender`，无需再次手动创建发送器。每次发送都会读取 Supplier，已有动态账号来源可直接作为该 Bean 返回。缺少具名 Supplier 时不会创建发送器。
+业务服务通过构造器注入 `com.wind.integration.message.email.alibabacloud.AlibabaCloudEmailMessageSender`，调用其 `sendMessage(message)`；自动创建的 Bean 名为 `alibabaCloudEmailMessageSender`，无需再次手动创建发送器。每次发送都会读取账号提供者；已有动态 `Supplier<String>` 可通过 `oldSupplier::get` 适配该接口。缺少 `AlibabaCloudEmailAccountSupplier` Bean 时不会创建发送器，普通 Supplier Bean 即使使用旧约定名称也不会触发自动装配。
 
-ACK 已配置 RRSA、角色权限并注入两个 ARN 和 `ALIBABA_CLOUD_OIDC_TOKEN_FILE` 后，仅切换邮件时，将上述 `dm` 认证组替换为下面配置；`app.mail.sender` 保持原值：
+ACK 已配置 RRSA、角色权限并注入两个 ARN 和 `ALIBABA_CLOUD_OIDC_TOKEN_FILE` 后，仅切换邮件时，将上述 `wind.message.email.alibaba` 认证组替换为下面配置；`app.mail.sender` 保持原值：
 
 ```yaml
 wind:
-  alibaba:
-    cloud:
-      dm:
+  message:
+    email:
+      alibaba:
         endpoint: ${MAIL_ENDPOINT}
         type: oidc_role_arn
 ```
@@ -82,13 +81,13 @@ wind:
 等价的 `application.properties`：
 
 ```properties
-wind.alibaba.cloud.dm.endpoint=${MAIL_ENDPOINT}
-wind.alibaba.cloud.dm.type=oidc_role_arn
+wind.message.email.alibaba.endpoint=${MAIL_ENDPOINT}
+wind.message.email.alibaba.type=oidc_role_arn
 ```
 
 必须从实际生效的全部配置来源移除原邮件 AK/SK、静态 SecurityToken，不能只覆盖 `type`。另一种方式是按[迁移指南](../../wind-alibabacloud-spring-boot-starter/MIGRATION.md)使用互斥认证 profile。重启或重新装配后生效；SDK 负责 OIDC 换证与 STS 刷新。该配置只选择邮件身份，OSS 和 KMS 的配置保持独立；同一 Pod 的 OIDC 环境注入对 KMS 默认路由的影响见迁移指南。
 
-应用已经提供 `AlibabaCloudEmailMessageSender` Bean，或名为 `alibabaCloudEmailMessageSender` 的 Bean 时，自动装配会退让；仅修改 YAML 不会替换自建客户端。需要多个产品共享身份时，再使用 `wind.alibaba.cloud.credentials`，并移除邮件产品下整组认证字段；规则见[公共 Spring 配置](../../wind-alibabacloud-spring-boot-starter/README.md)。
+应用已经提供 `AlibabaCloudEmailMessageSender` Bean，或名为 `alibabaCloudEmailMessageSender` 的 Bean 时，自动装配会退让；仅修改 YAML 不会替换自建客户端。需要多个产品共享身份时，再使用 `wind.alibaba.credentials`，并移除邮件产品下整组认证字段；规则见[公共 Spring 配置](../../wind-alibabacloud-spring-boot-starter/README.md)。
 
 ## 公共产品配置
 

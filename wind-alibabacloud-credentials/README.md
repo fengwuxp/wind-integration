@@ -17,19 +17,23 @@ Spring Boot 应用可直接按下方示例接入 OSS 和邮件推送。配置绑
 | 应用场景 | 引入的 Maven artifactId | 自动装配结果 |
 | --- | --- | --- |
 | 仅使用凭据 Java API | `wind-alibabacloud-credentials` | 不自动装配，调用 Factory |
-| 仅使用 OSS | `wind-oss-spring-boot-starter` | 引入公共 Starter 与 OSS 实现，创建 `WindOssClient` |
-| 仅使用邮件推送 | `wind-alibabacloud-spring-boot-starter` + `wind-message-emial-albabacloud` | 提供具名发件账号 Supplier 后创建发送器 |
-| 同时使用 OSS、邮件 | `wind-oss-spring-boot-starter` + `wind-message-emial-albabacloud` | 公共 Starter 由 OSS Starter 引入 |
+| 仅使用 OSS | `wind-alibabacloud-spring-boot-starter` + `wind-oss-alibabacloud` | 创建 `WindOssClient` |
+| 仅使用邮件推送 | `wind-alibabacloud-spring-boot-starter` + `wind-message-emial-albabacloud` | 提供 `AlibabaCloudEmailAccountSupplier` Bean 后创建发送器 |
+| 同时使用 OSS、邮件 | `wind-alibabacloud-spring-boot-starter` + `wind-oss-alibabacloud` + `wind-message-emial-albabacloud` | 同一个 Starter 按产品依赖分别装配 |
 | 其他阿里云 SDK | `wind-alibabacloud-spring-boot-starter` + 对应 SDK | 复用全局凭据，产品客户端由应用创建 |
 
-上表依赖均使用 `com.wind.integration`，外部云产品 SDK 使用其官方坐标。邮件 artifactId 沿用现有的 `emial-albabacloud` 拼写。当前内置的产品配置仅有 `oss`、`dm`，不支持随意增加一个产品后缀就自动生成客户端。
+上表依赖均使用 `com.wind.integration`，外部云产品 SDK 使用其官方坐标。邮件 artifactId 沿用现有的 `emial-albabacloud` 拼写。当前内置 OSS 和邮件产品自动装配，其他产品需由应用装配客户端，不能通过增加一个配置后缀自动生成。
 
 同时使用 OSS、邮件的依赖：
 
 ```xml
 <dependency>
     <groupId>com.wind.integration</groupId>
-    <artifactId>wind-oss-spring-boot-starter</artifactId>
+    <artifactId>wind-alibabacloud-spring-boot-starter</artifactId>
+</dependency>
+<dependency>
+    <groupId>com.wind.integration</groupId>
+    <artifactId>wind-oss-alibabacloud</artifactId>
 </dependency>
 <dependency>
     <groupId>com.wind.integration</groupId>
@@ -37,27 +41,30 @@ Spring Boot 应用可直接按下方示例接入 OSS 和邮件推送。配置绑
 </dependency>
 ```
 
-仅使用邮件时，将第一个依赖替换为 `wind-alibabacloud-spring-boot-starter`。无需再单独声明本凭据模块，Starter 会传递引入。
+仅使用一个产品时，只保留公共 Starter 和该产品模块。两个产品在 Starter 中均为可选依赖，应用需显式引入；无需再单独声明本凭据模块。原 `wind-oss-spring-boot-starter` 已退役，OSS 自动装配统一由公共 Starter 提供。
 
 ### OSS、DM 的配置位置
 
 | 配置前缀 | 用途 | 对应 Bean |
 | --- | --- | --- |
-| `wind.alibaba.cloud.credentials` | 可选的全局默认身份，不包含产品 endpoint | `alibabaCloudDefaultCredential`：官方 `com.aliyun.credentials.Client` |
-| `wind.alibaba.cloud.oss` | OSS endpoint 与可选独立身份 | `windAlibabaCloudOssProperties`、`alibabaCloudOssClient` |
-| `wind.alibaba.cloud.dm` | 邮件 endpoint 与可选独立身份 | `windAlibabaCloudEmailProperties`、`alibabaCloudEmailMessageSender` |
+| `wind.alibaba.credentials` | 可选的全局默认身份，不包含产品 endpoint | `alibabaCloudDefaultCredential`：官方 `com.aliyun.credentials.Client` |
+| `wind.oss.alibaba` | 阿里云 OSS endpoint 与可选独立身份 | `windAlibabaCloudOssProperties`、`alibabaCloudOssClient` |
+| `wind.message.email.alibaba` | 邮件 endpoint 与可选独立身份 | `windAlibabaCloudEmailProperties`、`alibabaCloudEmailMessageSender` |
+| `wind.oss.default-bucket-name` | OSS 通用默认 Bucket 名称，与认证无关 | 非空时创建 `defaultWindBucketTemplate` |
 
-`oss`、`dm` 的配置对象均为 `AlibabaCloudProductProperties`，按名称或 `@Qualifier` 注入。两个客户端的业务类型分别为 `com.wind.integration.oss.WindOssClient` 和 `com.wind.integration.message.email.alibabacloud.AlibabaCloudEmailMessageSender`。
+OSS、邮件的阿里云产品配置对象均为 `AlibabaCloudProductProperties`，按名称或 `@Qualifier` 注入。配置前缀由各自动配置维护；Java 类名和 Bean 名仍使用 `AlibabaCloud`，不随属性前缀调整。两个客户端的业务类型分别为 `com.wind.integration.oss.WindOssClient` 和 `com.wind.integration.message.email.alibabacloud.AlibabaCloudEmailMessageSender`。中间试用的 `wind.alibaba.cloud.*`、`spring.alibaba.cloud.*` 不提供兼容别名，迁移映射见[迁移指南](../wind-alibabacloud-spring-boot-starter/MIGRATION.md)。
 
-公共 `application.yml` 放业务端点和发件账号；只保留实际使用的产品：
+公共 `application.yml` 放业务端点、可选默认 Bucket 和发件账号；只保留实际使用的产品：
 
 ```yaml
 wind:
-  alibaba:
-    cloud:
-      oss:
-        endpoint: ${OSS_ENDPOINT}
-      dm:
+  oss:
+    alibaba:
+      endpoint: ${OSS_ENDPOINT}
+    default-bucket-name: ${OSS_BUCKET:}
+  message:
+    email:
+      alibaba:
         endpoint: ${MAIL_ENDPOINT}
 app:
   mail:
@@ -67,114 +74,107 @@ app:
 等价的 `application.properties`：
 
 ```properties
-wind.alibaba.cloud.oss.endpoint=${OSS_ENDPOINT}
-wind.alibaba.cloud.dm.endpoint=${MAIL_ENDPOINT}
+wind.oss.alibaba.endpoint=${OSS_ENDPOINT}
+wind.oss.default-bucket-name=${OSS_BUCKET:}
+wind.message.email.alibaba.endpoint=${MAIL_ENDPOINT}
 app.mail.sender=${MAIL_FROM_ADDRESS}
 ```
 
-`app.mail.sender` 是下方应用示例自定义的发件账号属性，不属于凭据模块。endpoint 沿用实际产品地域的地址；全局身份不提供 endpoint。需要默认 Bucket 模板时，另配 `wind.oss.default-bucket-name`，该键仍使用原位置。
+`app.mail.sender` 是下方应用示例自定义的发件账号属性，不属于凭据模块。endpoint 沿用实际产品地域的地址；全局身份不提供 endpoint。`wind.oss.default-bucket-name` 沿用原键，用于 OSS 通用默认 Bucket 模板，不属于认证字段；未设置 `OSS_BUCKET` 时示例取空值，不创建模板。
 
-### 先使用 AK/SK：每个产品保留自己的身份
+### 第一阶段：统一使用全局 AK/SK
 
-`application-ak.yml`：
+OSS 与邮件共用一组全局 AK/SK，分别读取自己的 endpoint。将这组凭据放入 `application-ak.yml`，产品配置保留上方公共文件中的 endpoint，默认 Bucket 和发件账号保持独立：
 
 ```yaml
 wind:
   alibaba:
-    cloud:
-      oss:
-        type: access_key
-        access-key: ${OSS_ACCESS_KEY_ID}
-        secret-key: ${OSS_ACCESS_KEY_SECRET}
-      dm:
-        type: access_key
-        access-key: ${MAIL_ACCESS_KEY_ID}
-        secret-key: ${MAIL_ACCESS_KEY_SECRET}
+    credentials:
+      type: access_key
+      access-key: ${CLOUD_ACCESS_KEY_ID}
+      secret-key: ${CLOUD_ACCESS_KEY_SECRET}
 ```
 
 等价的 `application-ak.properties`：
 
 ```properties
-wind.alibaba.cloud.oss.type=access_key
-wind.alibaba.cloud.oss.access-key=${OSS_ACCESS_KEY_ID}
-wind.alibaba.cloud.oss.secret-key=${OSS_ACCESS_KEY_SECRET}
-wind.alibaba.cloud.dm.type=access_key
-wind.alibaba.cloud.dm.access-key=${MAIL_ACCESS_KEY_ID}
-wind.alibaba.cloud.dm.secret-key=${MAIL_ACCESS_KEY_SECRET}
+wind.alibaba.credentials.type=access_key
+wind.alibaba.credentials.access-key=${CLOUD_ACCESS_KEY_ID}
+wind.alibaba.credentials.secret-key=${CLOUD_ACCESS_KEY_SECRET}
 ```
 
-例如启用 `SPRING_PROFILES_ACTIVE=prod,ak`，保留原有业务 profile。原来两个产品使用不同 AK 时，按此方式迁移，不要合并身份。
+例如启用 `SPRING_PROFILES_ACTIVE=prod,ak`，保留原有业务 profile。统一使用的 AK/SK 应能访问目标 OSS 资源及邮件推送操作；从 `wind.oss.alibaba`、`wind.message.email.alibaba` 中移除原局部认证字段，让两个产品继承全局身份。
 
-如果两个产品本来就共享相同身份和授权范围，可用下面的 `application-ak.yml` 替代上一个配置；产品只保留公共配置中的 endpoint：
-
-```yaml
-wind:
-  alibaba:
-    cloud:
-      credentials:
-        type: access_key
-        access-key: ${CLOUD_ACCESS_KEY_ID}
-        secret-key: ${CLOUD_ACCESS_KEY_SECRET}
-```
-
-等价的 `application-ak.properties`：
-
-```properties
-wind.alibaba.cloud.credentials.type=access_key
-wind.alibaba.cloud.credentials.access-key=${CLOUD_ACCESS_KEY_ID}
-wind.alibaba.cloud.credentials.secret-key=${CLOUD_ACCESS_KEY_SECRET}
-```
-
-选择规则是产品身份优先，否则使用全局身份。局部任一认证字段已设置就选择局部组，残缺配置直接报错，不从全局补字段。`read-timeout`、`sts-endpoint` 等认证选项也属于局部组；它们是获取凭据的参数，不是产品连接参数。
+产品身份仍优先于全局身份。局部任一认证字段已设置就选择局部组，残缺配置直接报错，不从全局补字段。`read-timeout`、`sts-endpoint` 等认证选项也属于局部组；它们是获取凭据的参数，不是产品连接参数。不同 endpoint 不需要配置不同 AK/SK。
 
 ### 邮件自动装配需要发件账号
 
 在应用组件扫描范围内加入：
 
 ```java
+import com.wind.integration.message.email.alibabacloud.AlibabaCloudEmailAccountSupplier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.function.Supplier;
-
 @Configuration(proxyBeanMethods = false)
 public class AlibabaCloudMailConfiguration {
 
-    @Bean("alibabaCloudEmailAccountSupplier")
-    public Supplier<String> emailAccount(@Value("${app.mail.sender}") String account) {
+    @Bean
+    public AlibabaCloudEmailAccountSupplier emailAccount(@Value("${app.mail.sender}") String account) {
         return () -> account;
     }
 }
 ```
 
-账号需是对应邮件产品已配置可用的发信地址。原应用使用动态账号时，可在该 Bean 中返回原 Supplier，每次发送都会重新取账号。没有这个具名 Supplier 时不会自动创建邮件发送器；OSS 无此要求。
+账号需是对应邮件产品已配置可用的发信地址。Spring 按 `AlibabaCloudEmailAccountSupplier` 类型装配，Bean 名称可自行定义；普通 `Supplier<String>` Bean 不会触发邮件自动装配。原应用使用动态 Supplier 时，可返回 `oldSupplier::get` 适配该接口，每次发送都会重新取账号。没有该类型 Bean 时不会自动创建邮件发送器；OSS 无此要求。
 
 业务代码直接通过构造器注入 `WindOssClient`、`AlibabaCloudEmailMessageSender` 使用，不需要再自行 new 产品客户端。应用若保留自定义客户端或同名发送器 Bean，自动装配会退让，YAML 不会接管自定义实现的认证逻辑。
 
-### 再切换 ACK OIDC：产品共用角色
+### 第二阶段：全局 AK/SK 切换 ACK OIDC
 
 ACK 已启用 RRSA，完成角色信任、产品权限和 ServiceAccount 配置，并向 Pod 注入两个 ARN 与 Token 文件路径后，创建 `application-ack.yml`：
 
 ```yaml
 wind:
   alibaba:
-    cloud:
-      credentials:
-        type: oidc_role_arn
+    credentials:
+      type: oidc_role_arn
 ```
 
 等价的 `application-ack.properties`：
 
 ```properties
-wind.alibaba.cloud.credentials.type=oidc_role_arn
+wind.alibaba.credentials.type=oidc_role_arn
 ```
 
-将认证 profile 从 `prod,ak` 换为 `prod,ack` 并重启。保留 endpoint、Bucket、发件账号；确认其他配置来源没有留下 `oss`、`dm` 的局部认证字段，也没有全局 AK/SK。Spring 会合并配置，不能仅新增全局 type 或把旧字段改为空字符串。
+将认证 profile 从 `prod,ak` 换为 `prod,ack` 并重启。保留 endpoint、Bucket、发件账号；确认其他配置来源没有留下 `wind.oss.alibaba`、`wind.message.email.alibaba` 的局部认证字段，也没有全局 AK/SK。Spring 会合并配置，不能仅新增全局 type 或把旧字段改为空字符串。
 
 两个 ARN 未显式配置时由 SDK 读取标准环境配置。Token 文件按显式 `oidc-token-file-path` → 真实 `ALIBABA_CLOUD_OIDC_TOKEN_FILE` → `/etc/secrets/alibaba_cloud_credential` 选择；标准 ACK 环境不需要重复填写路径。SDK 自动换取并刷新 STS，无需手工配置 `security-token`。
 
-希望邮件仍用 AK、仅 OSS 使用 OIDC，可在 ACK profile 中给 `dm` 配置完整的独立 AK/SK；希望某产品使用独立 OIDC 角色，则在产品组中写 `type: oidc_role_arn` 及其角色参数。静态 `type: sts` 也可用于全局或产品组，但需完整的临时 AK/SK/Token，且不会自动续期。
+### 可选：产品独立身份
+
+仅在个性化场景需要覆盖统一身份时，才在产品组中配置认证。例如在当前认证 profile 中追加邮件独立 AK/SK：
+
+```yaml
+wind:
+  message:
+    email:
+      alibaba:
+        type: access_key
+        access-key: ${MAIL_ACCESS_KEY_ID}
+        secret-key: ${MAIL_ACCESS_KEY_SECRET}
+```
+
+等价的 `.properties` 配置：
+
+```properties
+wind.message.email.alibaba.type=access_key
+wind.message.email.alibaba.access-key=${MAIL_ACCESS_KEY_ID}
+wind.message.email.alibaba.secret-key=${MAIL_ACCESS_KEY_SECRET}
+```
+
+这会让邮件优先使用局部身份，OSS 仍继承全局配置；它不是上述两阶段迁移的必需步骤。恢复统一身份时移除邮件整组局部认证字段。独立 OIDC 角色和静态 `sts` 也可显式配置；静态 STS 需完整的临时 AK/SK/Token，且不会自动续期。
 
 ### 自定义 SDK、连接配置与使用边界
 
@@ -184,7 +184,7 @@ wind.alibaba.cloud.credentials.type=oidc_role_arn
 
 KMS 不接入这套 Spring 全局选择，但其无参 `defaults()` 仍会响应 ACK 的 OIDC 环境变量，部署时需核对实际调用链与 KMS 权限。
 
-已有应用的字段映射、源码修改、验收和回退见[两阶段迁移指南](../wind-alibabacloud-spring-boot-starter/MIGRATION.md)。更多连接参数和客户端用法见 [OSS Spring 指南](../wind-oss/wind-oss-spring-boot-starter/README.md)、[邮件 Spring 指南](../wind-message/email/README.md#spring-boot-集成)以及[公共 Starter](../wind-alibabacloud-spring-boot-starter/README.md)。以下章节介绍不依赖 Spring 自动装配的工厂 API。
+已有应用的字段映射、源码修改、验收和回退见[两阶段迁移指南](../wind-alibabacloud-spring-boot-starter/MIGRATION.md)。更多连接参数和客户端用法见 [OSS Spring 指南](../wind-oss/alibabacloud/README.md#spring-boot-集成)、[邮件 Spring 指南](../wind-message/email/README.md#spring-boot-集成)以及[公共 Starter](../wind-alibabacloud-spring-boot-starter/README.md)。以下章节介绍不依赖 Spring 自动装配的工厂 API。
 
 ## 能力与职责
 
@@ -338,7 +338,7 @@ var credential = AlibabaCloudCredentialsFactory.fromProperties(properties);
 
 角色、OIDC、URI、策略、会话时长、超时和 IMDS 控制参数均可通过普通配置传入。会话时长单位为秒，连接与读取超时单位为毫秒；未配置值沿用官方 SDK 和本模块的缺省规则。OIDC 路径采用显式值、ACK 环境变量、项目缺省文件的优先级，空白值失败。
 
-Spring 应用建议把 AK、STS、ACK OIDC 的整组认证分别放入不同 profile，公共配置只保留产品 endpoint。只修改 `type` 不会清除 Spring 从其他配置文件继承的 AK/SK，应切换互斥的认证 profile 并重启；配置示例见 [Spring Starter](../wind-alibabacloud-spring-boot-starter/README.md)。
+Spring 应用建议把 AK、STS、ACK OIDC 的整组认证分别放入不同 profile，公共配置保留产品 endpoint 和可选默认 Bucket。只修改 `type` 不会清除 Spring 从其他配置文件继承的 AK/SK，应切换互斥的认证 profile 并重启；配置示例见 [Spring Starter](../wind-alibabacloud-spring-boot-starter/README.md)。
 
 `hasCredentials()` 仅判断认证字段是否有任意非 null 值，空白及 `false` 也算已配置，供装配方防止残缺配置被其他身份覆盖；它不代表配置已经有效。仅设置产品 `endpoint` 不构成认证配置。配置对象的 `toString()` 不输出密钥、Token、策略或角色信息；认证父类只输出 `type`，产品子类额外输出端点。
 

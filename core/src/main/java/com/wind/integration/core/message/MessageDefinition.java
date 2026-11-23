@@ -2,6 +2,8 @@ package com.wind.integration.core.message;
 
 
 import jakarta.validation.constraints.NotNull;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Map;
@@ -53,5 +55,14 @@ public interface MessageDefinition<T> {
     @NotNull
     default Map<String, Object> getMetadata() {
         return Collections.emptyMap();
+    }
+
+    default void putMetadataValue(@NonNull String name, @Nullable Object value) {
+        getMetadata().put(name, value);
+    }
+
+    @Nullable
+    default <T> T getMetadataValue(@NonNull String name) {
+        return (T) getMetadata().get(name);
     }
 }

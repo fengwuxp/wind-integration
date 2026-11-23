@@ -12,7 +12,7 @@ import com.aliyun.teaopenapi.models.Config;
 import com.wind.common.exception.BaseException;
 import com.wind.integration.alibaba.credentials.AlibabaCloudCredentialsFactory;
 import com.wind.integration.alibaba.credentials.AlibabaCloudProductProperties;
-import com.wind.integration.message.email.SimpleEmailMessage;
+import com.wind.integration.core.message.definition.SimpleEmailMessage;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

@@ -14,7 +14,7 @@ import com.wind.common.exception.DefaultExceptionCode;
 import com.wind.integration.core.message.MessageSender;
 import com.wind.integration.alibaba.credentials.AlibabaCloudCredentialsFactory;
 import com.wind.integration.alibaba.credentials.AlibabaCloudProductProperties;
-import com.wind.integration.message.email.SimpleEmailMessage;
+import com.wind.integration.core.message.definition.SimpleEmailMessage;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -128,7 +128,7 @@ public class AlibabaCloudEmailMessageSender implements MessageSender<SimpleEmail
             log.debug("aliyun 邮件发送成功, request = {}, response = {}", request, response);
             AssertUtils.isTrue(response.getStatusCode() >= 200 && response.getStatusCode() < 300, "邮件发送失败");
         } catch (TeaException exception) {
-            log.error("aliyun邮件发送失败, 收件邮箱 = {}, message = {}", message.receivers(), exception.getMessage(), exception);
+            log.error("aliyun 邮件发送失败, 收件邮箱 = {}, message = {}", message.receivers(), exception.getMessage(), exception);
             throw new BaseException(DefaultExceptionCode.COMMON_ERROR, "邮件发送失败", exception);
         }
     }

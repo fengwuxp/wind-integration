@@ -1,7 +1,7 @@
 package com.wind.integration.message.email.alibabacloud;
 
 import com.wind.integration.alibaba.credentials.AlibabaCloudProductProperties;
-import com.wind.integration.message.email.SimpleEmailMessage;
+import com.wind.integration.core.message.definition.SimpleEmailMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;

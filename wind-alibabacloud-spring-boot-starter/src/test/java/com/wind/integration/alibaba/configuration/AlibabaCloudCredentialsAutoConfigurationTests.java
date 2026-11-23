@@ -15,7 +15,7 @@ import com.aliyun.tea.TeaResponse;
 import com.wind.integration.alibaba.credentials.AlibabaCloudCredentialsFactory;
 import com.wind.integration.alibaba.credentials.AlibabaCloudCredentialsProperties;
 import com.wind.integration.alibaba.credentials.AlibabaCloudProductProperties;
-import com.wind.integration.message.email.SimpleEmailMessage;
+import com.wind.integration.core.message.definition.SimpleEmailMessage;
 import com.wind.integration.message.email.alibabacloud.AlibabaCloudEmailMessageSender;
 import com.wind.integration.message.email.alibabacloud.AlibabaCloudEmailAccountSupplier;
 import org.junit.jupiter.api.Assertions;

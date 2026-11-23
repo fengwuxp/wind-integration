@@ -307,7 +307,7 @@ public class FieldEncryptionConfiguration {
 | 实体未实现隔离接口，或改用其他持久化属性 | 显式配置 `FieldRule`，由元数据解析物理列 |
 | 读取多个获准的租户、工作空间或其他字段值 | Supplier 提供本次 `DataIsolationScope`；不改变请求的当前归属 |
 | 临时忽略某些内置查询维度 | 在已授权操作中使用 `DataIsolationQueryIgnoreHolder` |
-| 多个字段取 OR，或按关系表确定范围 | 实现 `DataIsolationStrategy`，返回完整的参数化条件 |
+| 完整字段组取 OR，或包含可信关系条件 | 使用 `FieldDataIsolationStrategy.grouped(...)`，保留组内 AND 与组间 OR |
 | 将业务数据权限统一应用到 Mapper 查询 | 由权限策略消费已校验范围，与基础隔离共同执行，见第 7.6 节 |
 | 插入时填充租户、环境、工作空间、测试标记 | 单独注册[插入监听器](#insert-listeners) |
 
@@ -527,6 +527,7 @@ executor.execute(ContextPropagationTaskDecorator.of().decorate(() -> {
 | --- | --- |
 | `FieldDataIsolationStrategy.withDefaults(customRules)` | 明确启用四个内置维度，自定义维度规则优先；普通字段规则额外追加 |
 | `new FieldDataIsolationStrategy(rules)` | 仅使用显式规则，不补默认维度；可用第二个构造参数指定顺序 |
+| `FieldDataIsolationStrategy.grouped(baseRules, registrations)` | 基础规则 AND 已登记实体的完整分组；分组内 AND、分组间 OR，不补默认维度 |
 
 `FieldRule(entityType, property, scopeSupplier, dimension)` 中，`property` 是 **Java 持久化属性名**，由 Flex 元数据解析物理列。上例应填写 `workspaceId`，不能填写 `organization_id`。单独添加 getter 别名不会建立持久化映射。
 
@@ -612,7 +613,39 @@ Supplier 在每次查询中调用，应读取请求内已准备好的结果；�
 
 平台操作获准读取多个目标租户时，可用 `FieldRule.forDimension(TENANT, "tenantId", targetTenantScopes)` 覆盖默认租户规则，让 targetTenantScopes 返回已校验的 `ofValues(...)`；保留其他维度。仅某类实体允许此范围时，使用实体级 FieldRule。目标实体未实现 TenantIsolationObject 时使用普通字段规则。账号归属、权限来源租户和目标数据租户应分别确定，不能用“忽略租户”代替一个有限的目标集合。
 
-多个独立字段取 AND。若只允许 `(租户 A, 工作空间 X)`、`(租户 B, 工作空间 Y)`，分别配置两个 IN 集合会产生未授权的交叉组合；应固定单租户范围，或由自定义策略保留成对条件。
+多个独立字段取 AND。若只允许 `(租户 A, 工作空间 X)`、`(租户 B, 工作空间 Y)`，分别配置两个 IN 集合会产生未授权的交叉组合；使用完整字段分组保留配对。
+
+**完整字段分组**
+
+```java
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy.ConditionGroup;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy.EntityRules;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy.FieldCondition;
+
+import java.util.List;
+import java.util.Set;
+
+FieldDataIsolationStrategy grouped = FieldDataIsolationStrategy.grouped(List.of(), List.of(
+        new EntityRules(OrderEntity.class, Set.of("tenantId", "workspaceId"), () -> List.of(
+                new ConditionGroup(List.of(
+                        FieldCondition.ofValues("tenantId", List.of(10L)),
+                        FieldCondition.ofValues("workspaceId", List.of(100L))), List.of()),
+                new ConditionGroup(List.of(
+                        FieldCondition.ofValues("tenantId", List.of(20L)),
+                        FieldCondition.ofValues("workspaceId", List.of(200L))), List.of())))));
+```
+
+该示例生成 `(tenant_id=10 AND workspace_id=100) OR (tenant_id=20 AND workspace_id=200)` 的参数化谓词；运行中的 Supplier 应读取调用方已准备的完整快照。基础硬边界可放在 baseRules，也可沿原 `withDefaults(...)` 策略独立装配，二者始终 AND。分组不响应内置维度 ignore。
+
+- EntityRules 精确匹配实体，同一实体不得重复登记；properties 是静态根属性白名单，启动检查不调用 groups。不同实体映射同一张表且采用精确实体分组时拒绝，不能选择某个实体的范围代替另一个。
+- 每个 SQL 叶只读取一次完整 groups，UNION 各叶仍使用各自 QueryContext；不缓存请求分组或生成后的别名条件。组内字段可重复，同属性的两条条件仍是 AND，不覆盖或并值。
+- groups 为空列表时生成 FALSE；`ConditionGroup.unrestricted()` 显式产生恒真分支，基础规则继续生效。null、来源异常、未知字段或 null 可信条件都拒绝，不能被其他恒真/恒假分支掩盖。
+- `FieldCondition.ofValues(property, values)`：空值集合为 FALSE，单值为等式，多值为 IN；值不能含 null。`isNotNull(property)` 只表达字段非空，接入方须确认这足以证明所需归属或关联存在。
+- 新分组字段依据真实实体字段类型绑定：类型已匹配的值直接使用；字符串引用经 Spring 转换后必须能还原为同一文本。`"001"` 映射 Long 字段失败，映射 String 字段仍为 `"001"`；不匹配的非字符串值失败。原 FieldRule 参数行为保持不变。
+- ConditionGroup.trustedConditions 接收可信 `Function<QueryContext, Condition>`，可以提供第 7.7 节支持的完整关系叶。关系条件需使用真实外内关联，context 与选择条件若要求同一关系行，必须在一个 EXISTS 内共同表达；回调自行按已知关系字段绑定参数，不通过字段反射猜关系结构。
+- `resolveRelation` 只执行 baseRules，不调用分组 Supplier，也不递归套用根资源分组。内表的租户/工作空间等基础边界仍执行；分组不代替基础边界登记。
+
 
 ### 7.4 临时忽略查询维度
 
@@ -645,7 +678,7 @@ FieldDataIsolationStrategy 对被忽略维度跳过 Supplier 与条件生成，�
 
 [DataIsolationStrategy](src/main/java/com/wind/mybatis/isolation/DataIsolationStrategy.java) 是 DAL 读取约束的扩展接口：针对适用实体，将本次可信上下文或已校验范围转换为参数化查询条件。它回答“这次读取要追加哪些行级约束”。租户归属、工作空间边界、业务数据权限都可以通过这一接口提供条件。
 
-接口以实体元数据和查询目标为输入，没有要求资源类型、角色模型或内置隔离接口。`FieldDataIsolationStrategy` 只是其中的通用实现：通过接口约定或显式配置，把字段允许值转换为等值/IN 条件。业务需要权限并集或关系范围时，可以实现另一个策略，无需继承字段策略，也无需修改拦截器。
+接口以实体元数据和查询目标为输入，没有要求资源类型、角色模型或内置隔离接口。`FieldDataIsolationStrategy` 提供基础字段 AND 和完整字段分组，也可组合已有可信关系 Condition。先复用该实现；只有其合同不能承接的读取语义才需要其他策略，不为角色或资源类型另建 SQL 编译实现。
 
 策略属于可信应用代码。它可以生成受支持的 SQL 谓词，但不承担身份认证、功能授权、角色解析、前后置业务校验、写控制、列权限或脱敏；这些能力由各自负责的模块提供。将权限范围转成查询条件，是完整权限流程中的读取执行环节。
 
@@ -692,7 +725,7 @@ UNION 的各分支分别调用根查询策略，同一实体出现多次也会�
 | `Condition` | SQL 谓词与按占位符顺序排列的参数值，是策略与执行器之间的结果契约 |
 | `FieldRule` | 可复用的字段规则值对象：目标类型、Java 属性、范围 Supplier、可选内置维度；不是所有策略的必需输入 |
 
-FieldRule 本身不决定 AND/OR、覆盖或忽略，消费它的策略负责这些语义。FieldDataIsolationStrategy 的规则按 AND 执行；业务权限策略也可以复用字段条件生成，再自行组成完整并集。元数据映射及 Condition 参数列表会复制为不可修改集合，但参数对象本身不做深拷贝。
+FieldRule 本身不决定 AND/OR、覆盖或忽略，消费它的策略负责这些语义。FieldDataIsolationStrategy 的基础 FieldRule 按 AND 执行；新增 EntityRules 的完整分组在组内 AND、组间 OR，最后再与基础规则 AND。元数据映射及 Condition 参数列表会复制为不可修改集合，但参数对象本身不做深拷贝。
 
 策略与其返回的多个 Condition 都取 AND，优先级不覆盖已有条件。需要 OR 时，应在一个 Condition 中保留完整分组：
 
@@ -708,7 +741,7 @@ return List.of(Condition.of(
 
 #### 如何增加一个策略
 
-先判断现有字段规则是否足够。只是属性名不同、允许值不同或追加一个独立字段约束，配置 FieldRule 即可。出现不同的条件组合、关系解释或范围模型时，再实现 DataIsolationStrategy。
+先判断现有字段规则与 grouped 分组入口是否足够。属性名、允许值或独立字段约束使用 FieldRule；完整并集、重复属性交集或可信关系叶使用 grouped。仅在这些合同不能覆盖的读取语义出现时，再实现 DataIsolationStrategy。
 
 扩展实现先用 supports 明确实体覆盖，再在 resolve 中读取本次可信范围、检查必要输入并返回条件。若实体还会出现在其他策略生成的关系内表中，须同时定义 resolveRelation；只用于根表时可以保留默认拒绝。最后通过真实 Mapper 验证正确结果、有效空范围、缺少输入、范围切换与查询缓存，不只断言生成的 SQL 字符串。
 
@@ -758,7 +791,7 @@ AND（同一资源、同一授权作用域内的有效权限分支并集）
 
 **与 Capte 权限能力对接**
 
-Capte/IAM 负责主体、作用域、授权来源与 READ/WRITE 用途的裁决，业务域提供可信对象归属及关系事实；Capte 的读取适配把结果转换成 Wind Condition。Wind 不依赖 Capte 资源目录，也不在 SQL 拦截过程中查询角色或重做授权。
+Capte/IAM 负责主体、作用域、授权来源与 READ/WRITE 用途的裁决，业务域提供可信对象归属及关系事实；Capte 的读取适配可把已裁决定义映射为 Field 的完整字段组，普通列与参数生成由 Wind 负责；复杂关系沿可信 Condition 回调提供。Wind 不依赖 Capte 资源目录，也不在 SQL 拦截过程中查询角色或重做授权。
 
 例如两条已裁决读取分支为“T1 的合规工单”与“T2 的充值工单”，应整体传入：
 
@@ -779,33 +812,32 @@ Fincone 当前要求完整 DATA 配对、包含择小、只读收紧及无适用
 可信策略生成的关系条件与手写 SQL 的支持范围不同。下面以“本人负责的订单，或本人参与的订单”为例：
 
 ```java
-import com.wind.mybatis.isolation.DataIsolationStrategy;
+import com.wind.mybatis.isolation.DataIsolationStrategy.Condition;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy.ConditionGroup;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy.EntityRules;
+import com.wind.mybatis.isolation.FieldDataIsolationStrategy.FieldCondition;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
-public final class OrderVisibilityStrategy implements DataIsolationStrategy {
-
-    private final Supplier<Long> userIds;
-
-    public OrderVisibilityStrategy(Supplier<Long> userIds) {
-        this.userIds = Objects.requireNonNull(userIds);
-    }
-
-    @Override
-    public boolean supports(EntityMetadata entity) {
-        return OrderEntity.class.equals(entity.type());
-    }
-
-    @Override
-    public List<Condition> resolve(QueryContext context) {
-        Long userId = Objects.requireNonNull(userIds.get(), "缺少可信用户");
-        String sql = "(" + context.column("ownerId") + " = ? OR EXISTS ("
-                + "SELECT 1 FROM t_order_member member WHERE member.order_id = "
-                + context.column("id") + " AND member.user_id = ?))";
-        return List.of(Condition.of(sql, userId, userId));
-    }
+static FieldDataIsolationStrategy orderVisibility(Supplier<Long> preparedUserIds) {
+    return FieldDataIsolationStrategy.grouped(List.of(), List.of(new EntityRules(
+            OrderEntity.class, Set.of("id", "ownerId"), () -> {
+                Long userId = Objects.requireNonNull(preparedUserIds.get(), "缺少可信用户");
+                ConditionGroup owned = new ConditionGroup(
+                        List.of(FieldCondition.ofValues("ownerId", List.of(userId))), List.of());
+                ConditionGroup member = new ConditionGroup(List.of(), List.of(query -> {
+                    String outer = query.qualifier().replace("`", "").replace("\"", "").replace("[", "").replace("]", "");
+                    String alias = "member".equalsIgnoreCase(outer) ? "member_scope" : "member";
+                    return Condition.of("EXISTS (SELECT 1 FROM t_order_member " + alias
+                            + " WHERE " + alias + ".order_id = " + query.column("id")
+                            + " AND " + alias + ".user_id = ?)", userId);
+                }));
+                return List.of(owned, member);
+            })));
 }
 ```
 
@@ -815,7 +847,7 @@ public final class OrderVisibilityStrategy implements DataIsolationStrategy {
 
 | 内表策略 | 关联读取行为 |
 | --- | --- |
-| `FieldDataIsolationStrategy` | 复用字段规则，包括当前范围及显式忽略语义 |
+| `FieldDataIsolationStrategy` | 只复用基础字段规则及显式忽略语义；不读取或应用完整分组 |
 | 自定义策略未覆写 `resolveRelation` | 拒绝关联查询 |
 | 自定义策略返回标量条件 | 条件全部 AND 到内表 WHERE |
 | 自定义策略明确返回空列表 | 仅该策略在关系场景不追加条件 |
@@ -830,7 +862,7 @@ public List<Condition> resolveRelation(QueryContext context) {
 }
 ```
 
-只有该策略的责任确实如此时才采用。其他基础边界仍须执行，不能为消除异常让所有策略一律返回空。上例 OrderVisibilityStrategy 没有覆写该方法，因此订单本身被其他策略用作关系内表时会拒绝。
+只有该策略的责任确实如此时才采用。其他基础边界仍须执行，不能为消除异常让所有策略一律返回空。上例字段分组不应用于订单作为关系内表的场景；必须另外配置所需基础边界。
 
 策略生成的关系条件限于：
 

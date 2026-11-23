@@ -64,6 +64,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 
+import java.util.function.Function;
+
 import static net.sf.jsqlparser.parser.CCJSqlParserConstants.K_TABLE;
 
 /**
@@ -189,7 +191,7 @@ final class SelectIsolationRewriter {
                 continue;
             }
             applicable.add(strategy);
-            Object signature = strategy instanceof FieldDataIsolationStrategy fields ? fields.bindings(entity) : entity;
+            Object signature = strategy instanceof FieldDataIsolationStrategy fields ? fields.mappingSignature(entity) : entity;
             signatures.add(List.of(strategy, signature));
         }
         return new TableBinding(entity, List.copyOf(applicable), List.copyOf(signatures));
@@ -222,8 +224,14 @@ final class SelectIsolationRewriter {
     }
 
     BoundSql rewrite(MappedStatement statement, BoundSql original) {
+        return rewrite(statement, original, null);
+    }
+
+    // 内部固定目标准备只替换本次根条件，静态表映射与关系校验沿用本实例。
+    BoundSql rewrite(MappedStatement statement, BoundSql original,
+                     @Nullable Function<QueryContext, List<Condition>> suppliedConditions) {
         String sqlText = original.getSql();
-        if (sqlText.equals(unisolatedStatements.get(statement.getId()))) {
+        if (suppliedConditions == null && sqlText.equals(unisolatedStatements.get(statement.getId()))) {
             logRewriteStatus(statement, "Read isolation skipped: statement={}, reason={}", "cached-unmanaged-query");
             return original;
         }
@@ -242,6 +250,9 @@ final class SelectIsolationRewriter {
         QueryShape shape = new QueryShape(root);
         validateQueryAccess(statement, select, shape);
         if (!hasIsolatedTable(shape)) {
+            if (suppliedConditions != null) {
+                throw new IllegalStateException("Explicit target query has no registered root strategy");
+            }
             logRewriteStatus(statement, "Read isolation skipped: statement={}, reason={}", "no-matching-strategy");
             cacheUnisolatedQuery(statement, original, select, shape);
             return original;
@@ -252,7 +263,7 @@ final class SelectIsolationRewriter {
         ParameterBindings parameters = new ParameterBindings(statement, adapted);
         boolean changed = false;
         for (PlainSelect leaf : leaves) {
-            if (isolateLeaf(statement, leaf, parameters)) {
+            if (isolateLeaf(statement, leaf, parameters, suppliedConditions)) {
                 changed = true;
             }
         }
@@ -429,19 +440,29 @@ final class SelectIsolationRewriter {
         }
     }
 
-    private boolean isolateLeaf(MappedStatement statement, PlainSelect query, ParameterBindings parameters) {
+    private boolean isolateLeaf(MappedStatement statement, PlainSelect query, ParameterBindings parameters,
+                                @Nullable Function<QueryContext, List<Condition>> suppliedConditions) {
         Table table = (Table) query.getFromItem();
         TableBinding binding = tables.get(simpleName(table.getName()));
         String qualifier = table.getAlias() == null ? table.getFullyQualifiedName() : table.getAlias().getName();
         QueryContext context = new QueryContext(statement.getId(), table.getFullyQualifiedName(), qualifier, binding.entity());
         Expression condition = null;
-        for (DataIsolationStrategy strategy : binding.strategies()) {
-            logResolvingStrategy(statement, binding, strategy);
-            List<Condition> conditions = Objects.requireNonNull(strategy.resolve(context), "isolation conditions");
+        if (suppliedConditions != null) {
+            List<Condition> conditions = Objects.requireNonNull(suppliedConditions.apply(context), "target conditions");
             for (Condition resolved : conditions) {
                 Expression predicate = createIsolationPredicate(statement, resolved, parameters, context);
                 Expression grouped = new ParenthesedExpressionList<>(predicate);
                 condition = condition == null ? grouped : new AndExpression(condition, grouped);
+            }
+        } else {
+            for (DataIsolationStrategy strategy : binding.strategies()) {
+                logResolvingStrategy(statement, binding, strategy);
+                List<Condition> conditions = Objects.requireNonNull(strategy.resolve(context), "isolation conditions");
+                for (Condition resolved : conditions) {
+                    Expression predicate = createIsolationPredicate(statement, resolved, parameters, context);
+                    Expression grouped = new ParenthesedExpressionList<>(predicate);
+                    condition = condition == null ? grouped : new AndExpression(condition, grouped);
+                }
             }
         }
         if (condition == null) {

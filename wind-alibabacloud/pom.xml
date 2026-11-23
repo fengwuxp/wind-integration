@@ -9,11 +9,17 @@
         <version>${revision}</version>
     </parent>
 
-    <artifactId>wind-message</artifactId>
+    <artifactId>wind-alibabacloud</artifactId>
     <packaging>pom</packaging>
+    <description>阿里云产品、钉钉机器人及 Spring 装配</description>
+
     <modules>
+        <module>credentials</module>
+        <module>oss</module>
+        <module>kms</module>
         <module>email</module>
         <module>dingtalk</module>
+        <module>spring-boot-starter</module>
     </modules>
 
     <properties>

@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.integration</groupId>
-        <artifactId>wind-message</artifactId>
+        <artifactId>wind-alibabacloud</artifactId>
         <version>${revision}</version>
     </parent>
 
@@ -15,6 +15,11 @@
 
     </properties>
     <dependencies>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-message-api</artifactId>
+        </dependency>
+        <!-- 保留既有消费者通过钉钉模块获得的 core 传递依赖。 -->
         <dependency>
             <groupId>com.wind.integration</groupId>
             <artifactId>wind-integration-core</artifactId>

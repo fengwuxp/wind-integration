@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.wind.integration</groupId>
+        <artifactId>wind-integration-abstractions</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>wind-message-api</artifactId>
+    <description>与提供方无关的消息契约、模板与公共消息模型</description>
+
+</project>

@@ -5,12 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.integration</groupId>
-        <artifactId>wind-message</artifactId>
+        <artifactId>wind-alibabacloud</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <artifactId>wind-message-emial-albabacloud</artifactId>
-
+    <artifactId>wind-oss-alibabacloud</artifactId>
 
     <dependencies>
         <dependency>
@@ -18,32 +17,26 @@
             <artifactId>wind-alibabacloud-credentials</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.aliyun</groupId>
-            <artifactId>dm20151123</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.wind.middleware</groupId>
-            <artifactId>wind-core</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.wind.integration</groupId>
-            <artifactId>wind-integration-core</artifactId>
+            <artifactId>wind-oss-api</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.jetbrains.kotlin</groupId>
-            <artifactId>kotlin-stdlib</artifactId>
+            <groupId>com.aliyun.oss</groupId>
+            <artifactId>aliyun-sdk-oss</artifactId>
         </dependency>
     </dependencies>
+
     <build>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <!-- 测试仅替换 SDK 外部 HTTP 通信。 -->
+                    <!-- 在测试 JVM 启动时加载 Mockito，避免依赖运行时自附加。 -->
                     <argLine>${jacoco-coverage-agent} -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+
 </project>

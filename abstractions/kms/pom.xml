@@ -5,15 +5,17 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.integration</groupId>
-        <artifactId>wind-integration</artifactId>
+        <artifactId>wind-integration-abstractions</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <artifactId>wind-kms</artifactId>
-    <packaging>pom</packaging>
-    <modules>
-        <module>api</module>
-        <module>alibabacloud</module>
-    </modules>
+    <artifactId>wind-kms-api</artifactId>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.wind.middleware</groupId>
+            <artifactId>wind-core</artifactId>
+        </dependency>
+    </dependencies>
 
 </project>

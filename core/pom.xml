@@ -13,6 +13,11 @@
 
 
     <dependencies>
+        <!-- 已有应用通过 core 使用消息类型，抽出独立产物后继续传递提供这些类。 -->
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-message-api</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.wind.middleware</groupId>
             <artifactId>wind-core</artifactId>

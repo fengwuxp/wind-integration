@@ -17,6 +17,7 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>abstractions</module>
         <module>core</module>
         <module>wind-operator</module>
         <module>office</module>
@@ -24,12 +25,8 @@
         <module>wind-money</module>
         <module>tests</module>
         <module>dependencies</module>
-        <module>wind-alibabacloud-credentials</module>
-        <module>wind-alibabacloud-spring-boot-starter</module>
-        <module>wind-oss</module>
-        <module>wind-kms</module>
+        <module>wind-alibabacloud</module>
         <module>wind-metrics</module>
-        <module>wind-message</module>
         <module>wind-im</module>
         <module>wind-workflow</module>
     </modules>
@@ -111,6 +108,11 @@
             <dependency>
                 <groupId>com.wind.integration</groupId>
                 <artifactId>wind-alibabacloud-spring-boot-starter</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.integration</groupId>
+                <artifactId>wind-message-api</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

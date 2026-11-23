@@ -5,17 +5,17 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.integration</groupId>
-        <artifactId>wind-kms</artifactId>
+        <artifactId>wind-integration</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <artifactId>wind-kms-api</artifactId>
+    <artifactId>wind-integration-abstractions</artifactId>
+    <packaging>pom</packaging>
+    <description>按能力分别发布对象存储、密码与凭据、消息投递的公共抽象</description>
 
-    <dependencies>
-        <dependency>
-            <groupId>com.wind.middleware</groupId>
-            <artifactId>wind-core</artifactId>
-        </dependency>
-    </dependencies>
-
+    <modules>
+        <module>oss</module>
+        <module>kms</module>
+        <module>message</module>
+    </modules>
 </project>

@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.integration</groupId>
-        <artifactId>wind-oss</artifactId>
+        <artifactId>wind-integration-abstractions</artifactId>
         <version>${revision}</version>
     </parent>
 

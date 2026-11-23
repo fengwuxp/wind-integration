@@ -5,11 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.integration</groupId>
-        <artifactId>wind-oss</artifactId>
+        <artifactId>wind-alibabacloud</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <artifactId>wind-oss-alibabacloud</artifactId>
+    <artifactId>wind-kms-alibabacloud</artifactId>
 
     <dependencies>
         <dependency>
@@ -17,12 +17,29 @@
             <artifactId>wind-alibabacloud-credentials</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.wind.integration</groupId>
-            <artifactId>wind-oss-api</artifactId>
+            <groupId>com.aliyun</groupId>
+            <artifactId>credentials-java</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
-            <groupId>com.aliyun.oss</groupId>
-            <artifactId>aliyun-sdk-oss</artifactId>
+            <groupId>com.aliyun</groupId>
+            <artifactId>kms20160120</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-kms-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.middleware</groupId>
+            <artifactId>wind-crypto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib</artifactId>
         </dependency>
     </dependencies>
 

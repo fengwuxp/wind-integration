@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.integration</groupId>
-        <artifactId>wind-integration</artifactId>
+        <artifactId>wind-alibabacloud</artifactId>
         <version>${revision}</version>
     </parent>
     <artifactId>wind-alibabacloud-spring-boot-starter</artifactId>

@@ -40,6 +40,7 @@
         <hutool.version>5.8.39</hutool.version>
         <apache-hc4.version>4.5.14</apache-hc4.version>
         <apache-http-async4.version>4.1.5</apache-http-async4.version>
+        <aliyun.dm.version>1.9.3</aliyun.dm.version>
         <aliyun.oss.version>3.18.5</aliyun.oss.version>
         <aliyun.kms.version>1.4.0</aliyun.kms.version>
         <aliyun.tea.version>1.4.1</aliyun.tea.version>
@@ -219,6 +220,11 @@
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpasyncclient</artifactId>
                 <version>${apache-http-async4.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.aliyun</groupId>
+                <artifactId>dm20151123</artifactId>
+                <version>${aliyun.dm.version}</version>
             </dependency>
             <!-- Source: https://mvnrepository.com/artifact/com.aliyun/credentials-java -->
             <dependency>

@@ -13,7 +13,7 @@ Wind 提供对象存储、加解密、消息投递等 Java 组件。业务代码
 
 对象存储和 KMS 继续使用 `wind-oss-api`、`wind-kms-api`。消息类移到 `wind-message-api` 后保留原包名。`wind-integration-core` 会传递引入这个 JAR。手工分发 JAR 的应用升级 core 时，需要一并提供同版本的 `wind-message-api`。
 
-本版退役了 `wind-oss`、`wind-kms` 和 `wind-message` 三个旧父 POM。显式继承它们的项目升级时需调整 `<parent>`。原来通过 `wind-message` 继承邮件 SDK 版本管理且直接声明 `com.aliyun:dm20151123` 的项目，需自行管理该依赖版本。
+本版退役了 `wind-oss`、`wind-kms` 和 `wind-message` 三个旧父 POM。显式继承它们的项目升级时需调整 `<parent>`。Wind 4.1 在根 POM 统一管理 `com.aliyun:dm20151123`（1.9.3）。继承 `wind-integration` 或导入 `wind-integration-dependencies` BOM 的应用可省略该依赖的版本。
 
 ## 构建与验证
 

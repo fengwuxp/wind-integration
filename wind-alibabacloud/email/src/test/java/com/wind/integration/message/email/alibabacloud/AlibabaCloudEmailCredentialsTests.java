@@ -21,6 +21,8 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,7 +36,7 @@ class AlibabaCloudEmailCredentialsTests {
 
     @ParameterizedTest
     @ValueSource(strings = {AuthConstant.ACCESS_KEY, AuthConstant.STS})
-    void testPublicProductPropertiesSelectIdentityAndResolveAccountForEachSend(String type) {
+    void testPublicProductPropertiesSelectIdentityAndResolveAccountForEachSend(String type) throws IOException {
         AlibabaCloudProductProperties properties = new AlibabaCloudProductProperties();
         properties.setEndpoint("dm.example.invalid");
         properties.setAccessKey("product-id");
@@ -60,8 +62,8 @@ class AlibabaCloudEmailCredentialsTests {
             assertSignedWith(request, "product-id", token);
             Assertions.assertEquals("dm.example.invalid", request.headers.get("host"));
         }
-        Assertions.assertEquals("first@example.test", requests.getFirst().query.get("AccountName"));
-        Assertions.assertEquals("second@example.test", requests.getLast().query.get("AccountName"));
+        Assertions.assertEquals("first@example.test", readForm(requests.getFirst()).get("AccountName"));
+        Assertions.assertEquals("second@example.test", readForm(requests.getLast()).get("AccountName"));
         Assertions.assertNull(properties.getType());
         Assertions.assertEquals("product-id", properties.getAccessKey());
         Assertions.assertFalse(properties.toString().contains("product-id"));
@@ -186,7 +188,7 @@ class AlibabaCloudEmailCredentialsTests {
     }
 
     @Test
-    void testSendingPreservesProtocolAndResolvesAccountForEveryMessage() {
+    void testSendingPreservesProtocolAndResolvesAccountForEveryMessage() throws IOException {
         AtomicReference<String> account = new AtomicReference<>("first@example.test");
         AlibabaCloudEmailMessageSender sender = AlibabaCloudEmailMessageSender.withCredential(accessKey("mail"), connection(), account::get);
         List<TeaRequest> requests = new ArrayList<>();
@@ -198,18 +200,22 @@ class AlibabaCloudEmailCredentialsTests {
         Assertions.assertEquals(2, requests.size());
         TeaRequest text = requests.getFirst();
         TeaRequest html = requests.getLast();
-        Assertions.assertEquals("first@example.test", text.query.get("AccountName"));
-        Assertions.assertEquals("second@example.test", html.query.get("AccountName"));
-        Assertions.assertEquals("测试标题", text.query.get("Subject"));
-        Assertions.assertEquals("测试内容", text.query.get("TextBody"));
-        Assertions.assertNull(text.query.get("HtmlBody"));
-        Assertions.assertEquals("<p>正文</p>", html.query.get("HtmlBody"));
-        Assertions.assertNull(html.query.get("TextBody"));
-        Assertions.assertEquals("recipient@example.test", text.query.get("ToAddress"));
-        Assertions.assertEquals("html@example.test", html.query.get("ToAddress"));
+        Map<String, String> textForm = readForm(text);
+        Map<String, String> htmlForm = readForm(html);
+        Assertions.assertEquals("first@example.test", textForm.get("AccountName"));
+        Assertions.assertEquals("second@example.test", htmlForm.get("AccountName"));
+        Assertions.assertEquals("测试标题", textForm.get("Subject"));
+        Assertions.assertEquals("测试内容", textForm.get("TextBody"));
+        Assertions.assertNull(textForm.get("HtmlBody"));
+        Assertions.assertEquals("<p>正文</p>", htmlForm.get("HtmlBody"));
+        Assertions.assertNull(htmlForm.get("TextBody"));
+        Assertions.assertEquals("recipient@example.test", textForm.get("ToAddress"));
+        Assertions.assertEquals("html@example.test", htmlForm.get("ToAddress"));
+        for (Map<String, String> form : List.of(textForm, htmlForm)) {
+            Assertions.assertEquals("1", form.get("AddressType"));
+            Assertions.assertEquals("true", form.get("ReplyToAddress"));
+        }
         for (TeaRequest request : requests) {
-            Assertions.assertEquals("1", request.query.get("AddressType"));
-            Assertions.assertEquals("true", request.query.get("ReplyToAddress"));
             Assertions.assertEquals("POST", request.method);
             Assertions.assertEquals("SingleSendMail", request.headers.get("x-acs-action"));
         }
@@ -283,6 +289,17 @@ class AlibabaCloudEmailCredentialsTests {
     private static void assertSignedWith(TeaRequest request, String accessKeyId, String token) {
         Assertions.assertTrue(request.headers.get("Authorization").contains(accessKeyId));
         Assertions.assertEquals(token, request.headers.get("x-acs-security-token"));
+    }
+
+    private static Map<String, String> readForm(TeaRequest request) throws IOException {
+        String body = new String(request.body.readAllBytes(), StandardCharsets.UTF_8);
+        Map<String, String> result = new HashMap<>();
+        for (String parameter : body.split("&")) {
+            String[] pair = parameter.split("=", 2);
+            String value = pair.length == 2 ? pair[1] : "";
+            result.put(URLDecoder.decode(pair[0], StandardCharsets.UTF_8), URLDecoder.decode(value, StandardCharsets.UTF_8));
+        }
+        return result;
     }
 
     private static MockedStatic<Tea> interceptHttp(List<TeaRequest> requests, List<Map<String, Object>> runtimes) {

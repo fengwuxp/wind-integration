@@ -33,6 +33,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -99,7 +100,7 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
     }
 
     @Test
-    void testMailEndpointOnlyInheritsGlobalStsAndBindsProductSeparately() {
+    void testMailEndpointOnlyInheritsGlobalStsAndBindsProductSeparately() throws IOException {
         List<TeaRequest> requests = new ArrayList<>();
         try (MockedStatic<Tea> ignored = interceptMail(requests)) {
             runner().withUserConfiguration(AccountConfiguration.class)
@@ -117,7 +118,8 @@ class AlibabaCloudCredentialsAutoConfigurationTests {
         Assertions.assertEquals(1, requests.size());
         Assertions.assertTrue(requests.getFirst().headers.get("Authorization").contains("STS.global"));
         Assertions.assertEquals("global-token", requests.getFirst().headers.get("x-acs-security-token"));
-        Assertions.assertEquals("sender@example.test", requests.getFirst().query.get("AccountName"));
+        String form = new String(requests.getFirst().body.readAllBytes(), StandardCharsets.UTF_8);
+        Assertions.assertTrue(List.of(form.split("&")).contains("AccountName=sender%40example.test"));
     }
 
     @Test

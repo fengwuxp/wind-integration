@@ -277,7 +277,7 @@ public class AlibabaCloudOssClient implements WindOssClient, AutoCloseable {
         return response.getObjectSummaries()
                 .stream()
                 .map(OSSObjectSummary::getKey)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override

@@ -10,6 +10,7 @@ import com.aliyun.oss.common.auth.CredentialsProvider;
 import com.aliyun.oss.common.auth.DefaultCredentials;
 import com.aliyun.oss.common.comm.ResponseMessage;
 import com.aliyun.oss.common.comm.SignVersion;
+import com.aliyun.oss.common.utils.HttpUtil;
 import com.aliyun.oss.internal.OSSUtils;
 import com.aliyun.oss.model.Bucket;
 import com.aliyun.oss.model.CopyObjectResult;
@@ -35,6 +36,7 @@ import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -312,13 +314,15 @@ public class AlibabaCloudOssClient implements WindOssClient, AutoCloseable {
     @Override
     public String getFileUrl(String bucketName, String objectKey) {
         String host = ossClient.getEndpoint().getHost();
-        return getBucketEndpoint(bucketName, host).concat(WindConstants.SLASH).concat(objectKey);
+        String encodedKey = HttpUtil.urlEncode(Objects.requireNonNull(objectKey), true);
+        return getBucketEndpoint(bucketName, host).concat(WindConstants.SLASH).concat(encodedKey);
     }
 
     @Override
     public String getFileInternalUrl(String bucketName, String objectKey) {
         String host = ossClient.getEndpoint().getHost();
-        return getBucketInternalEndpoint(bucketName, host).concat(WindConstants.SLASH).concat(objectKey);
+        String encodedKey = HttpUtil.urlEncode(Objects.requireNonNull(objectKey), true);
+        return getBucketInternalEndpoint(bucketName, host).concat(WindConstants.SLASH).concat(encodedKey);
     }
 
     @Override

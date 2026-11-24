@@ -26,6 +26,8 @@ import org.apache.http.protocol.HttpContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
@@ -33,12 +35,14 @@ import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 class AlibabaCloudOssClientTests {
 
@@ -52,6 +56,48 @@ class AlibabaCloudOssClientTests {
                 AlibabaCloudOssClient.getBucketInternalEndpoint("example", "oss-cn-hangzhou.aliyuncs.com"));
         Assertions.assertEquals("https://example.oss-cn-hangzhou-internal.aliyuncs.com",
                 AlibabaCloudOssClient.getBucketInternalEndpoint("example", "oss-cn-hangzhou-internal.aliyuncs.com"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("objectKeyUrlCases")
+    void testPublicObjectUrlEncodesRawKeyAndPreservesSlashes(String objectKey, String encodedKey) {
+        Client credential = AlibabaCloudCredentialsFactory.accessKey("test-id", "test-secret");
+        try (AlibabaCloudOssClient client = AlibabaCloudOssClient.withCredential(credential,
+                "http://oss-cn-hangzhou-internal.aliyuncs.com", new ClientConfiguration())) {
+            String url = client.getFileUrl("test-bucket", objectKey);
+
+            Assertions.assertEquals("https://test-bucket.oss-cn-hangzhou.aliyuncs.com/" + encodedKey, url);
+            URI parsed = URI.create(url);
+            Assertions.assertEquals("/" + objectKey, parsed.getPath());
+            Assertions.assertNull(parsed.getQuery());
+            Assertions.assertNull(parsed.getFragment());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("objectKeyUrlCases")
+    void testInternalObjectUrlEncodesRawKeyAndPreservesSlashes(String objectKey, String encodedKey) {
+        Client credential = AlibabaCloudCredentialsFactory.accessKey("test-id", "test-secret");
+        try (AlibabaCloudOssClient client = AlibabaCloudOssClient.withCredential(credential,
+                "http://oss-cn-hangzhou.aliyuncs.com", new ClientConfiguration())) {
+            String url = client.getFileInternalUrl("test-bucket", objectKey);
+
+            Assertions.assertEquals("https://test-bucket.oss-cn-hangzhou-internal.aliyuncs.com/" + encodedKey, url);
+            URI parsed = URI.create(url);
+            Assertions.assertEquals("/" + objectKey, parsed.getPath());
+            Assertions.assertNull(parsed.getQuery());
+            Assertions.assertNull(parsed.getFragment());
+        }
+    }
+
+    @Test
+    void testObjectUrlsStillRejectNullKeys() {
+        Client credential = AlibabaCloudCredentialsFactory.accessKey("test-id", "test-secret");
+        try (AlibabaCloudOssClient client = AlibabaCloudOssClient.withCredential(credential,
+                "https://oss-cn-hangzhou.aliyuncs.com", new ClientConfiguration())) {
+            Assertions.assertThrows(NullPointerException.class, () -> client.getFileUrl("test-bucket", null));
+            Assertions.assertThrows(NullPointerException.class, () -> client.getFileInternalUrl("test-bucket", null));
+        }
     }
 
     @Test
@@ -254,6 +300,17 @@ class AlibabaCloudOssClientTests {
         Assertions.assertThrows(BaseException.class, () -> AlibabaCloudOssClient.withCredential(credential, " ", new ClientConfiguration()));
         Assertions.assertThrows(BaseException.class, () -> AlibabaCloudOssClient.withCredential(credential, "https://oss-cn-hangzhou.aliyuncs.com", null));
         Assertions.assertThrows(BaseException.class, () -> AlibabaCloudOssClient.defaults(new Config().setType("invalid"), "https://oss-cn-hangzhou.aliyuncs.com", new ClientConfiguration()));
+    }
+
+    private static Stream<Arguments> objectKeyUrlCases() {
+        return Stream.of(
+                Arguments.of("object.txt", "object.txt"),
+                Arguments.of("report #? %.txt", "report%20%23%3F%20%25.txt"),
+                Arguments.of("a+b&c=d.txt", "a%2Bb%26c%3Dd.txt"),
+                Arguments.of("%2F/%20/%E4%B8%AD", "%252F/%2520/%25E4%25B8%25AD"),
+                Arguments.of("目录/报告📄.txt", "%E7%9B%AE%E5%BD%95/%E6%8A%A5%E5%91%8A%F0%9F%93%84.txt"),
+                Arguments.of("/leading//space name///", "/leading//space%20name///"),
+                Arguments.of("//", "//"));
     }
 
     private Client credentialClient(Supplier<CredentialModel> supplier) {

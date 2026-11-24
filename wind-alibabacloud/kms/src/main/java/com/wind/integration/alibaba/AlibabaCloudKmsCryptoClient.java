@@ -209,6 +209,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     public String encrypt(String keyId, String plaintext, Map<String, Object> options) {
         EncryptRequest request = new EncryptRequest();
         request.setKeyId(keyId);
+        // TODO 调整 Base64 编解码前，先核对旧调用方是否已编码明文，并验证历史密文的解密结果。
         request.setPlaintext(plaintext);
         Map<String, Object> context = new HashMap<>(options);
         request.setEncryptionContext(context);

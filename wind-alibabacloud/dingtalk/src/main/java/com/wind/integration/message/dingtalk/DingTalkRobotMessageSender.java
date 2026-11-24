@@ -8,6 +8,8 @@ import com.wind.integration.message.dingtalk.model.DingTalkRobotMessageResponse;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
+import java.net.URI;
+
 /**
  * 钉钉机器人消息发送
  * <a href="https://open.dingtalk.com/document/robots/custom-robot-access">自定义机器人接入</a>
@@ -29,8 +31,9 @@ public record DingTalkRobotMessageSender(RestClient restClient) implements Messa
         AssertUtils.hasText(message.title(), "argument title must not empty");
         AssertUtils.notNull(message.getMessageBody(), "argument message body is not null");
         DingTalkRobotMessageRequest request = DingTalkRobotMessageRequest.of(message.getMessageBody().getSendBodyInfo(), message.getAccessToken(), message.getSecret());
+        URI uri = URI.create(BASE_URL + WindConstants.QUESTION_MARK + request.getQueryString());
         DingTalkRobotMessageResponse response = restClient.post()
-                .uri(BASE_URL.concat(WindConstants.QUESTION_MARK).concat(request.getQueryString()))
+                .uri(uri)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(request.getData())
                 .retrieve()

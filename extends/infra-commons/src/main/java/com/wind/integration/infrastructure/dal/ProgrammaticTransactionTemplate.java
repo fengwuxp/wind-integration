@@ -12,7 +12,12 @@ import org.springframework.transaction.support.DefaultTransactionDefinition;
 import java.util.function.Supplier;
 
 /**
- * 编程式事务模板操作
+ * 通过 {@link PlatformTransactionManager} 按指定的传播行为执行回调，适用于在一段业务流程中为部分数据库操作划定事务边界。
+ * 默认使用 {@link Propagation#REQUIRED}，已有事务时参与该事务。
+ *
+ * <p>回调正常返回后请求提交。回调或提交抛出异常时，模板尝试回滚，随后重新抛出原异常；
+ * 为 {@link Supplier} 指定了降级回调时，改为调用该回调并返回其结果。
+ * 获取事务失败时异常直接传给调用者。</p>
  */
 @AllArgsConstructor
 @Slf4j

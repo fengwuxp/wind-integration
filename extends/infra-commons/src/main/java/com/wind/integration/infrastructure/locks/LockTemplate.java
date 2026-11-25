@@ -12,7 +12,13 @@ import java.util.function.Supplier;
 
 
 /**
- * 锁操作模板方法
+ * 按业务键获取 {@link WindLock}，在取得锁后执行回调。适用于多个任务可能同时处理同一订单等资源的场景。
+ *
+ * <p>锁由 {@link LockFactory} 提供。等待超时会抛出异常并跳过回调，等待被中断时会先恢复线程中断标记。
+ * 指定固定租期时，租期应覆盖回调的执行时间。</p>
+ *
+ * <p>工厂返回锁对象后，模板在退出时总会调用 {@link WindLock#unlock()}，包括获取锁失败的情况。
+ * 接入的锁实现需要能处理当前线程未持锁时的释放调用。</p>
  */
 @Slf4j
 @AllArgsConstructor
@@ -39,7 +45,7 @@ public class LockTemplate {
      * @param lockKey   锁 Key
      * @param waitTime  获取锁的等待时间
      * @param leaseTime 锁的存活时间
-     * @param timeUnit  等待时间的单位
+     * @param timeUnit  等待时间与租期的单位
      */
     public void tryLock(Runnable run, String lockKey, Integer waitTime, Integer leaseTime, TimeUnit timeUnit) {
         WindLock lock = null;

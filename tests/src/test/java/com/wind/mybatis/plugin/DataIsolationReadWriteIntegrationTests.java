@@ -120,19 +120,21 @@ class DataIsolationReadWriteIntegrationTests {
         });
     }
 
-    /** 缺少租户时清空实体预填值，租户必填约束由数据库拒绝，不能保留客户端值。 */
+    /** 上下文和实体同时缺少租户时，数据库必填约束拒绝插入。 */
     @Test
-    void testMissingTenantClearsPresetValueAndDatabaseRejectsNull() throws SQLException {
+    void testMissingTenantAndNullEntityValueViolateNotNullConstraint() throws SQLException {
         TenantContextHolder.clear();
         try (SqlSession session = sessionFactory.openSession()) {
             OrderEntity entity = order(10L);
+            entity.setTenantId(null);
             RuntimeException error = Assertions.assertThrows(RuntimeException.class,
                     () -> session.getMapper(OrderMapper.class).insert(entity));
             Throwable cause = error;
             while (cause.getCause() != null) {
                 cause = cause.getCause();
             }
-            Assertions.assertInstanceOf(SQLException.class, cause);
+            SQLException violation = Assertions.assertInstanceOf(SQLException.class, cause);
+            Assertions.assertEquals("23502", violation.getSQLState());
             Assertions.assertNull(entity.getTenantId());
             try (var statement = session.getConnection().createStatement();
                  var result = statement.executeQuery("SELECT COUNT(*) FROM t_holder_order WHERE id=10")) {
@@ -142,20 +144,26 @@ class DataIsolationReadWriteIntegrationTests {
         }
     }
 
-    /** 可空租户列允许落库，但缺少上下文的默认读取仍没有可见记录。 */
+    /** 缺少租户上下文时，可空租户列保留实体的值，默认读取范围为空。 */
     @Test
-    void testMissingTenantWritesNullWhenColumnAllowsIt() throws SQLException {
+    void testMissingTenantPreservesPresetAndNullValues() throws SQLException {
         TenantContextHolder.clear();
         try (SqlSession session = sessionFactory.openSession()) {
-            TenantRecord record = new TenantRecord(31L, 99L);
-            Assertions.assertEquals(1, session.getMapper(TenantMapper.class).insert(record));
-            Assertions.assertNull(record.getTenantId());
+            TenantMapper mapper = session.getMapper(TenantMapper.class);
+            Assertions.assertEquals(1, mapper.insert(new TenantRecord(31L, 99L)));
+            Assertions.assertEquals(1, mapper.insert(new TenantRecord(32L, null)));
             try (var statement = session.getConnection().createStatement();
-                 var result = statement.executeQuery("SELECT account_key FROM t_tenant_listener WHERE id=31")) {
+                 var result = statement.executeQuery("SELECT account_key FROM t_tenant_listener ORDER BY id")) {
+                Assertions.assertTrue(result.next());
+                Assertions.assertEquals(99L, result.getLong(1));
                 Assertions.assertTrue(result.next());
                 Assertions.assertNull(result.getObject(1));
             }
-            Assertions.assertNull(session.getMapper(TenantMapper.class).selectOneById(31L));
+            Assertions.assertNull(mapper.selectOneById(31L));
+            DataIsolationContextHolder.runWithTenant(99L, () -> {
+                Assertions.assertNotNull(mapper.selectOneById(31L));
+                Assertions.assertNull(mapper.selectOneById(32L));
+            });
             session.rollback();
         }
     }
@@ -372,15 +380,23 @@ class DataIsolationReadWriteIntegrationTests {
         }
     }
 
-    /** 工作空间监听器按当前契约允许填 null，该记录随后不在缺失工作空间的默认读取范围内。 */
+    /** 缺少工作空间上下文时保留预填归属，随后只有匹配工作空间的查询可见。 */
     @Test
-    void testMissingWorkspaceWritesNullAndReadsNoRows() throws Exception {
+    void testMissingWorkspacePreservesEntityValueAndRestrictsReads() throws Exception {
         DataIsolationContextHolder.callWith(Map.of(TENANT, 10L), () -> {
             try (SqlSession session = sessionFactory.openSession()) {
                 OrderMapper mapper = session.getMapper(OrderMapper.class);
-                Assertions.assertEquals(1, mapper.insert(order(10L)));
-                assertStoredContext(session, 10L, null);
+                OrderEntity preset = order(10L);
+                preset.setWorkspaceId("ws-b");
+                OrderEntity unassigned = order(11L);
+                unassigned.setWorkspaceId(null);
+                Assertions.assertEquals(1, mapper.insert(preset));
+                Assertions.assertEquals(1, mapper.insert(unassigned));
+                assertStoredContext(session, 10L, "ws-b");
+                assertStoredContext(session, 11L, null);
                 Assertions.assertEquals(List.of(), mapper.ids());
+                DataIsolationContextHolder.runWithWorkspace("ws-b",
+                        () -> Assertions.assertEquals(List.of(2L, 10L), mapper.ids()));
                 session.rollback();
             }
             return null;

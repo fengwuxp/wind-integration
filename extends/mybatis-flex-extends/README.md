@@ -183,10 +183,10 @@ flattenTree 接受非空根节点，返回包含根节点的深度优先前序�
 
 | 监听器 | 实体须实现的接口 | 写入内容 |
 | --- | --- | --- |
-| TenantIsolationFieldInsertListener | SettableTenantIsolationObject | DataIsolationContextHolder.getTenantId()，未绑定时填 null |
+| TenantIsolationFieldInsertListener | SettableTenantIsolationObject | DataIsolationContextHolder.getTenantId()，未绑定时保留实体值 |
 | EnvIsolationFieldInsertListener | EnvIsolationObject | DataIsolationContextHolder.requireEnv()，缺失、空字符串或仅空白时拒绝写入 |
 | TestDataIsolationFieldInsertListener | SettableTestDataIsolationObject | DataIsolationContextHolder.isTestData()，未绑定时为 false |
-| WorkspaceIsolationFieldInsertListener | SettableWorkspaceIsolationObject | DataIsolationContextHolder.getWorkspaceId()，未绑定时填 null |
+| WorkspaceIsolationFieldInsertListener | SettableWorkspaceIsolationObject | DataIsolationContextHolder.getWorkspaceId()，未绑定时保留实体值 |
 
 环境值的权威来源是应用的 Spring profile。`DataIsolationContextHolder.getEnv()` 通过 `ServiceInfoUtils.getSpringProfilesActive()` 读取它，读插件和插入监听器使用同一来源；在 trace 中绑定 ENVIRONMENT 不会覆盖应用 profile。
 
@@ -221,11 +221,11 @@ globalConfig.registerInsertListener(new WorkspaceIsolationFieldInsertListener(),
 
 注册应在业务写入前完成，具体生命周期沿用项目的 MyBatisFlexCustomizer。onInsert 和全局配置方式参考 [Flex 实体监听器](https://github.com/mybatis-flex/mybatis-flex/blob/main/docs/zh/core/table.md)。
 
-监听器会覆盖对应字段的已有值。查询忽略不会关闭这些监听器，也不会改变当前租户、工作空间或环境。它们只在 Flex 实体插入监听链上执行；手写 XML/注解 INSERT、直接 JDBC 和 UPDATE/DELETE 不经过该链路。
+查询忽略只作用于读取。Flex 实体插入仍执行已注册的监听器。手写 XML 或注解 INSERT、直接 JDBC 和 UPDATE/DELETE 由业务写入路径自行处理。
 
-退役 Flex 原生租户能力时，可用 TenantIsolationFieldInsertListener 承接实体插入的租户填充，无需启用 TenantFactory 或 `@Column(tenantId = true)`。已有 tenantId 会被当前上下文覆盖，缺少租户时也会覆盖为 null，不保留预填值。更新、删除仍须校验并限定目标归属，插入监听器和读插件都不会补写这些权限条件。
+退役 Flex 原生租户能力时，可用 TenantIsolationFieldInsertListener 承接实体插入的租户填充，无需启用 TenantFactory 或 `@Column(tenantId = true)`。更新、删除仍须由业务用例校验并限定目标归属。
 
-租户和工作空间监听器都允许填 null；如果业务要求每条记录必须有归属，需要入口校验或数据库约束，否则可能写入一条默认查询不可见的记录。
+插入时，已绑定的租户或工作空间会覆盖实体中的对应字段。缺少某一维度的上下文时，该字段保留原值，包括 null。要求记录必须有归属的写入用例，应绑定可信上下文或校验预填归属，并用数据库必填约束防止空值落库。默认读取在该维度未绑定时返回空结果。
 
 `TestDataIsolationObject.isTestData()` 保留默认 false 的行为；实际存储测试标记的实体应返回自身字段值，使用 Lombok `@Getter` 可生成对应方法。
 
@@ -613,6 +613,22 @@ Supplier 在每次查询中调用，应读取请求内已准备好的结果；�
 
 平台操作获准读取多个目标租户时，可用 `FieldRule.forDimension(TENANT, "tenantId", targetTenantScopes)` 覆盖默认租户规则，让 targetTenantScopes 返回已校验的 `ofValues(...)`；保留其他维度。仅某类实体允许此范围时，使用实体级 FieldRule。目标实体未实现 TenantIsolationObject 时使用普通字段规则。账号归属、权限来源租户和目标数据租户应分别确定，不能用“忽略租户”代替一个有限的目标集合。
 
+**正式运营和测试运营的读取范围**
+
+若正式运营获准读取本租户的正式、测试及历史未分类数据，而测试运营只获准读取测试数据，覆盖内置的 `TEST_DATA` 读取规则。以下示例中的 `operatorAccess` 是宿主在认证后准备的可信资格。`requireTestOperator()` 对测试运营返回 true，对正式运营返回 false；身份缺失、资格未知或无权时抛异常。实体须实现 `TestDataIsolationObject` 并映射测试标记属性。
+
+```java
+FieldDataIsolationStrategy fields = FieldDataIsolationStrategy.withDefaults(List.of(
+        FieldRule.forDimension(TEST_DATA, "testData", () -> {
+            if (operatorAccess.requireTestOperator()) {
+                return DataIsolationScope.of(true);
+            }
+            return DataIsolationScope.unrestrictedScope();
+        })));
+```
+
+正式运营的查询省略测试标记条件，因此也能读到 SQL NULL。测试运营只匹配 `test_data = true`。两种查询都继续使用原业务条件，以及实体已配置的租户、工作空间等边界。显式请求正式数据或指定业务主体时，入口先依据该资格核验请求；测试运营指定正式数据或越界主体时直接拒绝。只有实际执行查询时才会调用规则供应者。这个读取配置与插入记录时使用的测试标记分别生效。
+
 多个独立字段取 AND。若只允许 `(租户 A, 工作空间 X)`、`(租户 B, 工作空间 Y)`，分别配置两个 IN 集合会产生未授权的交叉组合；使用完整字段分组保留配对。
 
 **完整字段分组**
@@ -783,7 +799,7 @@ AND（同一资源、同一授权作用域内的有效权限分支并集）
 | 指定租户内的工单 | 将合法目标租户集合映射到 tenantId | 该 DATA 分支仍与独立目标租户边界取 AND |
 | 本人所在部门或指定部门的员工 | IAM 解析部门 ID 集合，权限策略生成当前任职 EXISTS；可与指定员工 ID 取 OR | 员工读取另有独立租户、当前团队约束，无 DATA 时也要执行 |
 | 部门仅当前节点或包含后代 | 请求准备阶段按当前树解析 NODE_ONLY/SUBTREE，保留根引用与层级定义 | 不包含兄弟节点，不保存后代快照；下次请求重新解析才能反映树变化 |
-| 无适用 DATA、多个角色贡献 DATA | 按权限产品合同明确拒绝或裁决完整范围；Fincone 受控类型无适用 DATA 时拒绝 | 不能将缺少授权转换为“不追加过滤”；不混合不同团队的角色范围 |
+| 无适用 DATA、多个角色贡献 DATA | 应用按资源和操作裁决，向 Wind 提供明确的读取分组 | 空分组返回零行；需要拒绝调用时由权限入口报错 |
 
 这些是查询表达示例，不是产品允许配置的白名单。哪些资源、模式和维度组合合法，由权限产品及其解析入口决定；非法、退役或未知定义必须在那里拒绝，不能静默丢弃后变成无绑定。Wind 不需要为每种业务条件新增策略接口。
 
@@ -801,7 +817,7 @@ Capte/IAM 负责主体、作用域、授权来源与 READ/WRITE 用途的裁决�
 
 参数保持对应分支的顺序；不能改成两个独立的 IN 集合，也不能把分支内字段分别 OR。实际条件中的列限定名由 QueryContext.column 取得，值始终参数化绑定。
 
-Fincone 当前要求完整 DATA 配对、包含择小、只读收紧及无适用 DATA 拒绝，这些规则由 Capte/IAM 承接。消费者若使用 `noBinding` 或返回空条件列表，其技术含义仅是本策略不追加过滤，不能据此把“无 DATA”或显式 ALL 当成无条件放行。合法范围没有匹配记录才是普通空结果；范围缺失、失效或无法解析应由授权入口或策略明确拒绝。
+例如，主体获授租户 T 全部只读、T 内团队 A 可读写时，A 内可读写，T 内 A 以外仍可读、不可写。RBAC 按操作、目标归属及完整绑定裁决，业务更新只消费这次写裁决。Wind 执行最终读取分组。合法范围没有匹配记录时返回空结果，未准备或无法解释的规则应在权限入口或规则供应者处报错。
 
 读取插件和插入字段填充不承担写入鉴权。修改、删除、创建及转派由原业务用例消费 WRITE 结果，在必要的事务、版本和前后置检查中执行；不能把 SELECT 可见性作为写权限证明。
 
@@ -928,7 +944,7 @@ ORDER BY r.id LIMIT ? OFFSET ?
 
 **读取和写入使用同一归属来源**
 
-插件只处理 SELECT；租户、环境、测试标记和工作空间的插入填充见[第 5 节](#insert-listeners)。监听器会覆盖对应字段的已有值，查询忽略不会停止填充。环境缺失或为空白时拒绝插入；租户、工作空间未绑定时允许填 null，业务必填要求应在入口及数据库约束落实。
+插件只处理 SELECT；租户、环境、测试标记和工作空间的插入填充见[第 5 节](#insert-listeners)。环境缺失或为空白时拒绝插入。租户、工作空间缺少对应上下文时保留实体值，业务入口负责校验预填归属。
 
 应用通过租户插入监听器填充当前归属，并继续负责写权限校验，无需为保留填充而启用原生租户过滤。读取一个获准的多租户集合，不表示允许向该集合中的任意租户写入；写入目标须由具体操作的可信上下文确定。读插件对 INSERT/UPDATE/DELETE 直通，即使更新前曾读到对象，实际更新或删除仍须带必要的归属和业务条件。
 
@@ -968,13 +984,13 @@ JSQLParser 5.4 的原 SQL 解析超时覆盖排队与执行时间；超时或调
 
 ### 接入时验证什么
 
-先在实际工厂中确认 Wind 插件、实体规则和各维度的执行责任，再用两个租户、两个工作空间的数据验证结果。完整迁移租户隔离到 Wind 时确认原生 TenantFactory 未启用；保留 Flex 租户时，Wind 显式配置其他维度，并分别验证手写 SQL 和写入边界。生成 SQL 与 XML/注解 SQL 都应覆盖，不能只检查 Bean 或正常列表。
+每种受控资源上线前，核对它的实体、所属 SqlSessionFactory 和业务查询入口，在该工厂确认插件和规则已生效。用两个租户、两个工作空间的数据验证可见结果，并按第 7.9 节核验实际工厂的缓存配置和授权变更后的读取结果。完整迁移租户隔离到 Wind 时确认原生 TenantFactory 未启用；保留 Flex 租户时，Wind 显式配置其他维度，并分别验证手写 SQL 和写入边界。生成 SQL 与 XML/注解 SQL 都应覆盖，不能只检查 Bean 或正常列表。
 
 | 验证场景 | 预期结果 |
 | --- | --- |
 | 同一范围查询列表、详情、计数、聚合、分页、导出 | 返回记录、总数与统计使用相同边界；越界 ID 不可见 |
 | 普通实体仅有 tenantId 字段或 Flex 租户注解 | 补显式 Wind 规则后，生成与手写 SQL 均隔离 |
-| 无 DATA、有效空范围、缺失或非法权限范围 | 按当前权限合同验证；Fincone 受控类型无 DATA 明确拒绝，合法空范围无记录，缺失或非法范围拒绝 |
+| 无 DATA、有效空范围、缺失或非法权限范围 | 按宿主权限合同裁决无 DATA 的行为；分组已准备且为空时无记录，未准备或非法范围须拒绝查询 |
 | 多个合法完整分支 | 保留分支内部的字段/关系配对和 AND，分支间按已裁决语义组合；基础边界与原业务条件继续 AND |
 | 单个/多个目标租户、嵌套上下文、异常退出、线程复用 | 只返回获准范围，退出后恢复，不残留前次身份 |
 | 忽略一个或多个内置维度 | 只移除对应字段条件，普通字段和权限策略仍生效；退出后恢复 |

@@ -7,7 +7,7 @@ import com.wind.integration.core.model.SettableTenantIsolationObject;
 import java.io.Serializable;
 
 /**
- * 为可设置租户归属的实体填充当前租户，缺少上下文时填 null。
+ * 将当前租户写入实体。未绑定租户时保留实体的租户值。
  * Flex 按 Class 解析监听目标，父类泛型使用原始接口。
  *
  * @author wuxp

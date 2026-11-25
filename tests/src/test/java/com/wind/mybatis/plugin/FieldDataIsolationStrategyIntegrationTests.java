@@ -12,6 +12,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.integration.core.context.DataIsolationContextHolder;
 import com.wind.integration.core.context.DataIsolationQueryIgnoreHolder;
 import com.wind.integration.core.model.TenantIsolationObject;
+import com.wind.integration.core.model.TestDataIsolationObject;
 import com.wind.mybatis.isolation.DataIsolationScope;
 import com.wind.mybatis.isolation.DataIsolationStrategy.FieldRule;
 import com.wind.mybatis.isolation.DataIsolationStrategy;
@@ -33,9 +34,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static com.wind.integration.core.enums.DataIsolationDimensions.TENANT;
+import static com.wind.integration.core.enums.DataIsolationDimensions.TEST_DATA;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -78,6 +81,34 @@ class FieldDataIsolationStrategyIntegrationTests {
                 assertNull(mapper.selectOneById(2L));
                 assertNull(mapper.selectOneById(3L));
                 assertEquals(List.of(1L, 4L), mapper.annotatedIds());
+            }
+        });
+    }
+
+    @Test
+    void testOperatorTestDataVisibilityWithinTenant() throws Exception {
+        try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE operator_item (id BIGINT PRIMARY KEY, tenant_id BIGINT, test_data BOOLEAN)");
+            statement.execute("INSERT INTO operator_item VALUES (1,10,FALSE),(2,10,TRUE),(3,10,NULL),(4,20,TRUE),(5,20,FALSE),(6,20,NULL)");
+        }
+        var testOperator = new AtomicReference<Boolean>();
+        var fields = FieldDataIsolationStrategy.withDefaults(List.of(FieldRule.forDimension(TEST_DATA, "testData", () -> {
+            Boolean classification = testOperator.get();
+            if (classification == null) {
+                throw new IllegalStateException("Operator qualification is required");
+            }
+            return classification ? DataIsolationScope.of(true) : DataIsolationScope.unrestrictedScope();
+        })));
+        SqlSessionFactory factory = factory(new DataIsolationQueryInterceptor(List.of(fields)), OperatorItemMapper.class);
+        DataIsolationContextHolder.runWithTenant(10L, () -> {
+            try (SqlSession session = factory.openSession()) {
+                OperatorItemMapper mapper = session.getMapper(OperatorItemMapper.class);
+                testOperator.set(false);
+                assertEquals(List.of(1L, 2L, 3L), mapper.ids());
+                testOperator.set(true);
+                assertEquals(List.of(2L), mapper.ids());
+                testOperator.set(null);
+                assertThrows(PersistenceException.class, mapper::ids);
             }
         });
     }
@@ -396,6 +427,25 @@ class FieldDataIsolationStrategyIntegrationTests {
     }
 
     interface PlainMapper extends BaseMapper<PlainItem> {
+    }
+
+    @Getter
+    @Table("operator_item")
+    static class OperatorItem implements TenantIsolationObject<Long>, TestDataIsolationObject {
+        @Id
+        private Long id;
+        private Long tenantId;
+        private Boolean testData;
+
+        @Override
+        public boolean isTestData() {
+            return Boolean.TRUE.equals(testData);
+        }
+    }
+
+    interface OperatorItemMapper extends BaseMapper<OperatorItem> {
+        @Select("SELECT id FROM operator_item ORDER BY id")
+        List<Long> ids();
     }
 
     interface SummaryMapper {

@@ -189,7 +189,7 @@ public final class AlibabaCloudCredentialsFactory {
         AssertUtils.notNull(config, "凭据配置不能为空");
         String type = config.getType();
         AssertUtils.hasText(type, "凭据参数 type 不能为空白");
-        log.info("阿里云凭据认证模式 type = {}", type);
+        log.info("阿里云凭据客户端已创建 type = {}", type);
         switch (type) {
             case AuthConstant.ACCESS_KEY, AuthConstant.STS, AuthConstant.RAM_ROLE_ARN -> {
                 AssertUtils.hasText(config.getAccessKeyId(), "凭据参数 accessKeyId 不能为空白");

@@ -217,6 +217,13 @@ class AlibabaCloudKmsCredentialConfigurationTests {
         String provider = "acs:ram::123456789:oidc-provider/test";
         return Stream.of(
                 Arguments.of("file", null, null, null, ""),
+                Arguments.of("file-over-oidc", role, provider, "token", ""),
+                Arguments.of("file-over-partial-oidc", role, null, "token", ""),
+                Arguments.of("file-over-blank-oidc", "", "", "", ""),
+                Arguments.of("file-read-failure", role, provider, "token", ""),
+                Arguments.of("file-invalid-content", role, provider, "token", ""),
+                Arguments.of("file-state-unknown", role, provider, "token", ""),
+                Arguments.of("missing-all", null, null, null, ""),
                 Arguments.of("environment-ak", null, null, null, ""),
                 Arguments.of("environment-sts", null, null, null, ""),
                 Arguments.of("role-only", role, null, null, "ALIBABA_CLOUD_OIDC_PROVIDER_ARN"),
@@ -232,6 +239,7 @@ class AlibabaCloudKmsCredentialConfigurationTests {
                 Arguments.of("empty-all", "", "", "", "ALIBABA_CLOUD_ROLE_ARN"),
                 Arguments.of("oidc", role, provider, "token", ""),
                 Arguments.of("oidc-sdk-override", role, provider, "token", ""),
+                Arguments.of("explicit-over-file", null, null, null, ""),
                 Arguments.of("explicit-over-oidc", role, provider, "token", ""),
                 Arguments.of("explicit-over-partial", role, null, null, ""),
                 Arguments.of("explicit-over-blank", "", "", "", ""));
@@ -264,8 +272,10 @@ class AlibabaCloudKmsCredentialConfigurationTests {
             }
             environment.put("ALIBABA_CLOUD_OIDC_TOKEN_FILE", tokenValue);
         }
-        environment.put("ALIBABA_CLOUD_ACCESS_KEY_ID", "environment-ak");
-        environment.put("ALIBABA_CLOUD_ACCESS_KEY_SECRET", "environment-secret");
+        if (!"missing-all".equals(mode)) {
+            environment.put("ALIBABA_CLOUD_ACCESS_KEY_ID", "environment-ak");
+            environment.put("ALIBABA_CLOUD_ACCESS_KEY_SECRET", "environment-secret");
+        }
         if ("environment-sts".equals(mode)) {
             environment.put("ALIBABA_CLOUD_SECURITY_TOKEN", "environment-token");
         }
@@ -284,11 +294,30 @@ class AlibabaCloudKmsCredentialConfigurationTests {
         public static void main(String[] args) throws Exception {
             String mode = args[0];
             String invalidVariable = args[1];
-            try (MockedStatic<Files> files = interceptCredentialFile(); MockedStatic<AuthUtils> tokenReader = interceptOidcToken()) {
+            try (MockedStatic<Files> files = interceptCredentialFile(); MockedStatic<AuthUtils> tokenReader = interceptOidcToken(mode.startsWith("oidc"))) {
+                if (!invalidVariable.isEmpty() || mode.startsWith("oidc") || "missing-all".equals(mode)) {
+                    files.when(() -> Files.notExists(CREDENTIAL_FILE)).thenReturn(true);
+                    files.when(() -> Files.exists(CREDENTIAL_FILE)).thenReturn(false);
+                }
                 if (!invalidVariable.isEmpty() || mode.startsWith("oidc") || mode.startsWith("explicit-")) {
                     files.when(() -> Files.readString(CREDENTIAL_FILE)).thenThrow(new AssertionError("已配置策略不得回退凭据文件"));
                 }
-                if (!invalidVariable.isEmpty()) {
+                if ("file-read-failure".equals(mode) || "file-state-unknown".equals(mode) || "missing-all".equals(mode)) {
+                    if ("file-state-unknown".equals(mode)) {
+                        files.when(() -> Files.exists(CREDENTIAL_FILE)).thenReturn(false);
+                    }
+                    IOException unreadable = new IOException("test credential file unavailable");
+                    files.when(() -> Files.readString(CREDENTIAL_FILE)).thenThrow(unreadable);
+                    BaseException failure = Assertions.assertThrows(BaseException.class, AlibabaCloudKmsCryptoClient::defaults);
+                    Assertions.assertEquals("读取阿里云凭据文件失败", failure.getMessage());
+                    Assertions.assertSame(unreadable, failure.getCause());
+                    Assertions.assertThrows(BaseException.class, () -> AlibabaCloudKmsCryptoClient.defaults(null));
+                } else if ("file-invalid-content".equals(mode)) {
+                    files.when(() -> Files.readString(CREDENTIAL_FILE)).thenReturn(" encrypted-incomplete ");
+                    BaseException failure = Assertions.assertThrows(BaseException.class, AlibabaCloudKmsCryptoClient::defaults);
+                    Assertions.assertTrue(failure.getMessage().contains("需要两条非空白的 AK/SK 行"));
+                    Assertions.assertThrows(BaseException.class, () -> AlibabaCloudKmsCryptoClient.defaults(null));
+                } else if (!invalidVariable.isEmpty()) {
                     BaseException failure = Assertions.assertThrows(BaseException.class, AlibabaCloudKmsCryptoClient::defaults);
                     Assertions.assertTrue(failure.getMessage().contains(invalidVariable));
                     Assertions.assertThrows(BaseException.class, () -> AlibabaCloudKmsCryptoClient.defaults(null));
@@ -339,6 +368,11 @@ class AlibabaCloudKmsCredentialConfigurationTests {
                         Assertions.assertEquals("ciphertext", AlibabaCloudKmsCryptoClient.defaults(explicit).encrypt("key-id", "plaintext"));
                         Assertions.assertTrue(requests.getFirst().headers.get("Authorization").contains("STS.explicit"));
                         Assertions.assertEquals("explicit-token", requests.getFirst().headers.get("x-acs-security-token"));
+                        Assertions.assertEquals("ciphertext", AlibabaCloudKmsCryptoClient.defaults(explicit,
+                                new com.aliyun.teaopenapi.models.Config().setEndpoint("custom.example.invalid")).encrypt("key-id", "plaintext"));
+                        Assertions.assertTrue(requests.getLast().headers.get("Authorization").contains("STS.explicit"));
+                        Assertions.assertEquals("explicit-token", requests.getLast().headers.get("x-acs-security-token"));
+                        Assertions.assertEquals("custom.example.invalid", requests.getLast().headers.get("host"));
                     }
                 } else {
                     List<TeaRequest> requests = new ArrayList<>();
@@ -349,6 +383,9 @@ class AlibabaCloudKmsCredentialConfigurationTests {
                                 new com.aliyun.teaopenapi.models.Config().setEndpoint("custom.example.invalid")).encrypt("key-id", "plaintext"));
                         Assertions.assertTrue(requests.getLast().headers.get("Authorization").contains("file-id"));
                         Assertions.assertEquals("custom.example.invalid", requests.getLast().headers.get("host"));
+                        for (TeaRequest request : requests) {
+                            Assertions.assertNull(request.headers.get("x-acs-security-token"));
+                        }
                     }
                 }
             }
@@ -368,11 +405,12 @@ class AlibabaCloudKmsCredentialConfigurationTests {
         /**
          * SDK 通过 FileInputStream 读 Token，在读取边界验证环境路径或缺省路径，避免访问真实挂载文件。
          */
-        private static MockedStatic<AuthUtils> interceptOidcToken() {
+        private static MockedStatic<AuthUtils> interceptOidcToken(boolean oidcAllowed) {
             String environmentPath = System.getenv("ALIBABA_CLOUD_OIDC_TOKEN_FILE");
             String expectedPath = environmentPath == null ? CREDENTIAL_FILE.toString() : environmentPath;
             return Mockito.mockStatic(AuthUtils.class, invocation -> {
                 if ("getOIDCToken".equals(invocation.getMethod().getName())) {
+                    Assertions.assertTrue(oidcAllowed, "文件或显式身份分支不得读取 OIDC Token");
                     Assertions.assertEquals(expectedPath, invocation.getArgument(0));
                     return "route-oidc-token";
                 }
@@ -388,6 +426,9 @@ class AlibabaCloudKmsCredentialConfigurationTests {
 
         @Override
         public String decrypt(String encryptedText) {
+            if ("encrypted-incomplete".equals(encryptedText)) {
+                return "file-id";
+            }
             Assertions.assertEquals("encrypted-test", encryptedText);
             return "file-id\n\nfile-secret\nignored-extra-line";
         }
@@ -396,6 +437,12 @@ class AlibabaCloudKmsCredentialConfigurationTests {
     private static MockedStatic<Files> interceptCredentialFile() {
         return Mockito.mockStatic(Files.class, invocation -> {
             if (invocation.getArguments().length > 0 && CREDENTIAL_FILE.equals(invocation.getArgument(0))) {
+                if ("exists".equals(invocation.getMethod().getName())) {
+                    return true;
+                }
+                if ("notExists".equals(invocation.getMethod().getName())) {
+                    return false;
+                }
                 if ("readString".equals(invocation.getMethod().getName())) {
                     return " encrypted-test ";
                 }

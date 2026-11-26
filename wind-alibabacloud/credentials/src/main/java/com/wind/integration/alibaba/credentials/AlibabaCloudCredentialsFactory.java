@@ -7,6 +7,7 @@ import com.aliyun.credentials.utils.AuthConstant;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.exception.BaseException;
 import com.wind.common.exception.DefaultExceptionCode;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -25,6 +26,7 @@ import java.util.function.UnaryOperator;
  * 本工厂不使用默认凭据链，也不创建全局客户端。
  */
 @NullMarked
+@Slf4j
 public final class AlibabaCloudCredentialsFactory {
 
     /**
@@ -187,6 +189,7 @@ public final class AlibabaCloudCredentialsFactory {
         AssertUtils.notNull(config, "凭据配置不能为空");
         String type = config.getType();
         AssertUtils.hasText(type, "凭据参数 type 不能为空白");
+        log.info("阿里云凭据认证模式 type = {}", type);
         switch (type) {
             case AuthConstant.ACCESS_KEY, AuthConstant.STS, AuthConstant.RAM_ROLE_ARN -> {
                 AssertUtils.hasText(config.getAccessKeyId(), "凭据参数 accessKeyId 不能为空白");
@@ -345,6 +348,15 @@ public final class AlibabaCloudCredentialsFactory {
      */
     public static Client credentialsUri(@Nullable String uri) {
         return create(new Config().setType(AuthConstant.CREDENTIALS_URI).setCredentialsUri(uri));
+    }
+
+    /**
+     * 判断默认凭据文件是否存在。无法确定文件状态时继续尝试文件模式，由读取操作报告错误。
+     *
+     * @return 仅在确认文件不存在时返回 false
+     */
+    public static boolean hasDefaultCredentialFile() {
+        return !Files.notExists(DEFAULT_CREDENTIAL_FILE);
     }
 
     /**

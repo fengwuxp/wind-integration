@@ -132,8 +132,7 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     }
 
     /**
-     * 两个 OIDC ARN 环境配置齐全时使用 OIDC，Token 优先读取环境路径，路径未设置时使用缺省文件。
-     * 两个 ARN 均未设置时使用加密 AK 文件，残缺配置报错。
+     * 优先使用默认加密 AK 文件。文件缺失时，按环境中的角色 ARN 和 OIDC 提供商 ARN 选择 OIDC。
      *
      * @return AlibabaCloudKmsCryptoClient
      */
@@ -142,9 +141,9 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     }
 
     /**
-     * 使用显式凭据配置或 OIDC 环境策略，KMS 端点沿用现有系统配置。
+     * 使用显式凭据配置或自动选择的身份，KMS 端点沿用现有系统配置。
      *
-     * @param credentialConfig 显式配置；仅 null 表示检查 OIDC 环境配置
+     * @param credentialConfig 显式配置，传 null 时按默认文件、OIDC 环境的顺序选择
      * @return KMS 客户端
      */
     public static AlibabaCloudKmsCryptoClient defaults(com.aliyun.credentials.models.@Nullable Config credentialConfig) {
@@ -154,11 +153,10 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
     /**
      * 统一选择凭据来源并装配 KMS 客户端。显式配置优先，选定来源失败时不会回退到其他身份。
      * <p>
-     * 未传凭据配置时，仅检查角色 ARN 和 OIDC 提供商 ARN；均未设置才使用加密 AK 文件。
-     * 部分设置或空白值均报错；选中 OIDC 时由公共工厂优先解析环境 Token 路径，未设置时采用缺省路径。
-     * 不读取环境 AK/STS，也不进入官方默认凭据链。
+     * 未传凭据配置时优先读取默认加密 AK 文件。只有确认文件缺失才检查 OIDC 环境配置。
+     * 两个 ARN 齐全时使用 OIDC，部分设置或空白时报错，两者均未设置时沿用文件凭据的错误处理。
      *
-     * @param credentialConfig 显式配置；仅 null 表示检查 OIDC 环境配置，空 type 或 default 类型仍为错误
+     * @param credentialConfig 显式配置，传 null 时自动选择，空 type 或 default 类型仍为错误
      * @param clientConfig     不包含身份字段的 KMS 连接配置
      * @return KMS 客户端
      */
@@ -166,6 +164,10 @@ public class AlibabaCloudKmsCryptoClient implements WindCredentialsClient, WindC
         AssertUtils.notNull(clientConfig, "KMS 连接配置不能为空");
         if (credentialConfig != null) {
             return withCredential(AlibabaCloudCredentialsFactory.create(credentialConfig), clientConfig);
+        }
+        if (AlibabaCloudCredentialsFactory.hasDefaultCredentialFile()) {
+            // TODO 优先使用文件模式
+            return withCredentialFile(clientConfig);
         }
         Optional<com.aliyun.credentials.Client> oidc = AlibabaCloudCredentialsFactory.findOidcRoleArnFromEnvironment();
         return oidc.map(value -> withCredential(value, clientConfig)).orElseGet(() -> withCredentialFile(clientConfig));
